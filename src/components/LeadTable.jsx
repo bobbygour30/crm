@@ -1,55 +1,138 @@
 import { motion } from 'framer-motion';
 import { FaEye } from 'react-icons/fa';
 
-function LeadTable({ leads, filter, setFilter, setSelectedLead }) {
+function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignLead }) {
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="space-y-4"
     >
-      <div className="flex flex-col xs:flex-row justify-between items-start xs:items-center mb-4 gap-2">
-        <select
-          className="p-2 xs:p-3 border rounded w-full xs:w-40 sm:w-48 text-xs xs:text-sm sm:text-base"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
-        >
-          <option value="All">All</option>
-          <option value="New">New</option>
-          <option value="Contacted">Contacted</option>
-          <option value="Qualified">Qualified</option>
-          <option value="Closed">Closed</option>
-        </select>
-      </div>
-      <div className="bg-white rounded-xl shadow-md overflow-x-auto">
-        <table className="w-full table-auto min-w-[200px]">
-          <thead>
-            <tr className="bg-gray-100 text-left text-xs xs:text-sm sm:text-base">
-              <th className="p-2 xs:p-3 sm:p-4">Name</th>
-              <th className="p-2 xs:p-3 sm:p-4 hidden xs:table-cell">Email</th>
-              <th className="p-2 xs:p-3 sm:p-4 hidden xs:table-cell">Source</th>
-              <th className="p-2 xs:p-3 sm:p-4">Status</th>
-              <th className="p-2 xs:p-3 sm:p-4">Score</th>
-              <th className="p-2 xs:p-3 sm:p-4">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads
-              .filter((lead) => filter === 'All' || lead.status === filter)
-              .map((lead) => (
-                <motion.tr
-                  key={lead.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="border-b hover:bg-gray-50 text-xs xs:text-sm sm:text-base"
-                >
-                  <td className="p-2 xs:p-3 sm:p-4">{lead.name}</td>
-                  <td className="p-2 xs:p-3 sm:p-4 hidden xs:table-cell">{lead.email}</td>
-                  <td className="p-2 xs:p-3 sm:p-4 hidden xs:table-cell">{lead.source}</td>
-                  <td className="p-2 xs:p-3 sm:p-4">
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        transition={{ duration: 0.4 }}
+        className="flex flex-col sm:flex-row justify-start items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100"
+      >
+        <div className="w-full sm:w-auto">
+          <label className="text-sm font-medium text-gray-700 mb-1 block sm:hidden">Filter Leads</label>
+          <select
+            className="w-full sm:w-48 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          >
+            <option value="All">All Leads</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Qualified">Qualified</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+      </motion.div>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
+        {/* Table for larger screens */}
+        <div className="hidden sm:block overflow-x-auto">
+          <table className="w-full table-auto">
+            <thead>
+              <tr className="bg-gray-100 text-left text-sm">
+                <th className="p-4 font-medium text-gray-700">Name</th>
+                <th className="p-4 font-medium text-gray-700">Email</th>
+                <th className="p-4 font-medium text-gray-700">Source</th>
+                <th className="p-4 font-medium text-gray-700">Status</th>
+                <th className="p-4 font-medium text-gray-700">Score</th>
+                <th className="p-4 font-medium text-gray-700">Assigned To</th>
+                <th className="p-4 font-medium text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {leads
+                .filter((lead) => filter === 'All' || lead.status === filter)
+                .map((lead) => (
+                  <motion.tr
+                    key={lead.id}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="border-b hover:bg-gray-50 text-sm"
+                  >
+                    <td className="p-4">{lead.name}</td>
+                    <td className="p-4">{lead.email}</td>
+                    <td className="p-4">{lead.source}</td>
+                    <td className="p-4">
+                      <span
+                        className={`px-3 py-1 rounded-full text-sm ${
+                          lead.status === 'New'
+                            ? 'bg-blue-100 text-blue-800'
+                            : lead.status === 'Contacted'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : lead.status === 'Qualified'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-gray-100 text-gray-800'
+                        }`}
+                      >
+                        {lead.status}
+                      </span>
+                    </td>
+                    <td className="p-4">{lead.score}</td>
+                    <td className="p-4">
+                      {lead.assignedTo
+                        ? users.find((user) => user.id === lead.assignedTo)?.name || 'Unknown'
+                        : 'Unassigned'}
+                    </td>
+                    <td className="p-4 flex space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setSelectedLead(lead)}
+                        className="text-indigo-600 hover:text-indigo-800 p-1"
+                      >
+                        <FaEye className="h-5 w-5" />
+                      </motion.button>
+                      <select
+                        value={lead.assignedTo || ''}
+                        onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
+                        className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      >
+                        <option value="">Unassign</option>
+                        {users.map((user) => (
+                          <option key={user.id} value={user.id}>
+                            {user.name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </motion.tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        {/* Card layout for mobile screens */}
+        <div className="block sm:hidden space-y-4 p-4">
+          {leads
+            .filter((lead) => filter === 'All' || lead.status === filter)
+            .map((lead) => (
+              <motion.div
+                key={lead.id}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
+                className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 shadow-sm"
+              >
+                <div className="space-y-2">
+                  <div>
+                    <span className="font-medium text-gray-700">Name:</span> {lead.name}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Email:</span> {lead.email}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Source:</span> {lead.source}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Status:</span>
                     <span
-                      className={`px-2 py-1 rounded text-xs xs:text-sm ${
+                      className={`ml-2 px-3 py-1 rounded-full text-xs ${
                         lead.status === 'New'
                           ? 'bg-blue-100 text-blue-800'
                           : lead.status === 'Contacted'
@@ -61,23 +144,42 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead }) {
                     >
                       {lead.status}
                     </span>
-                  </td>
-                  <td className="p-2 xs:p-3 sm:p-4">{lead.score}</td>
-                  <td className="p-2 xs:p-3 sm:p-4 flex space-x-2">
-                    <button
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Score:</span> {lead.score}
+                  </div>
+                  <div>
+                    <span className="font-medium text-gray-700">Assigned To:</span>{' '}
+                    {lead.assignedTo
+                      ? users.find((user) => user.id === lead.assignedTo)?.name || 'Unknown'
+                      : 'Unassigned'}
+                  </div>
+                  <div className="flex flex-col space-y-2 pt-2">
+                    <motion.button
+                      whileHover={{ scale: 1.1 }}
+                      whileTap={{ scale: 0.9 }}
                       onClick={() => setSelectedLead(lead)}
-                      className="text-blue-600 hover:text-blue-800 p-1"
+                      className="text-indigo-600 hover:text-indigo-800 p-2 self-start"
                     >
-                      <FaEye className="h-4 w-4 xs:h-5 xs:w-5" />
-                    </button>
-                    <button className="bg-green-600 text-white px-3 py-1 xs:px-4 xs:py-2 rounded hover:bg-green-700 transition text-xs xs:text-sm">
-                      Assign
-                    </button>
-                  </td>
-                </motion.tr>
-              ))}
-          </tbody>
-        </table>
+                      <FaEye className="h-5 w-5" />
+                    </motion.button>
+                    <select
+                      value={lead.assignedTo || ''}
+                      onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
+                      className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full bg-gray-50"
+                    >
+                      <option value="">Unassign</option>
+                      {users.map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+        </div>
       </div>
     </motion.div>
   );

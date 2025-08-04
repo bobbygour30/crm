@@ -45,27 +45,48 @@ function Analytics({ leads }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6"
     >
-      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Lead Conversion</h2>
         <div className="w-full h-64 sm:h-80 md:h-96">
-          <Pie data={conversionData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { enabled: true } } }} />
+          <Pie
+            data={conversionData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
+            }}
+          />
         </div>
       </div>
-      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Leads by Source</h2>
         <div className="w-full h-64 sm:h-80 md:h-96">
-          <Bar data={leadSourceData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { enabled: true } } }} />
+          <Bar
+            data={leadSourceData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
+            }}
+          />
         </div>
       </div>
-      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md lg:col-span-2">
+      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100 lg:col-span-2">
         <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Lead Trends</h2>
         <div className="w-full h-64 sm:h-80 md:h-96">
-          <Line data={leadTrendData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { enabled: true } } }} />
+          <Line
+            data={leadTrendData}
+            options={{
+              responsive: true,
+              maintainAspectRatio: false,
+              plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
+            }}
+          />
         </div>
       </div>
     </motion.div>

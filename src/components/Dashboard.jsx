@@ -21,39 +21,48 @@ function Dashboard({ leads, activities }) {
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5 }}
       className="space-y-6"
     >
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <motion.div
           whileHover={{ scale: 1.05 }}
-          className="bg-white p-4 sm:p-6 rounded-xl shadow-md border-l-4 border-green-500"
+          className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-green-500"
         >
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Total Leads</h2>
           <p className="text-2xl sm:text-3xl font-bold text-green-600">{leads.length}</p>
         </motion.div>
         <motion.div
           whileHover={{ scale: 1.05 }}
-          className="bg-white p-4 sm:p-6 rounded-xl shadow-md border-l-4 border-blue-500"
+          className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-blue-500"
         >
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Conversion Rate</h2>
           <p className="text-2xl sm:text-3xl font-bold text-blue-600">70%</p>
         </motion.div>
         <motion.div
           whileHover={{ scale: 1.05 }}
-          className="bg-white p-4 sm:p-6 rounded-xl shadow-md border-l-4 border-yellow-500"
+          className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-yellow-500"
         >
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Active Deals</h2>
-          <p className="text-2xl sm:text-3xl font-bold text-yellow-600">{leads.filter((l) => l.status !== 'Closed').length}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-yellow-600">
+            {leads.filter((l) => l.status !== 'Closed').length}
+          </p>
         </motion.div>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        <div className="bg-white p-4 sm:p-6 rounded-xl shadow-md">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Leads by Source</h2>
           <div className="w-full h-64 sm:h-80 md:h-96">
-            <Bar data={leadSourceData} options={{ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, tooltip: { enabled: true } } }} />
+            <Bar
+              data={leadSourceData}
+              options={{
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { position: 'top' }, tooltip: { enabled: true } },
+              }}
+            />
           </div>
         </div>
         <ActivityTimeline activities={activities} leads={leads} />

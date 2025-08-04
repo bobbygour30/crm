@@ -14,11 +14,12 @@ import { leads, tasks, users, activities } from './data/mockData';
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [filter, setFilter] = useState('All');
-  const [isAdmin] = useState(true); // Mock auth
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Changed to true for visibility
+  const [isAdmin] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [selectedLead, setSelectedLead] = useState(null);
   const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
   const [taskList, setTaskList] = useState(tasks);
+  const [userList, setUserList] = useState(users);
   const [pipeline, setPipeline] = useState({
     New: leads.filter((lead) => lead.status === 'New'),
     Contacted: leads.filter((lead) => lead.status === 'Contacted'),
@@ -54,8 +55,21 @@ function App() {
     setNewTask({ title: '', dueDate: '', priority: 'Medium' });
   };
 
+  const handleAssignLead = (leadId, userId) => {
+    const updatedPipeline = Object.keys(pipeline).reduce((acc, stage) => {
+      acc[stage] = pipeline[stage].map((lead) =>
+        lead.id === leadId ? { ...lead, assignedTo: userId } : lead
+      );
+      return acc;
+    }, {});
+    setPipeline(updatedPipeline);
+    if (selectedLead && selectedLead.id === leadId) {
+      setSelectedLead({ ...selectedLead, assignedTo: userId });
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50 font-sans flex" data-sidebar-open={isSidebarOpen}>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 font-sans flex">
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -63,11 +77,12 @@ function App() {
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
       />
-      <div className="flex-1 p-4 sm:p-6 transition-all duration-300 md:ml-16 md:[&[data-sidebar-open=true]]:ml-64">
+      <div className="flex-1 p-4 sm:p-8 transition-all duration-300 md:ml-16 md:[&[data-sidebar-open=true]]:ml-64">
         <motion.h1
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="text-2xl sm:text-3xl font-bold text-gray-800 mb-4 sm:mb-6"
+          transition={{ duration: 0.5 }}
+          className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 sm:mb-8 tracking-tight"
         >
           {activeTab.charAt(0).toUpperCase() + activeTab.slice(1)} Panel
         </motion.h1>
@@ -79,11 +94,13 @@ function App() {
               filter={filter}
               setFilter={setFilter}
               setSelectedLead={setSelectedLead}
+              users={userList}
+              onAssignLead={handleAssignLead}
             />
           )}
           {activeTab === 'pipeline' && (
             <DndContext onDragEnd={handleDragEnd}>
-              <PipelineBoard pipeline={pipeline} />
+              <PipelineBoard pipeline={pipeline} users={userList} />
             </DndContext>
           )}
           {activeTab === 'tasks' && (
@@ -95,10 +112,18 @@ function App() {
             />
           )}
           {activeTab === 'analytics' && <Analytics leads={leads} />}
-          {activeTab === 'users' && isAdmin && <UserManagement users={users} />}
+          {activeTab === 'users' && isAdmin && (
+            <UserManagement users={userList} setUsers={setUserList} />
+          )}
         </AnimatePresence>
         {selectedLead && (
-          <LeadModal lead={selectedLead} setSelectedLead={setSelectedLead} activities={activities} />
+          <LeadModal
+            lead={selectedLead}
+            setSelectedLead={setSelectedLead}
+            activities={activities}
+            users={userList}
+            onAssignLead={handleAssignLead}
+          />
         )}
       </div>
     </div>
