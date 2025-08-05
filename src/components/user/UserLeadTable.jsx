@@ -1,24 +1,18 @@
 import { motion } from 'framer-motion';
 import { FaEye } from 'react-icons/fa';
+import LeadModal from '../admin/LeadModal';
 
-function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignLead }) {
+function UserLeadTable({ leads, filter, setFilter, setSelectedLead, selectedLead }) {
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-4"
-    >
-      <motion.div
-        initial={{ opacity: 0, x: -20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ duration: 0.4 }}
-        className="flex flex-col sm:flex-row justify-start items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100"
-      >
+    <div className="space-y-4">
+      <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 sm:mb-8 tracking-tight">
+        Leads
+      </h1>
+      <div className="flex flex-col sm:flex-row justify-start items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
         <div className="w-full sm:w-auto">
           <label className="text-sm font-medium text-gray-700 mb-1 block sm:hidden">Filter Leads</label>
           <select
-            className="w-full sm:w-48 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all shadow-sm hover:shadow-md"
+            className="w-full sm:w-48 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500"
             value={filter}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -29,9 +23,8 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignL
             <option value="Closed">Closed</option>
           </select>
         </div>
-      </motion.div>
+      </div>
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100">
-        {/* Table for larger screens */}
         <div className="hidden sm:block overflow-x-auto">
           <table className="w-full table-auto">
             <thead>
@@ -41,7 +34,6 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignL
                 <th className="p-4 font-medium text-gray-700">Source</th>
                 <th className="p-4 font-medium text-gray-700">Status</th>
                 <th className="p-4 font-medium text-gray-700">Score</th>
-                <th className="p-4 font-medium text-gray-700">Assigned To</th>
                 <th className="p-4 font-medium text-gray-700">Actions</th>
               </tr>
             </thead>
@@ -76,11 +68,6 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignL
                     </td>
                     <td className="p-4">{lead.score}</td>
                     <td className="p-4">
-                      {lead.assignedTo
-                        ? users.find((user) => user.id === lead.assignedTo)?.name || 'Unknown'
-                        : 'Unassigned'}
-                    </td>
-                    <td className="p-4 flex space-x-2">
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -89,25 +76,12 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignL
                       >
                         <FaEye className="h-5 w-5" />
                       </motion.button>
-                      <select
-                        value={lead.assignedTo || ''}
-                        onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
-                        className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                      >
-                        <option value="">Unassign</option>
-                        {users.map((user) => (
-                          <option key={user.id} value={user.id}>
-                            {user.name}
-                          </option>
-                        ))}
-                      </select>
                     </td>
                   </motion.tr>
                 ))}
             </tbody>
           </table>
         </div>
-        {/* Card layout for mobile screens */}
         <div className="block sm:hidden space-y-4 p-4">
           {leads
             .filter((lead) => filter === 'All' || lead.status === filter)
@@ -148,41 +122,32 @@ function LeadTable({ leads, filter, setFilter, setSelectedLead, users, onAssignL
                   <div>
                     <span className="font-medium text-gray-700">Score:</span> {lead.score}
                   </div>
-                  <div>
-                    <span className="font-medium text-gray-700">Assigned To:</span>{' '}
-                    {lead.assignedTo
-                      ? users.find((user) => user.id === lead.assignedTo)?.name || 'Unknown'
-                      : 'Unassigned'}
-                  </div>
-                  <div className="flex flex-col space-y-2 pt-2">
+                  <div className="pt-2">
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => setSelectedLead(lead)}
-                      className="text-indigo-600 hover:text-indigo-800 p-2 self-start"
+                      className="text-indigo-600 hover:text-indigo-800 p-2"
                     >
                       <FaEye className="h-5 w-5" />
                     </motion.button>
-                    <select
-                      value={lead.assignedTo || ''}
-                      onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
-                      className="p-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 w-full bg-gray-50"
-                    >
-                      <option value="">Unassign</option>
-                      {users.map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name}
-                        </option>
-                      ))}
-                    </select>
                   </div>
                 </div>
               </motion.div>
             ))}
         </div>
       </div>
-    </motion.div>
+      {selectedLead && (
+        <LeadModal
+          lead={selectedLead}
+          setSelectedLead={setSelectedLead}
+          activities={[]}
+          users={[]}
+          onAssignLead={() => {}}
+        />
+      )}
+    </div>
   );
 }
 
-export default LeadTable;
+export default UserLeadTable;

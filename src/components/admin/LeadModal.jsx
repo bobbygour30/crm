@@ -36,7 +36,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="text"
               value={lead.name}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -45,7 +45,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="email"
               value={lead.email}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -54,7 +54,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="text"
               value={lead.company}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -63,7 +63,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="text"
               value={lead.phone}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -72,7 +72,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="text"
               value={lead.source}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -81,7 +81,7 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="text"
               value={lead.status}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
@@ -90,25 +90,27 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             <input
               type="number"
               value={lead.score}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
               readOnly
             />
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-600 block mb-1">Assigned To</label>
-            <select
-              value={lead.assignedTo || ''}
-              onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
-              className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-            >
-              <option value="">Unassign</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {users.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-600 block mb-1">Assigned To</label>
+              <select
+                value={lead.assignedTo || ''}
+                onChange={(e) => onAssignLead(lead.id, e.target.value || null)}
+                className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 text-sm sm:text-base focus:ring-2 focus:ring-indigo-500 transition-all"
+              >
+                <option value="">Unassign</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div>
             <h3 className="text-sm font-semibold text-gray-800 mb-2">Activity History</h3>
             <ul className="space-y-3">
@@ -136,13 +138,6 @@ function LeadModal({ lead, setSelectedLead, activities, users, onAssignLead }) {
             className="w-full sm:w-auto px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition-colors text-sm sm:text-base"
           >
             Close
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors text-sm sm:text-base"
-          >
-            Save Changes
           </motion.button>
         </div>
       </motion.div>
