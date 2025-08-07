@@ -10,7 +10,7 @@ function UserHeader({ setIsSidebarOpen, user }) {
         >
           <FaBars className="h-6 w-6 text-gray-800" />
         </button>
-        <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Lead CRM</h1>
+        <h1 className="text-xl ml-20 sm:text-2xl font-bold text-gray-900">Lead CRM</h1>
       </div>
       <div className="flex items-center space-x-4">
         <span className="text-sm sm:text-base font-medium text-gray-700">{user.name}</span>

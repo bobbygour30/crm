@@ -8,6 +8,7 @@ import UserTaskList from './UserTaskList';
 import UserProfile from './UserProfile';
 import UserActivity from './UserActivity';
 import HomePage from './HomePage';
+import Attendance from './Attendance';
 import { leads, tasks, activities, users } from '../../data/mockData';
 
 function UserApp(){
@@ -86,6 +87,7 @@ function UserApp(){
                 />
               }
             />
+            <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
           </Routes>
         </div>
       </div>
