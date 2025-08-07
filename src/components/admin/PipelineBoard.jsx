@@ -10,7 +10,7 @@ function SortableLead({ lead, users }) {
     transition,
   };
 
-  const assignedUser = users.find((user) => user.id === lead.assignedTo);
+  const assignedUser = users && Array.isArray(users) ? users.find((user) => user.id === lead.assignedTo) : null;
 
   return (
     <motion.div
@@ -32,6 +32,20 @@ function SortableLead({ lead, users }) {
 }
 
 function PipelineBoard({ pipeline, users }) {
+  // Fallback if pipeline is undefined or null
+  if (!pipeline || typeof pipeline !== 'object') {
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100 text-center text-gray-600"
+      >
+        No pipeline data available.
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ opacity: 0 }}

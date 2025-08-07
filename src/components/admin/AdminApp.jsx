@@ -8,6 +8,7 @@ import PipelineBoard from './PipelineBoard';
 import TaskList from './TaskList';
 import Analytics from './Analytics';
 import UserManagement from './UserManagement';
+import AdminAttendance from './AdminAttendance';
 import LeadModal from './LeadModal';
 import { leads, tasks, users, activities } from '../../data/mockData';
 
@@ -114,6 +115,9 @@ function AdminApp() {
           {activeTab === 'analytics' && <Analytics leads={leads} />}
           {activeTab === 'users' && isAdmin && (
             <UserManagement users={userList} setUsers={setUserList} />
+          )}
+          {activeTab === 'attendance' && isAdmin && (
+            <AdminAttendance users={userList} />
           )}
         </AnimatePresence>
         {selectedLead && (

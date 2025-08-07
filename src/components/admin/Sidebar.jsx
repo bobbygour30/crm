@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { FaBars, FaTimes, FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, FaUserCog } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, FaUserCog, FaClock } from 'react-icons/fa';
 
 function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen }) {
   const tabs = [
@@ -8,7 +8,10 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Pipeline', icon: FaChartBar },
     { name: 'Tasks', icon: FaClipboardList },
     { name: 'Analytics', icon: FaChartPie },
-    ...(isAdmin ? [{ name: 'Users', icon: FaUserCog }] : []),
+    ...(isAdmin ? [
+      { name: 'Users', icon: FaUserCog },
+      { name: 'Attendance', icon: FaClock }
+    ] : []),
   ];
 
   return (
