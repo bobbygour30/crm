@@ -9,15 +9,17 @@ import UserProfile from './UserProfile';
 import UserActivity from './UserActivity';
 import HomePage from './HomePage';
 import Attendance from './Attendance';
-import { leads, tasks, activities, users } from '../../data/mockData';
+import UserCampaigns from './UserCampaigns';
+import { leads, tasks, activities, users, campaigns } from '../../data/mockData';
 
-function UserApp(){
+function UserApp() {
   const [activeTab, setActiveTab] = useState('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filter, setFilter] = useState('All');
   const [selectedLead, setSelectedLead] = useState(null);
   const [taskList, setTaskList] = useState(tasks);
   const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
+  const [campaignList, setCampaignList] = useState(campaigns);
   const navigate = useNavigate();
 
   const handleAddTask = (e) => {
@@ -88,6 +90,12 @@ function UserApp(){
               }
             />
             <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
+            <Route
+              path="/mycampaigns"
+              element={
+                <UserCampaigns campaigns={campaignList} user={loggedInUser} />
+              }
+            />
           </Routes>
         </div>
       </div>

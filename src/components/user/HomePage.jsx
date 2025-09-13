@@ -78,6 +78,7 @@ function HomePage() {
             <Link to="/leads" className="text-gray-700 hover:text-indigo-600 font-medium text-sm lg:text-base transition-colors">Leads</Link>
             <Link to="/tasks" className="text-gray-700 hover:text-indigo-600 font-medium text-sm lg:text-base transition-colors">Tasks</Link>
             <Link to="/profile" className="text-gray-700 hover:text-indigo-600 font-medium text-sm lg:text-base transition-colors">Profile</Link>
+            <Link to="/mycampaigns" className="text-gray-700 hover:text-indigo-600 font-medium text-sm lg:text-base transition-colors">My Campaigns</Link>
             <Link to="/login" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-sm lg:text-base hover:bg-indigo-700 transition-colors">Login</Link>
           </div>
           <button
@@ -95,6 +96,7 @@ function HomePage() {
               <Link to="/leads" className="text-gray-700 hover:text-indigo-600 font-medium text-base" onClick={() => setIsMenuOpen(false)}>Leads</Link>
               <Link to="/tasks" className="text-gray-700 hover:text-indigo-600 font-medium text-base" onClick={() => setIsMenuOpen(false)}>Tasks</Link>
               <Link to="/profile" className="text-gray-700 hover:text-indigo-600 font-medium text-base" onClick={() => setIsMenuOpen(false)}>Profile</Link>
+              <Link to="/mycampaigns" className="text-gray-700 hover:text-indigo-600 font-medium text-base" onClick={() => setIsMenuOpen(false)}>My Campaigns</Link>
               <Link to="/login" className="bg-indigo-600 text-white px-4 py-2 rounded-lg font-semibold text-base hover:bg-indigo-700" onClick={() => setIsMenuOpen(false)}>Login</Link>
             </div>
           </div>

@@ -1,9 +1,9 @@
 export const leads = [
-  { id: '1', name: 'John Doe', email: 'john@example.com', source: 'Website', status: 'New', score: 80, company: 'Acme Corp', phone: '123-456-7890', assignedTo: null },
-  { id: '2', name: 'Jane Smith', email: 'jane@example.com', source: 'Social Media', status: 'Contacted', score: 65, company: 'Tech Solutions', phone: '234-567-8901', assignedTo: '2' },
-  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', source: 'Referral', status: 'Qualified', score: 90, company: 'Global Inc', phone: '345-678-9012', assignedTo: null },
-  { id: '4', name: 'Alice Brown', email: 'alice@example.com', source: 'Email', status: 'Closed', score: 95, company: 'Innovate Ltd', phone: '456-789-0123', assignedTo: '1' },
-  { id: '5', name: 'Emma Wilson', email: 'emma@example.com', source: 'Website', status: 'New', score: 75, company: 'Future Tech', phone: '567-890-1234', assignedTo: null },
+  { id: '1', name: 'John Doe', email: 'john@example.com', source: 'Website', status: 'New', score: 80, company: 'Acme Corp', phone: '123-456-7890', assignedTo: null, campaignId: 'camp1' },
+  { id: '2', name: 'Jane Smith', email: 'jane@example.com', source: 'Social Media', status: 'Contacted', score: 65, company: 'Tech Solutions', phone: '234-567-8901', assignedTo: '2', campaignId: 'camp1' },
+  { id: '3', name: 'Bob Johnson', email: 'bob@example.com', source: 'Referral', status: 'Qualified', score: 90, company: 'Global Inc', phone: '345-678-9012', assignedTo: null, campaignId: 'camp2' },
+  { id: '4', name: 'Alice Brown', email: 'alice@example.com', source: 'Email', status: 'Closed', score: 95, company: 'Innovate Ltd', phone: '456-789-0123', assignedTo: '1', campaignId: 'camp2' },
+  { id: '5', name: 'Emma Wilson', email: 'emma@example.com', source: 'Website', status: 'New', score: 75, company: 'Future Tech', phone: '567-890-1234', assignedTo: null, campaignId: 'camp1' },
 ];
 
 export const tasks = [
@@ -33,4 +33,33 @@ export const leadTrends = [
   { month: 'May', leads: 80 },
   { month: 'Jun', leads: 100 },
   { month: 'Jul', leads: 120 },
+];
+
+export const campaigns = [
+  {
+    id: 'camp1',
+    name: 'Campaign Admin Sep 13, 15:02',
+    pipeline: 'Database',
+    manager: 'Admin User',
+    agents: ['Sales Rep', 'Marketing Lead'],
+    leadDistribution: 'On Demand',
+    additionalSettings: '',
+    priority: 'Medium',
+    leadDuplicacy: 'Within This Campaign',
+    ifDuplicateFound: 'Ignore Duplicate',
+    createdAt: 'Sep 13, 2025, 15:02',
+  },
+  {
+    id: 'camp2',
+    name: 'Marketing Blitz Q3',
+    pipeline: 'CRM',
+    manager: 'Admin User',
+    agents: ['Sales Rep'],
+    leadDistribution: 'Equal',
+    additionalSettings: 'Target high-value clients',
+    priority: 'High',
+    leadDuplicacy: 'Across All Campaigns',
+    ifDuplicateFound: 'Notify Agent',
+    createdAt: 'Sep 12, 2025, 10:30',
+  },
 ];

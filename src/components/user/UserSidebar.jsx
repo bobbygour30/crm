@@ -1,4 +1,4 @@
-import { FaBars, FaTimes, FaHome, FaUsers, FaClipboardList, FaUser, FaChartPie, FaClock } from 'react-icons/fa';
+import { FaBars, FaTimes, FaHome, FaUsers, FaClipboardList, FaUser, FaChartPie, FaClock, FaBullhorn } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
@@ -8,6 +8,7 @@ function UserSidebar({ activeTab, setActiveTab, isSidebarOpen, setIsSidebarOpen,
     { name: 'Dashboard', icon: FaHome, path: '/dashboard' },
     { name: 'Leads', icon: FaUsers, path: '/leads' },
     { name: 'Tasks', icon: FaClipboardList, path: '/tasks' },
+    { name: 'My Campaigns', icon: FaBullhorn, path: '/mycampaigns' },
     { name: 'Profile', icon: FaUser, path: '/profile' },
     { name: 'Activity', icon: FaChartPie, path: '/activity' },
     { name: 'Attendance', icon: FaClock, path: '/attendance' },
