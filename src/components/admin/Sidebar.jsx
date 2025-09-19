@@ -1,13 +1,14 @@
 import { motion } from 'framer-motion';
-import { FaBars, FaTimes, FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, FaUserCog, FaClock } from 'react-icons/fa';
+import { FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, FaUserCog, FaClock, FaSignOutAlt } from 'react-icons/fa';
 
-function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen }) {
+function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout }) {
   const tabs = [
     { name: 'Dashboard', icon: FaHome },
     { name: 'Leads', icon: FaUsers },
     { name: 'Pipeline', icon: FaChartBar },
     { name: 'Tasks', icon: FaClipboardList },
     { name: 'Analytics', icon: FaChartPie },
+    { name: 'Invoice', icon: FaClipboardList }, // Add this line
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog },
       { name: 'Attendance', icon: FaClock }
@@ -26,15 +27,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
           onClick={() => setIsSidebarOpen(false)}
         />
       )}
-      {!isSidebarOpen && (
-        <button
-          onClick={() => setIsSidebarOpen(true)}
-          className="fixed top-4 right-4 z-50 md:left-0 md:[&[data-open=true]]:left-64 p-2 rounded-full bg-indigo-600 text-white hover:bg-indigo-700 md:bg-transparent md:hover:bg-gray-200 md:text-gray-800 transition-all duration-200 shadow-lg md:shadow-none"
-          data-open={isSidebarOpen}
-        >
-          <FaBars className="h-6 w-6" />
-        </button>
-      )}
       <motion.div
         initial={{ x: '-100%' }}
         animate={{ x: isSidebarOpen ? 0 : '-100%' }}
@@ -49,30 +41,43 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
               onClick={() => setIsSidebarOpen(false)}
               className="p-2 rounded-full hover:bg-indigo-700 transition-colors"
             >
-              <FaTimes className="h-6 w-6" />
+              <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
             </button>
           )}
         </div>
-        <nav className="flex flex-col space-y-2 p-2">
-          {tabs.map((tab) => (
-            <motion.button
-              key={tab.name}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
-                activeTab.toLowerCase() === tab.name.toLowerCase()
-                  ? 'bg-indigo-600 shadow-md'
-                  : 'hover:bg-indigo-700'
-              }`}
-              onClick={() => {
-                setActiveTab(tab.name.toLowerCase());
-                if (window.innerWidth < 768) setIsSidebarOpen(false);
-              }}
-            >
-              <tab.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
-              <span>{tab.name}</span>
-            </motion.button>
-          ))}
+        <nav className="flex flex-col space-y-2 p-2 h-[calc(100%-100px)] justify-between">
+          <div>
+            {tabs.map((tab) => (
+              <motion.button
+                key={tab.name}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
+                  activeTab.toLowerCase() === tab.name.toLowerCase()
+                    ? 'bg-indigo-600 shadow-md'
+                    : 'hover:bg-indigo-700'
+                }`}
+                onClick={() => {
+                  setActiveTab(tab.name.toLowerCase());
+                  if (window.innerWidth < 768) setIsSidebarOpen(false);
+                }}
+              >
+                <tab.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
+                {isSidebarOpen && <span>{tab.name}</span>}
+              </motion.button>
+            ))}
+          </div>
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base hover:bg-indigo-700 transition-colors"
+            onClick={handleLogout}
+          >
+            <FaSignOutAlt className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
+            {isSidebarOpen && <span>Logout</span>}
+          </motion.button>
         </nav>
       </motion.div>
     </>

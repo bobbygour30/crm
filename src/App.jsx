@@ -1,27 +1,65 @@
-import { useState } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+// App.jsx
+import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import AdminApp from './components/admin/AdminApp';
 import UserApp from './components/user/UserApp';
 
 function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    const auth = localStorage.getItem('isAuthenticated');
+    return auth === 'true';
+  });
+  
+  const [isAdmin, setIsAdmin] = useState(() => {
+    const admin = localStorage.getItem('isAdmin');
+    return admin === 'true';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('isAuthenticated', isAuthenticated.toString());
+    localStorage.setItem('isAdmin', isAdmin.toString());
+  }, [isAuthenticated, isAdmin]);
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setIsAdmin(false);
+    localStorage.removeItem('isAuthenticated');
+    localStorage.removeItem('isAdmin');
+  };
 
   return (
     <BrowserRouter>
       <Routes>
         <Route
           path="/login"
-          element={<Login setIsAuthenticated={setIsAuthenticated} setIsAdmin={setIsAdmin} />}
+          element={
+            isAuthenticated ? (
+              <Navigate to={isAdmin ? "/admin" : "/"} />
+            ) : (
+              <Login setIsAuthenticated={setIsAuthenticated} setIsAdmin={setIsAdmin} />
+            )
+          }
         />
         <Route
           path="/admin/*"
-          element={isAuthenticated && isAdmin ? <AdminApp /> : <Navigate to="/login" />}
+          element={
+            isAuthenticated && isAdmin ? (
+              <AdminApp handleLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
         />
         <Route
           path="/*"
-          element={isAuthenticated ? <UserApp /> : <Navigate to="/login" />}
+          element={
+            isAuthenticated && !isAdmin ? (
+              <UserApp handleLogout={handleLogout} />
+            ) : (
+              <Navigate to="/login" />
+            )
+          }
         />
       </Routes>
     </BrowserRouter>

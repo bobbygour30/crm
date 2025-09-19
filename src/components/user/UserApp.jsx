@@ -1,4 +1,5 @@
-import { useState } from 'react';
+// UserApp.jsx
+import { useState, useEffect } from 'react';
 import { Routes, Route, useNavigate } from 'react-router-dom';
 import UserSidebar from './UserSidebar';
 import UserHeader from './UserHeader';
@@ -12,7 +13,7 @@ import Attendance from './Attendance';
 import UserCampaigns from './UserCampaigns';
 import { leads, tasks, activities, users, campaigns } from '../../data/mockData';
 
-function UserApp() {
+function UserApp({ handleLogout }) {
   const [activeTab, setActiveTab] = useState('home');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filter, setFilter] = useState('All');
@@ -28,7 +29,8 @@ function UserApp() {
     setNewTask({ title: '', dueDate: '', priority: 'Medium' });
   };
 
-  const handleLogout = () => {
+  const handleUserLogout = () => {
+    handleLogout();
     navigate('/login');
   };
 
@@ -41,13 +43,17 @@ function UserApp() {
         setActiveTab={setActiveTab}
         setIsSidebarOpen={setIsSidebarOpen}
         isSidebarOpen={isSidebarOpen}
-        handleLogout={handleLogout}
+        handleLogout={handleUserLogout}
       />
       <div className="flex-1 flex flex-col">
-        <UserHeader setIsSidebarOpen={setIsSidebarOpen} user={loggedInUser} />
+        <UserHeader 
+          setIsSidebarOpen={setIsSidebarOpen} 
+          user={loggedInUser}
+          handleLogout={handleUserLogout}
+        />
         <div className="p-4 sm:p-8 md:ml-16 md:[&[data-sidebar-open=true]]:ml-64">
           <Routes>
-            <Route path="/" element={<HomePage />} />
+            <Route path="/" element={<HomePage handleLogout={handleUserLogout} />} />
             <Route
               path="/dashboard"
               element={<UserDashboard leads={leads} activities={activities} user={loggedInUser} />}
