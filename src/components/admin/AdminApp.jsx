@@ -11,11 +11,12 @@ import Analytics from './Analytics';
 import UserManagement from './UserManagement';
 import AdminAttendance from './AdminAttendance';
 import LeadModal from './LeadModal';
-import InvoiceGenerator from './InvoiceGenerator'; // Add this import
-import { leads, tasks, users, activities } from '../../data/mockData';
+import InvoiceGenerator from './InvoiceGenerator';
+import { tasks, users, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 
 function AdminApp({ handleLogout }) {
+  const [leads, setLeads] = useState([]); // Replace static leads with state
   const [activeTab, setActiveTab] = useState('dashboard');
   const [filter, setFilter] = useState('All');
   const [isAdmin] = useState(true);
@@ -25,14 +26,25 @@ function AdminApp({ handleLogout }) {
   const [taskList, setTaskList] = useState(tasks);
   const [userList, setUserList] = useState(users);
   const [pipeline, setPipeline] = useState({
-    New: leads.filter((lead) => lead.status === 'New'),
-    Contacted: leads.filter((lead) => lead.status === 'Contacted'),
-    Qualified: leads.filter((lead) => lead.status === 'Qualified'),
-    Closed: leads.filter((lead) => lead.status === 'Closed'),
+    New: [],
+    Contacted: [],
+    Qualified: [],
+    Closed: [],
   });
-  
+
   const navigate = useNavigate();
 
+  // Update pipeline whenever leads change
+  useEffect(() => {
+    setPipeline({
+      New: leads.filter((lead) => lead.status === 'New'),
+      Contacted: leads.filter((lead) => lead.status === 'Contacted'),
+      Qualified: leads.filter((lead) => lead.status === 'Qualified'),
+      Closed: leads.filter((lead) => lead.status === 'Closed'),
+    });
+  }, [leads]);
+
+  // Handle window resize for sidebar visibility
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
@@ -51,6 +63,11 @@ function AdminApp({ handleLogout }) {
     navigate('/login');
   };
 
+  // Add new lead to leads state
+  const handleAddLead = (newLead) => {
+    setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]); // Generate unique ID
+  };
+
   const handleDragEnd = (event) => {
     const { active, over } = event;
     if (!over) return;
@@ -59,17 +76,10 @@ function AdminApp({ handleLogout }) {
     const destinationColumnId = over.id;
 
     if (sourceColumnId !== destinationColumnId) {
-      const sourceColumn = [...pipeline[sourceColumnId]];
-      const destinationColumn = [...pipeline[destinationColumnId]];
-      const [movedLead] = sourceColumn.splice(active.data.current.sortable.index, 1);
-      movedLead.status = destinationColumnId;
-      destinationColumn.push(movedLead);
-
-      setPipeline({
-        ...pipeline,
-        [sourceColumnId]: sourceColumn,
-        [destinationColumnId]: destinationColumn,
-      });
+      const updatedLeads = leads.map((lead) =>
+        lead.id === active.id ? { ...lead, status: destinationColumnId } : lead
+      );
+      setLeads(updatedLeads);
     }
   };
 
@@ -80,13 +90,10 @@ function AdminApp({ handleLogout }) {
   };
 
   const handleAssignLead = (leadId, userId) => {
-    const updatedPipeline = Object.keys(pipeline).reduce((acc, stage) => {
-      acc[stage] = pipeline[stage].map((lead) =>
-        lead.id === leadId ? { ...lead, assignedTo: userId } : lead
-      );
-      return acc;
-    }, {});
-    setPipeline(updatedPipeline);
+    const updatedLeads = leads.map((lead) =>
+      lead.id === leadId ? { ...lead, assignedTo: userId } : lead
+    );
+    setLeads(updatedLeads);
     if (selectedLead && selectedLead.id === leadId) {
       setSelectedLead({ ...selectedLead, assignedTo: userId });
     }
@@ -101,7 +108,7 @@ function AdminApp({ handleLogout }) {
       analytics: 'Analytics & Reports',
       users: 'User Management',
       attendance: 'Attendance Tracking',
-      invoice: 'Invoice Generator' // Add this line
+      invoice: 'Invoice Generator',
     };
     return titles[activeTab] || activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
   };
@@ -115,7 +122,7 @@ function AdminApp({ handleLogout }) {
       analytics: 'Analyze your business performance with detailed reports',
       users: 'Manage user accounts and permissions',
       attendance: 'Track and manage employee attendance',
-      invoice: 'Generate invoices for your services' // Add this line
+      invoice: 'Generate invoices for your services',
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   };
@@ -145,7 +152,7 @@ function AdminApp({ handleLogout }) {
         handleLogout={handleAdminLogout}
       />
 
-      <div 
+      <div
         className={`flex-1 transition-all duration-300 ${
           isSidebarOpen ? 'md:ml-64' : 'md:ml-16'
         } ml-0`}
@@ -208,6 +215,7 @@ function AdminApp({ handleLogout }) {
                   setSelectedLead={setSelectedLead}
                   users={userList}
                   onAssignLead={handleAssignLead}
+                  onAddLead={handleAddLead}
                 />
               )}
               {activeTab === 'pipeline' && (
@@ -232,7 +240,7 @@ function AdminApp({ handleLogout }) {
               {activeTab === 'attendance' && isAdmin && (
                 <AdminAttendance users={userList} />
               )}
-              {activeTab === 'invoice' && <InvoiceGenerator />} {/* Add this line */}
+              {activeTab === 'invoice' && <InvoiceGenerator />}
             </motion.div>
           </AnimatePresence>
         </div>
