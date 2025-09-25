@@ -83,27 +83,40 @@ const InvoiceGenerator = () => {
   };
 
   const generatePDF = async () => {
-    const element = invoiceRef.current;
-    if (!element) return;
+  const element = invoiceRef.current;
+  if (!element) return;
 
-    try {
-      convertOklchToRgb(element);
-      const canvas = await html2canvas(element, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-      });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const imgProps = pdf.getImageProperties(imgData);
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
-      pdf.save("invoice.pdf");
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-    }
-  };
+  try {
+    convertOklchToRgb(element);
+
+    const canvas = await html2canvas(element, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#ffffff",
+    });
+
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF("p", "mm", "a4");
+
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const margin = 10; // mm margin on all sides ✅
+    const imgWidth = pageWidth - margin * 2;
+    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+    // Center the image vertically if smaller than page height
+    const yPosition = (pageHeight - imgHeight) / 2 > margin 
+      ? (pageHeight - imgHeight) / 2 
+      : margin;
+
+    pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
+    pdf.save("invoice.pdf");
+  } catch (err) {
+    console.error("PDF generation failed:", err);
+  }
+};
+
 
   return (
     <div className="p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-md">
@@ -267,41 +280,50 @@ const InvoiceGenerator = () => {
 
       {/* Invoice Template */}
       <div
-        ref={invoiceRef}
-        className="mt-8 border border-[#000000] text-sm p-4 mx-auto"
-        style={{ width: "800px", minHeight: "1120px", background: "#ffffff", margin: "0 auto", padding: "20px" }}
-      >
-        <div className="text-center mb-4">
-          <img src={assets.logo} alt="Arshyan Insurance Logo" className="h-16 mx-auto mb-2" />
-          <h1 className="font-bold text-[#000080] text-xl">Arshyan Insurance Marketing & Services Pvt. Ltd</h1>
-          <p className="text-[#000000]">
-            Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089
-          </p>
-          <p className="text-[#000000]">Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com</p>
-          <p className="text-[#000000]">
-            website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715
-          </p>
+  ref={invoiceRef}
+  className="text-sm mx-auto"
+  style={{
+    width: "800px",
+    minHeight: "1120px",
+    background: "#ffffff",
+    padding: "20px",
+    border: "2px solid #000000",   // ✅ Stronger border
+    boxSizing: "border-box",       // ✅ Ensures border isn’t cut off
+  }}
+>
+        {/* Header */}
+        <div className="flex justify-between items-center border-b border-[#000000] pb-2">
+          <img src={assets.logo} alt="Arshyan Insurance Logo" className="h-16" />
+          <div className="text-right text-[#000000]">
+            <h1 className="font-bold text-[#000080] text-lg">Arshyan Insurance Marketing & Services Pvt. Ltd</h1>
+            <p>Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089</p>
+            <p>Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com</p>
+            <p>website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715</p>
+          </div>
         </div>
 
-        <div className="bg-[#e5e7eb] text-center font-bold py-2 border-y border-[#000000] text-[#000000]">
+        {/* Tax Invoice Label */}
+        <div className="bg-[#e5e7eb] text-center font-bold py-2 border-y border-[#000000] mt-2 text-[#000000]">
           TAX INVOICE
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="text-[#000000]">
+        {/* Company & Invoice Info */}
+        <div className="grid grid-cols-2 border border-[#000000] mt-2">
+          <div className="p-2 text-[#000000] border-r border-[#000000]">
             <p><strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong></p>
             <p>212, 1st Floor Block G-3, Sector-16 Rohini New Delhi-110089</p>
             <p>07ABCCA0500H1ZD</p>
             <p>ABCCA0500H</p>
           </div>
-          <div className="text-[#000000]">
+          <div className="p-2 text-[#000000]">
             <p><strong>INVOICE NO:</strong> {invoiceNo}</p>
             <p><strong>INVOICE DATE:</strong> {invoiceDate}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="text-[#000000]">
+        {/* Bill To & Vendor Info */}
+        <div className="grid grid-cols-2 border border-[#000000] mt-2">
+          <div className="p-2 text-[#000000] border-r border-[#000000]">
             <p><strong>Bill To</strong></p>
             <p>{billToCompany}</p>
             <p>{billToAddress}</p>
@@ -310,53 +332,63 @@ const InvoiceGenerator = () => {
             <p><strong>GSTIN:</strong> {billToGSTIN}</p>
             <p><strong>PAN:</strong> {billToPAN}</p>
           </div>
-          <div className="text-[#000000]">
+          <div className="p-2 text-[#000000]">
             <p><strong>Vendor Code:</strong> {vendorCode}</p>
             <p><strong>State Name:</strong> Delhi</p>
             <p><strong>State Code:</strong> 07</p>
           </div>
         </div>
 
-        <table className="w-full mt-4 border border-[#000000] text-sm">
+        {/* Particulars Table */}
+        <table className="w-full mt-2 border border-[#000000] text-sm">
           <thead>
-            <tr className="bg-[#e5e7eb]">
-              <th className="border border-[#000000] p-2 text-[#000000]"><strong>Particulars</strong></th>
-              <th className="border border-[#000000] p-2 text-[#000000]"><strong>HSN/SAC</strong></th>
-              <th className="border border-[#000000] p-2 text-[#000000]"><strong>Amount (INR)</strong></th>
+            <tr className="bg-[#e5e7eb] text-[#000000]">
+              <th className="border border-[#000000] p-2">Particulars</th>
+              <th className="border border-[#000000] p-2">HSN/SAC</th>
+              <th className="border border-[#000000] p-2">Amount (INR)</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td className="border border-[#000000] p-2 text-[#000000]">
-                {serviceDescription}<br />
-                <strong>Customer Name:</strong> {customerName}<br />
-                <strong>Ref No:</strong> {refNo}
-              </td>
-              <td className="border border-[#000000] p-2 text-[#000000] text-center">
-                998311<br />
-                CGST 9%<br />
-                SGST 9%
-              </td>
-              <td className="border border-[#000000] p-2 text-[#000000] text-right">
-                ₹ {baseAmount.toFixed(2)}<br />
-                ₹ {cgst.toFixed(2)}<br />
-                ₹ {sgst.toFixed(2)}
-              </td>
-            </tr>
+           <tr>
+  <td className="border border-[#000000] p-2 text-[#000000]">
+    <div className="space-y-1">
+      <div>{serviceDescription}</div>
+      <div><strong>Customer Name:</strong> {customerName}</div>
+      <div><strong>Ref No:</strong> {refNo}</div>
+    </div>
+  </td>
+  <td className="border border-[#000000] p-2 text-center text-[#000000]">
+    <div className="space-y-1">
+      <div>998311</div>
+      <div>CGST 9%</div>
+      <div>SGST 9%</div>
+    </div>
+  </td>
+  <td className="border border-[#000000] p-2 text-right text-[#000000]">
+    <div className="space-y-1">
+      <div>₹ {baseAmount.toFixed(2)}</div>
+      <div>₹ {cgst.toFixed(2)}</div>
+      <div>₹ {sgst.toFixed(2)}</div>
+    </div>
+  </td>
+</tr>
+
             <tr>
               <td className="border border-[#000000] p-2"></td>
-              <td className="border border-[#000000] p-2 text-[#000000] font-bold text-right"><strong>Total Amount</strong></td>
-              <td className="border border-[#000000] p-2 text-[#000000] font-bold text-right">₹ {totalAmount.toFixed(2)}</td>
+              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">Total Amount</td>
+              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">₹ {totalAmount.toFixed(2)}</td>
             </tr>
           </tbody>
         </table>
 
-        <div className="border-y border-[#000000] p-2 mt-4 text-[#000000]">
+        {/* Amount in Words */}
+        <div className="border border-[#000000] p-2 mt-2 text-[#000000]">
           {numberToWords(totalAmount)}
         </div>
 
-        <div className="grid grid-cols-2 gap-4 mt-4">
-          <div className="text-[#000000]">
+        {/* Bank Details & Sign */}
+        <div className="grid grid-cols-2 border border-[#000000] mt-2">
+          <div className="p-2 text-[#000000] border-r border-[#000000]">
             <p><strong>COMPANY BANK ACCOUNT DETAILS :-</strong></p>
             <p><strong>NAME:</strong> ARSHYAN INSURANCE MARKETING & SERVICES PVT LTD</p>
             <p><strong>BANK NAME:</strong> RBL BANK LTD</p>
@@ -364,9 +396,9 @@ const InvoiceGenerator = () => {
             <p><strong>IFSC CODE:</strong> RATN0000559</p>
             <p><strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085</p>
           </div>
-          <div className="text-right text-[#000000]">
+          <div className="p-2 text-right text-[#000000] flex flex-col justify-end">
             <p>For Arshyan Insurance Marketing & Service Pvt Ltd</p>
-            <div className="h-12" /> {/* Space for stamp/sign */}
+            <div className="h-12" />
             <p><strong>Authorised Signatory</strong></p>
           </div>
         </div>
