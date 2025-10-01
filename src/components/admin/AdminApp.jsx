@@ -14,9 +14,10 @@ import LeadModal from './LeadModal';
 import InvoiceGenerator from './InvoiceGenerator';
 import { tasks, users, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
+import assets from '../../assets/assets'; // ✅ Import assets
 
 function AdminApp({ handleLogout }) {
-  const [leads, setLeads] = useState([]); // Replace static leads with state
+  const [leads, setLeads] = useState([]);
   const [activeTab, setActiveTab] = useState('dashboard');
   const [filter, setFilter] = useState('All');
   const [isAdmin] = useState(true);
@@ -34,7 +35,6 @@ function AdminApp({ handleLogout }) {
 
   const navigate = useNavigate();
 
-  // Update pipeline whenever leads change
   useEffect(() => {
     setPipeline({
       New: leads.filter((lead) => lead.status === 'New'),
@@ -44,7 +44,6 @@ function AdminApp({ handleLogout }) {
     });
   }, [leads]);
 
-  // Handle window resize for sidebar visibility
   useEffect(() => {
     const handleResize = () => {
       if (window.innerWidth < 768) {
@@ -63,9 +62,8 @@ function AdminApp({ handleLogout }) {
     navigate('/login');
   };
 
-  // Add new lead to leads state
   const handleAddLead = (newLead) => {
-    setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]); // Generate unique ID
+    setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
   };
 
   const handleDragEnd = (event) => {
@@ -99,6 +97,7 @@ function AdminApp({ handleLogout }) {
     }
   };
 
+  // ✅ Now returns logo + title
   const getPageTitle = () => {
     const titles = {
       dashboard: 'Dashboard',
@@ -110,7 +109,15 @@ function AdminApp({ handleLogout }) {
       attendance: 'Attendance Tracking',
       invoice: 'Invoice Generator',
     };
-    return titles[activeTab] || activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+
+    const titleText = titles[activeTab] || activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
+
+    return (
+      <div className="flex items-center space-x-3">
+        <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
+        <span className='text-2xl'>{titleText}</span>
+      </div>
+    );
   };
 
   const getPageDescription = () => {
@@ -166,10 +173,10 @@ function AdminApp({ handleLogout }) {
           >
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight flex items-center space-x-2">
                   {getPageTitle()}
                 </h1>
-                <p className="text-gray-600 mt-2 text-sm sm:text-base">
+                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">
                   {getPageDescription()}
                 </p>
               </div>

@@ -63,9 +63,7 @@ function Dashboard({ leads, activities, users }) {
       transition={{ duration: 0.5 }}
       className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
     >
-      <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 sm:mb-6 md:mb-8 tracking-tight">
-        Dashboard
-      </h1>
+      
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <motion.div
           whileHover={{ scale: 1.05 }}

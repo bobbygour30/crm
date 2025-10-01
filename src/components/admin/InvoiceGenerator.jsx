@@ -9,21 +9,58 @@ const InvoiceGenerator = () => {
   const [vendorCode, setVendorCode] = useState("110089103");
   const [customerName, setCustomerName] = useState("Mr. Vaibhav Goyal");
   const [refNo, setRefNo] = useState("OG-26-1149-4014-00000028");
-  const [baseAmount, setBaseAmount] = useState(7626.0); // Default base amount
+  const [baseAmount, setBaseAmount] = useState(7626); // Default base amount (integer)
   const [billToCompany, setBillToCompany] = useState("M/s. Mobile Master");
-  const [billToAddress, setBillToAddress] = useState("H-4/12, Sector 16, Rohini, Delhi, 110089");
+  const [billToAddress, setBillToAddress] = useState(
+    "H-4/12, Sector 16, Rohini, Delhi, 110089"
+  );
   const [billToMobile, setBillToMobile] = useState("+91-9871625373");
   const [billToEmail, setBillToEmail] = useState("sunnyscrud85@gmail.com");
   const [billToGSTIN, setBillToGSTIN] = useState("07AKVPG9548E1ZM");
   const [billToPAN, setBillToPAN] = useState("AKVPG9548E");
-  const [serviceDescription, setServiceDescription] = useState("Mobile Insurance - Services");
+  const [serviceDescription, setServiceDescription] = useState(
+    "Mobile Insurance - Services"
+  );
   const invoiceRef = useRef();
 
   // Function to convert number to words
   const numberToWords = (num) => {
-    const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
-    const teens = ["", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-    const tens = ["", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const units = [
+      "",
+      "One",
+      "Two",
+      "Three",
+      "Four",
+      "Five",
+      "Six",
+      "Seven",
+      "Eight",
+      "Nine",
+    ];
+    const teens = [
+      "",
+      "Eleven",
+      "Twelve",
+      "Thirteen",
+      "Fourteen",
+      "Fifteen",
+      "Sixteen",
+      "Seventeen",
+      "Eighteen",
+      "Nineteen",
+    ];
+    const tens = [
+      "",
+      "Ten",
+      "Twenty",
+      "Thirty",
+      "Forty",
+      "Fifty",
+      "Sixty",
+      "Seventy",
+      "Eighty",
+      "Ninety",
+    ];
     const thousands = ["", "Thousand", "Million", "Billion"];
 
     if (num === 0) return "Zero";
@@ -32,13 +69,19 @@ const InvoiceGenerator = () => {
       if (n === 0) return "";
       if (n < 10) return units[n];
       if (n < 20) return teens[n - 10];
-      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + units[n % 10] : "");
-      return units[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " " + convertLessThanThousand(n % 100) : "");
+      if (n < 100)
+        return (
+          tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + units[n % 10] : "")
+        );
+      return (
+        units[Math.floor(n / 100)] +
+        " Hundred" +
+        (n % 100 !== 0 ? " " + convertLessThanThousand(n % 100) : "")
+      );
     };
 
-    const [integerPart, decimalPart = "0"] = num.toFixed(2).split(".");
     let words = "";
-    let numInt = parseInt(integerPart);
+    let numInt = num;
 
     if (numInt === 0) {
       words = "Zero";
@@ -46,26 +89,23 @@ const InvoiceGenerator = () => {
       let i = 0;
       while (numInt > 0) {
         if (numInt % 1000 !== 0) {
-          words = convertLessThanThousand(numInt % 1000) + (thousands[i] ? " " + thousands[i] : "") + (words ? " " + words : "");
+          words =
+            convertLessThanThousand(numInt % 1000) +
+            (thousands[i] ? " " + thousands[i] : "") +
+            (words ? " " + words : "");
         }
         numInt = Math.floor(numInt / 1000);
         i++;
       }
     }
 
-    const paise = parseInt(decimalPart);
-    let paiseWords = "";
-    if (paise > 0) {
-      paiseWords = convertLessThanThousand(paise) + " Paise";
-    }
-
-    return "Rupees " + words + (paiseWords ? " and " + paiseWords : "") + " Only";
+    return "Rupees " + words + " Only";
   };
 
-  // Calculate CGST, SGST, and Total Amount
-  const cgst = baseAmount * 0.09;
-  const sgst = baseAmount * 0.09;
-  const totalAmount = baseAmount + cgst + sgst;
+  // Calculate CGST, SGST, and Total Amount (rounded)
+  const cgst = Math.round(baseAmount * 0.09);
+  const sgst = Math.round(baseAmount * 0.09);
+  const totalAmount = Math.round(baseAmount + cgst + sgst);
 
   const convertOklchToRgb = (element) => {
     const walker = document.createTreeWalker(element, Node.ELEMENT_NODE);
@@ -83,40 +123,40 @@ const InvoiceGenerator = () => {
   };
 
   const generatePDF = async () => {
-  const element = invoiceRef.current;
-  if (!element) return;
+    const element = invoiceRef.current;
+    if (!element) return;
 
-  try {
-    convertOklchToRgb(element);
+    try {
+      convertOklchToRgb(element);
 
-    const canvas = await html2canvas(element, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: "#ffffff",
-    });
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
 
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF("p", "mm", "a4");
+      const imgData = canvas.toDataURL("image/png");
+      const pdf = new jsPDF("p", "mm", "a4");
 
-    const pageWidth = pdf.internal.pageSize.getWidth();
-    const pageHeight = pdf.internal.pageSize.getHeight();
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
 
-    const margin = 10; // mm margin on all sides ✅
-    const imgWidth = pageWidth - margin * 2;
-    const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const margin = 10; // mm margin on all sides
+      const imgWidth = pageWidth - margin * 2;
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
-    // Center the image vertically if smaller than page height
-    const yPosition = (pageHeight - imgHeight) / 2 > margin 
-      ? (pageHeight - imgHeight) / 2 
-      : margin;
+      // Center the image vertically if smaller than page height
+      const yPosition =
+        (pageHeight - imgHeight) / 2 > margin
+          ? (pageHeight - imgHeight) / 2
+          : margin;
 
-    pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
-    pdf.save("invoice.pdf");
-  } catch (err) {
-    console.error("PDF generation failed:", err);
-  }
-};
-
+      pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
+      pdf.save("invoice.pdf");
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+    }
+  };
 
   return (
     <div className="p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-md">
@@ -177,7 +217,7 @@ const InvoiceGenerator = () => {
           <input
             type="number"
             value={baseAmount}
-            onChange={(e) => setBaseAmount(parseFloat(e.target.value) || 0)}
+            onChange={(e) => setBaseAmount(parseInt(e.target.value) || 0)}
             className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
           />
         </div>
@@ -280,25 +320,38 @@ const InvoiceGenerator = () => {
 
       {/* Invoice Template */}
       <div
-  ref={invoiceRef}
-  className="text-sm mx-auto"
-  style={{
-    width: "800px",
-    minHeight: "1120px",
-    background: "#ffffff",
-    padding: "20px",
-    border: "2px solid #000000",   // ✅ Stronger border
-    boxSizing: "border-box",       // ✅ Ensures border isn’t cut off
-  }}
->
+        ref={invoiceRef}
+        className="text-sm mx-auto"
+        style={{
+          width: "800px",
+          minHeight: "1120px",
+          background: "#ffffff",
+          padding: "20px",
+          border: "2px solid #000000",
+          boxSizing: "border-box",
+        }}
+      >
         {/* Header */}
         <div className="flex justify-between items-center border-b border-[#000000] pb-2">
-          <img src={assets.logo} alt="Arshyan Insurance Logo" className="h-16" />
+          <img
+            src={assets.logo}
+            alt="Arshyan Insurance Logo"
+            className="h-16"
+          />
           <div className="text-right text-[#000000]">
-            <h1 className="font-bold text-[#000080] text-lg">Arshyan Insurance Marketing & Services Pvt. Ltd</h1>
-            <p>Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089</p>
-            <p>Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com</p>
-            <p>website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715</p>
+            <h1 className="font-bold text-[#000080] text-lg">
+              Arshyan Insurance Marketing & Services Pvt. Ltd
+            </h1>
+            <p>
+              Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New
+              Delhi-110089
+            </p>
+            <p>
+              Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com
+            </p>
+            <p>
+              website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715
+            </p>
           </div>
         </div>
 
@@ -310,32 +363,54 @@ const InvoiceGenerator = () => {
         {/* Company & Invoice Info */}
         <div className="grid grid-cols-2 border border-[#000000] mt-2">
           <div className="p-2 text-[#000000] border-r border-[#000000]">
-            <p><strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong></p>
+            <p>
+              <strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong>
+            </p>
             <p>212, 1st Floor Block G-3, Sector-16 Rohini New Delhi-110089</p>
             <p>07ABCCA0500H1ZD</p>
             <p>ABCCA0500H</p>
           </div>
           <div className="p-2 text-[#000000]">
-            <p><strong>INVOICE NO:</strong> {invoiceNo}</p>
-            <p><strong>INVOICE DATE:</strong> {invoiceDate}</p>
+            <p>
+              <strong>INVOICE NO:</strong> {invoiceNo}
+            </p>
+            <p>
+              <strong>INVOICE DATE:</strong> {invoiceDate}
+            </p>
           </div>
         </div>
 
         {/* Bill To & Vendor Info */}
         <div className="grid grid-cols-2 border border-[#000000] mt-2">
           <div className="p-2 text-[#000000] border-r border-[#000000]">
-            <p><strong>Bill To</strong></p>
+            <p>
+              <strong>Bill To</strong>
+            </p>
             <p>{billToCompany}</p>
             <p>{billToAddress}</p>
-            <p><strong>Mobile:</strong> {billToMobile}</p>
-            <p><strong>Email:</strong> {billToEmail}</p>
-            <p><strong>GSTIN:</strong> {billToGSTIN}</p>
-            <p><strong>PAN:</strong> {billToPAN}</p>
+            <p>
+              <strong>Mobile:</strong> {billToMobile}
+            </p>
+            <p>
+              <strong>Email:</strong> {billToEmail}
+            </p>
+            <p>
+              <strong>GSTIN:</strong> {billToGSTIN}
+            </p>
+            <p>
+              <strong>PAN:</strong> {billToPAN}
+            </p>
           </div>
           <div className="p-2 text-[#000000]">
-            <p><strong>Vendor Code:</strong> {vendorCode}</p>
-            <p><strong>State Name:</strong> Delhi</p>
-            <p><strong>State Code:</strong> 07</p>
+            <p>
+              <strong>Vendor Code:</strong> {vendorCode}
+            </p>
+            <p>
+              <strong>State Name:</strong> Delhi
+            </p>
+            <p>
+              <strong>State Code:</strong> 07
+            </p>
           </div>
         </div>
 
@@ -349,34 +424,42 @@ const InvoiceGenerator = () => {
             </tr>
           </thead>
           <tbody>
-           <tr>
-  <td className="border border-[#000000] p-2 text-[#000000]">
-    <div className="space-y-1">
-      <div>{serviceDescription}</div>
-      <div><strong>Customer Name:</strong> {customerName}</div>
-      <div><strong>Ref No:</strong> {refNo}</div>
-    </div>
-  </td>
-  <td className="border border-[#000000] p-2 text-center text-[#000000]">
-    <div className="space-y-1">
-      <div>998311</div>
-      <div>CGST 9%</div>
-      <div>SGST 9%</div>
-    </div>
-  </td>
-  <td className="border border-[#000000] p-2 text-right text-[#000000]">
-    <div className="space-y-1">
-      <div>₹ {baseAmount.toFixed(2)}</div>
-      <div>₹ {cgst.toFixed(2)}</div>
-      <div>₹ {sgst.toFixed(2)}</div>
-    </div>
-  </td>
-</tr>
+            <tr>
+              <td className="border border-[#000000] p-2 text-[#000000]">
+                <div className="space-y-1">
+                  <div>{serviceDescription}</div>
+                  <div>
+                    <strong>Customer Name:</strong> {customerName}
+                  </div>
+                  <div>
+                    <strong>Ref No:</strong> {refNo}
+                  </div>
+                </div>
+              </td>
+              <td className="border border-[#000000] p-2 text-center text-[#000000]">
+                <div className="space-y-1">
+                  <div>998311</div>
+                  <div>CGST 9%</div>
+                  <div>SGST 9%</div>
+                </div>
+              </td>
+              <td className="border border-[#000000] p-2 text-right text-[#000000]">
+                <div className="space-y-1">
+                  <div>₹ {baseAmount}</div>
+                  <div>₹ {cgst}</div>
+                  <div>₹ {sgst}</div>
+                </div>
+              </td>
+            </tr>
 
             <tr>
               <td className="border border-[#000000] p-2"></td>
-              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">Total Amount</td>
-              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">₹ {totalAmount.toFixed(2)}</td>
+              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">
+                Total Amount
+              </td>
+              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">
+                ₹ {totalAmount}
+              </td>
             </tr>
           </tbody>
         </table>
@@ -389,17 +472,32 @@ const InvoiceGenerator = () => {
         {/* Bank Details & Sign */}
         <div className="grid grid-cols-2 border border-[#000000] mt-2">
           <div className="p-2 text-[#000000] border-r border-[#000000]">
-            <p><strong>COMPANY BANK ACCOUNT DETAILS :-</strong></p>
-            <p><strong>NAME:</strong> ARSHYAN INSURANCE MARKETING & SERVICES PVT LTD</p>
-            <p><strong>BANK NAME:</strong> RBL BANK LTD</p>
-            <p><strong>CURRENT A/C NO:</strong> 409002419528</p>
-            <p><strong>IFSC CODE:</strong> RATN0000559</p>
-            <p><strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085</p>
+            <p>
+              <strong>COMPANY BANK ACCOUNT DETAILS :-</strong>
+            </p>
+            <p>
+              <strong>NAME:</strong> ARSHYAN INSURANCE MARKETING & SERVICES PVT
+              LTD
+            </p>
+            <p>
+              <strong>BANK NAME:</strong> RBL BANK LTD
+            </p>
+            <p>
+              <strong>CURRENT A/C NO:</strong> 409002419528
+            </p>
+            <p>
+              <strong>IFSC CODE:</strong> RATN0000559
+            </p>
+            <p>
+              <strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085
+            </p>
           </div>
           <div className="p-2 text-right text-[#000000] flex flex-col justify-end">
             <p>For Arshyan Insurance Marketing & Service Pvt Ltd</p>
             <div className="h-12" />
-            <p><strong>Authorised Signatory</strong></p>
+            <p>
+              <strong>Authorised Signatory</strong>
+            </p>
           </div>
         </div>
       </div>
