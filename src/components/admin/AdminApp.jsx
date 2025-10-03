@@ -101,7 +101,6 @@ const getPageTitle = () => {
   return (
     <div className="flex items-center space-x-3">
       <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
-      <span className="text-2xl">{titleText}</span>
     </div>
   );
 };
