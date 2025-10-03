@@ -28,7 +28,7 @@ function UserCampaigns({ campaigns, user }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
-      className="p-6 bg-gray-50 min-h-screen"
+      className="p-6 bg-gray-50 min-h-screen mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
     >
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Assigned Campaigns</h1>
 

@@ -10,11 +10,12 @@ import TaskList from './TaskList';
 import Analytics from './Analytics';
 import UserManagement from './UserManagement';
 import AdminAttendance from './AdminAttendance';
-import LeadModal from './LeadModal';
 import InvoiceGenerator from './InvoiceGenerator';
+import VehicleAdmin from './VehicleAdmin';
+import LeadModal from './LeadModal';
 import { tasks, users, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
-import assets from '../../assets/assets'; // ✅ Import assets
+import assets from '../../assets/assets';
 
 function AdminApp({ handleLogout }) {
   const [leads, setLeads] = useState([]);
@@ -26,12 +27,7 @@ function AdminApp({ handleLogout }) {
   const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
   const [taskList, setTaskList] = useState(tasks);
   const [userList, setUserList] = useState(users);
-  const [pipeline, setPipeline] = useState({
-    New: [],
-    Contacted: [],
-    Qualified: [],
-    Closed: [],
-  });
+  const [pipeline, setPipeline] = useState({ New: [], Contacted: [], Qualified: [], Closed: [] });
 
   const navigate = useNavigate();
 
@@ -45,14 +41,7 @@ function AdminApp({ handleLogout }) {
   }, [leads]);
 
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth < 768) {
-        setIsSidebarOpen(false);
-      } else {
-        setIsSidebarOpen(true);
-      }
-    };
-
+    const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
@@ -62,9 +51,7 @@ function AdminApp({ handleLogout }) {
     navigate('/login');
   };
 
-  const handleAddLead = (newLead) => {
-    setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
-  };
+  const handleAddLead = (newLead) => setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
@@ -97,45 +84,47 @@ function AdminApp({ handleLogout }) {
     }
   };
 
-  // ✅ Now returns logo + title
-  const getPageTitle = () => {
-    const titles = {
-      dashboard: 'Dashboard',
-      leads: 'Lead Management',
-      pipeline: 'Sales Pipeline',
-      tasks: 'Task Management',
-      analytics: 'Analytics & Reports',
-      users: 'User Management',
-      attendance: 'Attendance Tracking',
-      invoice: 'Invoice Generator',
-    };
-
-    const titleText = titles[activeTab] || activeTab.charAt(0).toUpperCase() + activeTab.slice(1);
-
-    return (
-      <div className="flex items-center space-x-3">
-        <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
-        <span className='text-2xl'>{titleText}</span>
-      </div>
-    );
+  // AdminApp.jsx (relevant parts only)
+const getPageTitle = () => {
+  const titles = {
+    dashboard: 'Dashboard',
+    leads: 'Lead Management',
+    pipeline: 'Sales Pipeline',
+    tasks: 'Task Management',
+    analytics: 'Analytics & Reports',
+    users: 'User Management',
+    attendance: 'Attendance Tracking',
+    invoice: 'Invoice Generator',
+    'vehicle-admin': 'Vehicle Admin', // Correct key
   };
+  const titleText = titles[activeTab] || activeTab;
+  return (
+    <div className="flex items-center space-x-3">
+      <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
+      <span className="text-2xl">{titleText}</span>
+    </div>
+  );
+};
 
-  const getPageDescription = () => {
-    const descriptions = {
-      dashboard: 'Get an overview of your CRM performance',
-      leads: 'Manage and track all your leads in one place',
-      pipeline: 'Visualize and manage your sales pipeline',
-      tasks: 'Keep track of all tasks and deadlines',
-      analytics: 'Analyze your business performance with detailed reports',
-      users: 'Manage user accounts and permissions',
-      attendance: 'Track and manage employee attendance',
-      invoice: 'Generate invoices for your services',
-    };
-    return descriptions[activeTab] || 'Manage your CRM efficiently';
+const getPageDescription = () => {
+  const descriptions = {
+    dashboard: 'Get an overview of your CRM performance',
+    leads: 'Manage and track all your leads in one place',
+    pipeline: 'Visualize and manage your sales pipeline',
+    tasks: 'Keep track of all tasks and deadlines',
+    analytics: 'Analyze your business performance with detailed reports',
+    users: 'Manage user accounts and permissions',
+    attendance: 'Track and manage employee attendance',
+    invoice: 'Generate invoices for your services',
+    'vehicle-admin': 'Manage all vehicle administration tasks', // Correct key
   };
+  return descriptions[activeTab] || 'Manage your CRM efficiently';
+};
+
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 font-sans flex relative">
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex relative">
+      {/* Mobile toggle */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow"
@@ -144,12 +133,10 @@ function AdminApp({ handleLogout }) {
       </button>
 
       {isSidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
-          onClick={() => setIsSidebarOpen(false)}
-        />
+        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30" onClick={() => setIsSidebarOpen(false)} />
       )}
 
+      {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -159,11 +146,8 @@ function AdminApp({ handleLogout }) {
         handleLogout={handleAdminLogout}
       />
 
-      <div
-        className={`flex-1 transition-all duration-300 ${
-          isSidebarOpen ? 'md:ml-64' : 'md:ml-16'
-        } ml-0`}
-      >
+      {/* Main Content */}
+      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-16'} ml-0`}>
         <div className="p-4 sm:p-6 lg:p-8 pt-16 md:pt-8">
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -176,9 +160,7 @@ function AdminApp({ handleLogout }) {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight flex items-center space-x-2">
                   {getPageTitle()}
                 </h1>
-                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">
-                  {getPageDescription()}
-                </p>
+                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">{getPageDescription()}</p>
               </div>
               <div className="flex items-center space-x-4 mt-4 sm:mt-0">
                 <motion.div
@@ -211,9 +193,7 @@ function AdminApp({ handleLogout }) {
               transition={{ duration: 0.3 }}
               className="min-h-[calc(100vh-200px)]"
             >
-              {activeTab === 'dashboard' && (
-                <Dashboard leads={leads} activities={activities} />
-              )}
+              {activeTab === 'dashboard' && <Dashboard leads={leads} activities={activities} />}
               {activeTab === 'leads' && (
                 <LeadTable
                   leads={leads}
@@ -231,23 +211,13 @@ function AdminApp({ handleLogout }) {
                 </DndContext>
               )}
               {activeTab === 'tasks' && (
-                <TaskList
-                  tasks={taskList}
-                  newTask={newTask}
-                  setNewTask={setNewTask}
-                  handleAddTask={handleAddTask}
-                />
+                <TaskList tasks={taskList} newTask={newTask} setNewTask={setNewTask} handleAddTask={handleAddTask} />
               )}
-              {activeTab === 'analytics' && (
-                <Analytics leads={leads} />
-              )}
-              {activeTab === 'users' && isAdmin && (
-                <UserManagement users={userList} setUsers={setUserList} />
-              )}
-              {activeTab === 'attendance' && isAdmin && (
-                <AdminAttendance users={userList} />
-              )}
+              {activeTab === 'analytics' && <Analytics leads={leads} />}
+              {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
+              {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
               {activeTab === 'invoice' && <InvoiceGenerator />}
+              {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
             </motion.div>
           </AnimatePresence>
         </div>

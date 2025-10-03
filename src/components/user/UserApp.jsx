@@ -1,68 +1,82 @@
-// UserApp.jsx
-import { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate } from 'react-router-dom';
-import UserSidebar from './UserSidebar';
-import UserHeader from './UserHeader';
-import UserDashboard from './UserDashboard';
-import UserLeadTable from './UserLeadTable';
-import UserTaskList from './UserTaskList';
-import UserProfile from './UserProfile';
-import UserActivity from './UserActivity';
-import HomePage from './HomePage';
-import Attendance from './Attendance';
-import UserCampaigns from './UserCampaigns';
-import { leads, tasks, activities, users, campaigns } from '../../data/mockData';
+import { useState } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
+import Navbar from "./Navbar";
+import UserDashboard from "./UserDashboard";
+import UserLeadTable from "./UserLeadTable";
+import UserTaskList from "./UserTaskList";
+import UserProfile from "./UserProfile";
+import UserActivity from "./UserActivity";
+import HomePage from "./HomePage";
+import Attendance from "./Attendance";
+import UserCampaigns from "./UserCampaigns";
+import VehicleQuote from "./VehicleQuote"; // 🚗 Import new page
+import {
+  leads,
+  tasks,
+  activities,
+  users,
+  campaigns,
+} from "../../data/mockData";
 
 function UserApp({ handleLogout }) {
-  const [activeTab, setActiveTab] = useState('home');
+  const [activeTab, setActiveTab] = useState("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [filter, setFilter] = useState('All');
+  const [filter, setFilter] = useState("All");
   const [selectedLead, setSelectedLead] = useState(null);
   const [taskList, setTaskList] = useState(tasks);
-  const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
+  const [newTask, setNewTask] = useState({
+    title: "",
+    dueDate: "",
+    priority: "Medium",
+  });
   const [campaignList, setCampaignList] = useState(campaigns);
   const navigate = useNavigate();
 
   const handleAddTask = (e) => {
     e.preventDefault();
     setTaskList([...taskList, { id: `${taskList.length + 1}`, ...newTask }]);
-    setNewTask({ title: '', dueDate: '', priority: 'Medium' });
+    setNewTask({ title: "", dueDate: "", priority: "Medium" });
   };
 
   const handleUserLogout = () => {
     handleLogout();
-    navigate('/login');
+    navigate("/login");
   };
 
-  const loggedInUser = users.find((user) => user.role === 'User') || users[1];
+  const loggedInUser = users.find((user) => user.role === "User") || users[1];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-gray-100 font-sans flex">
-      <UserSidebar
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-gray-100 flex">
+      <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        setIsSidebarOpen={setIsSidebarOpen}
-        isSidebarOpen={isSidebarOpen}
-        handleLogout={handleUserLogout}
+        handleLogout={handleLogout}
       />
+
       <div className="flex-1 flex flex-col">
-        <UserHeader 
-          setIsSidebarOpen={setIsSidebarOpen} 
-          user={loggedInUser}
-          handleLogout={handleUserLogout}
-        />
-        <div className="p-4 sm:p-8 md:ml-16 md:[&[data-sidebar-open=true]]:ml-64">
+        <div>
           <Routes>
-            <Route path="/" element={<HomePage handleLogout={handleUserLogout} />} />
+            <Route
+              path="/"
+              element={<HomePage handleLogout={handleUserLogout} />}
+            />
             <Route
               path="/dashboard"
-              element={<UserDashboard leads={leads} activities={activities} user={loggedInUser} />}
+              element={
+                <UserDashboard
+                  leads={leads}
+                  activities={activities}
+                  user={loggedInUser}
+                />
+              }
             />
             <Route
               path="/leads"
               element={
                 <UserLeadTable
-                  leads={leads.filter((lead) => lead.assignedTo === loggedInUser.id)}
+                  leads={leads.filter(
+                    (lead) => lead.assignedTo === loggedInUser.id
+                  )}
                   filter={filter}
                   setFilter={setFilter}
                   setSelectedLead={setSelectedLead}
@@ -81,27 +95,37 @@ function UserApp({ handleLogout }) {
                 />
               }
             />
-            <Route path="/profile" element={<UserProfile user={loggedInUser} />} />
+            <Route
+              path="/profile"
+              element={<UserProfile user={loggedInUser} />}
+            />
             <Route
               path="/activity"
               element={
                 <UserActivity
                   activities={activities.filter((activity) =>
                     leads.some(
-                      (lead) => lead.id === activity.leadId && lead.assignedTo === loggedInUser.id
+                      (lead) =>
+                        lead.id === activity.leadId &&
+                        lead.assignedTo === loggedInUser.id
                     )
                   )}
                   leads={leads}
                 />
               }
             />
-            <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
+            <Route
+              path="/attendance"
+              element={<Attendance user={loggedInUser} />}
+            />
             <Route
               path="/mycampaigns"
               element={
                 <UserCampaigns campaigns={campaignList} user={loggedInUser} />
               }
             />
+            <Route path="/vehicle-quote" element={<VehicleQuote />} />{" "}
+            {/* 🚗 New Route */}
           </Routes>
         </div>
       </div>

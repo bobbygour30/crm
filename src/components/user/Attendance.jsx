@@ -34,7 +34,7 @@ function Attendance({ user }) {
   };
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="space-y-6 max-w-7xl mt-20 mx-auto px-4 sm:px-6 lg:px-8">
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 sm:mb-6 md:mb-8 tracking-tight">
         Attendance
       </h1>

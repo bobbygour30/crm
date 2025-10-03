@@ -1,17 +1,21 @@
 import { motion } from 'framer-motion';
-import { FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, FaUserCog, FaClock, FaSignOutAlt } from 'react-icons/fa';
+import { 
+  FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, 
+  FaUserCog, FaClock, FaSignOutAlt, FaCarSide 
+} from 'react-icons/fa';
 
 function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout }) {
   const tabs = [
-    { name: 'Dashboard', icon: FaHome },
-    { name: 'Leads', icon: FaUsers },
-    { name: 'Pipeline', icon: FaChartBar },
-    { name: 'Tasks', icon: FaClipboardList },
-    { name: 'Analytics', icon: FaChartPie },
-    { name: 'Invoice', icon: FaClipboardList }, // Add this line
+    { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
+    { name: 'Leads', icon: FaUsers, key: 'leads' },
+    { name: 'Pipeline', icon: FaChartBar, key: 'pipeline' },
+    { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
+    { name: 'Analytics', icon: FaChartPie, key: 'analytics' },
+    { name: 'Invoice', icon: FaClipboardList, key: 'invoice' },
+    { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     ...(isAdmin ? [
-      { name: 'Users', icon: FaUserCog },
-      { name: 'Attendance', icon: FaClock }
+      { name: 'Users', icon: FaUserCog, key: 'users' },
+      { name: 'Attendance', icon: FaClock, key: 'attendance' }
     ] : []),
   ];
 
@@ -51,16 +55,14 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
           <div>
             {tabs.map((tab) => (
               <motion.button
-                key={tab.name}
+                key={tab.key}
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
-                  activeTab.toLowerCase() === tab.name.toLowerCase()
-                    ? 'bg-indigo-600 shadow-md'
-                    : 'hover:bg-indigo-700'
+                  activeTab === tab.key ? 'bg-indigo-600 shadow-md' : 'hover:bg-indigo-700'
                 }`}
                 onClick={() => {
-                  setActiveTab(tab.name.toLowerCase());
+                  setActiveTab(tab.key);
                   if (window.innerWidth < 768) setIsSidebarOpen(false);
                 }}
               >
