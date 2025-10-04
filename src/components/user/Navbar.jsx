@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   FaBars,
   FaTimes,
-  FaHome,
   FaUsers,
   FaClipboardList,
   FaUser,
@@ -22,11 +21,9 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const tabs = [
-    { name: "Home", icon: FaHome, path: "/" },
-    { name: "Dashboard", icon: FaChartBar, path: "/dashboard" },
+    { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
-    { name: "My Campaigns", icon: FaBullhorn, path: "/mycampaigns" },
     { name: "Vehicle Quote", icon: FaCarSide, path: "/vehicle-quote" },
     { name: "Profile", icon: FaUser, path: "/profile" },
     { name: "Activity", icon: FaChartPie, path: "/activity" },
@@ -47,7 +44,7 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
   useEffect(() => {
     const currentTab =
       tabs.find((tab) => tab.path === location.pathname)?.name.toLowerCase() ||
-      "home";
+      "dashboard";
     setActiveTab(currentTab);
   }, [location.pathname, setActiveTab]);
 

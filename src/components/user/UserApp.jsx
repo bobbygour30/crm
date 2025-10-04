@@ -6,9 +6,7 @@ import UserLeadTable from "./UserLeadTable";
 import UserTaskList from "./UserTaskList";
 import UserProfile from "./UserProfile";
 import UserActivity from "./UserActivity";
-import HomePage from "./HomePage";
 import Attendance from "./Attendance";
-import UserCampaigns from "./UserCampaigns";
 import VehicleQuote from "./VehicleQuote";
 import {
   leads,
@@ -76,9 +74,8 @@ function UserApp({ handleLogout }) {
       <div className="flex-1 flex flex-col">
         <div>
           <Routes>
-            <Route path="/" element={<HomePage handleLogout={handleUserLogout} />} />
             <Route
-              path="/dashboard"
+              path="/"
               element={
                 <UserDashboard
                   leads={leads}
@@ -129,10 +126,7 @@ function UserApp({ handleLogout }) {
               }
             />
             <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
-            <Route
-              path="/mycampaigns"
-              element={<UserCampaigns campaigns={campaignList} user={loggedInUser} />}
-            />
+
             <Route path="/vehicle-quote" element={<VehicleQuote />} />
           </Routes>
         </div>

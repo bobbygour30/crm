@@ -8,9 +8,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
   const tabs = [
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Leads', icon: FaUsers, key: 'leads' },
-    { name: 'Pipeline', icon: FaChartBar, key: 'pipeline' },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
-    { name: 'Analytics', icon: FaChartPie, key: 'analytics' },
     { name: 'Invoice', icon: FaClipboardList, key: 'invoice' },
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     ...(isAdmin ? [

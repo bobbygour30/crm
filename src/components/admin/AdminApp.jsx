@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { DndContext } from '@dnd-kit/core';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import LeadTable from './LeadTable';
-import PipelineBoard from './PipelineBoard';
 import TaskList from './TaskList';
 import Analytics from './Analytics';
 import UserManagement from './UserManagement';
@@ -27,7 +25,6 @@ function AdminApp({ handleLogout }) {
   const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
   const [taskList, setTaskList] = useState(tasks);
   const [userList, setUserList] = useState(users);
-  const [pipeline, setPipeline] = useState({ New: [], Contacted: [], Qualified: [], Closed: [] });
 
   const navigate = useNavigate();
 
@@ -36,17 +33,7 @@ function AdminApp({ handleLogout }) {
   // ----------------------------------------------------------------------
   const username = localStorage.getItem('username') || 'Admin';
 
-  // ----------------------------------------------------------------------
-  // Pipeline sync
-  // ----------------------------------------------------------------------
-  useEffect(() => {
-    setPipeline({
-      New: leads.filter((lead) => lead.status === 'New'),
-      Contacted: leads.filter((lead) => lead.status === 'Contacted'),
-      Qualified: leads.filter((lead) => lead.status === 'Qualified'),
-      Closed: leads.filter((lead) => lead.status === 'Closed'),
-    });
-  }, [leads]);
+  
 
   // ----------------------------------------------------------------------
   // Sidebar open/close on resize
@@ -110,7 +97,6 @@ function AdminApp({ handleLogout }) {
     const titles = {
       dashboard: 'Dashboard',
       leads: 'Lead Management',
-      pipeline: 'Sales Pipeline',
       tasks: 'Task Management',
       analytics: 'Analytics & Reports',
       users: 'User Management',
@@ -121,7 +107,6 @@ function AdminApp({ handleLogout }) {
     return (
       <div className="flex items-center space-x-3">
         <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
-        <span className="ml-2 hidden md:inline">{titles[activeTab] || activeTab}</span>
       </div>
     );
   };
@@ -130,7 +115,6 @@ function AdminApp({ handleLogout }) {
     const descriptions = {
       dashboard: 'Get an overview of your CRM performance',
       leads: 'Manage and track all your leads in one place',
-      pipeline: 'Visualize and manage your sales pipeline',
       tasks: 'Keep track of all tasks and deadlines',
       analytics: 'Analyze your business performance with detailed reports',
       users: 'Manage user accounts and permissions',
@@ -241,11 +225,6 @@ function AdminApp({ handleLogout }) {
                   onAssignLead={handleAssignLead}
                   onAddLead={handleAddLead}
                 />
-              )}
-              {activeTab === 'pipeline' && (
-                <DndContext onDragEnd={handleDragEnd}>
-                  <PipelineBoard pipeline={pipeline} users={userList} />
-                </DndContext>
               )}
               {activeTab === 'tasks' && (
                 <TaskList

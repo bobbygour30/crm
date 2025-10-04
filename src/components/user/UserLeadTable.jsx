@@ -33,7 +33,6 @@ function UserLeadTable({ leads, filter, setFilter, setSelectedLead, selectedLead
                 <th className="p-4 font-medium text-gray-700">Email</th>
                 <th className="p-4 font-medium text-gray-700">Source</th>
                 <th className="p-4 font-medium text-gray-700">Status</th>
-                <th className="p-4 font-medium text-gray-700">Score</th>
                 <th className="p-4 font-medium text-gray-700">Actions</th>
               </tr>
             </thead>

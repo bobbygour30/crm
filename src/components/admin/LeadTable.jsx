@@ -10,7 +10,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     email: '',
     source: '',
     status: 'New',
-    score: 0,
+    
     policyNumber: '',
     lob: '',
     sumInsured: 0,
@@ -63,7 +63,6 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
       email: '',
       source: '',
       status: 'New',
-      score: 0,
       policyNumber: '',
       lob: '',
       sumInsured: 0,
@@ -119,7 +118,6 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
             email: row['Email ID'] || '',
             source: row['Reference'] || '',
             status: row['Status'] || 'New',
-            score: parseNumber(row['Payout']),
             policyNumber: row['Policy Number'] || '',
             lob: row['LOB'] || '',
             sumInsured: parseNumber(row['Sum Insured']),
@@ -277,15 +275,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 <option value="Closed">Closed</option>
               </select>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Score</label>
-              <input
-                type="number"
-                value={newLead.score}
-                onChange={(e) => setNewLead({ ...newLead, score: parseInt(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+            
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Number</label>
               <input

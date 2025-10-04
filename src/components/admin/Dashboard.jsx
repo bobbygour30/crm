@@ -2,9 +2,8 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
-import { DndContext } from '@dnd-kit/core';
 import ActivityTimeline from './ActivityTimeline';
-import PipelineBoard from './PipelineBoard';
+import Analytics from './Analytics';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
@@ -105,12 +104,7 @@ function Dashboard({ leads, activities, users }) {
         </div>
         <ActivityTimeline activities={activities} leads={leads} />
       </div>
-      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
-        <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Lead Pipeline</h2>
-        <DndContext onDragEnd={handleDragEnd}>
-          <PipelineBoard pipeline={pipeline} users={users || []} />
-        </DndContext>
-      </div>
+      <Analytics leads={leads} />
     </motion.div>
   );
 }
