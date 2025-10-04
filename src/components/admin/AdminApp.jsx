@@ -31,6 +31,14 @@ function AdminApp({ handleLogout }) {
 
   const navigate = useNavigate();
 
+  // ----------------------------------------------------------------------
+  // NEW: read username from localStorage (fallback to generic name)
+  // ----------------------------------------------------------------------
+  const username = localStorage.getItem('username') || 'Admin';
+
+  // ----------------------------------------------------------------------
+  // Pipeline sync
+  // ----------------------------------------------------------------------
   useEffect(() => {
     setPipeline({
       New: leads.filter((lead) => lead.status === 'New'),
@@ -40,18 +48,29 @@ function AdminApp({ handleLogout }) {
     });
   }, [leads]);
 
+  // ----------------------------------------------------------------------
+  // Sidebar open/close on resize
+  // ----------------------------------------------------------------------
   useEffect(() => {
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
+  // ----------------------------------------------------------------------
+  // Logout handler (clears everything and redirects)
+  // ----------------------------------------------------------------------
   const handleAdminLogout = () => {
-    handleLogout();
+    handleLogout();               // clears auth state in App.jsx
+    localStorage.removeItem('username'); // explicit clear
     navigate('/login');
   };
 
-  const handleAddLead = (newLead) => setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
+  // ----------------------------------------------------------------------
+  // Helper CRUD actions
+  // ----------------------------------------------------------------------
+  const handleAddLead = (newLead) =>
+    setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
 
   const handleDragEnd = (event) => {
     const { active, over } = event;
@@ -84,46 +103,50 @@ function AdminApp({ handleLogout }) {
     }
   };
 
-  // AdminApp.jsx (relevant parts only)
-const getPageTitle = () => {
-  const titles = {
-    dashboard: 'Dashboard',
-    leads: 'Lead Management',
-    pipeline: 'Sales Pipeline',
-    tasks: 'Task Management',
-    analytics: 'Analytics & Reports',
-    users: 'User Management',
-    attendance: 'Attendance Tracking',
-    invoice: 'Invoice Generator',
-    'vehicle-admin': 'Vehicle Admin', // Correct key
+  // ----------------------------------------------------------------------
+  // Page title / description helpers
+  // ----------------------------------------------------------------------
+  const getPageTitle = () => {
+    const titles = {
+      dashboard: 'Dashboard',
+      leads: 'Lead Management',
+      pipeline: 'Sales Pipeline',
+      tasks: 'Task Management',
+      analytics: 'Analytics & Reports',
+      users: 'User Management',
+      attendance: 'Attendance Tracking',
+      invoice: 'Invoice Generator',
+      'vehicle-admin': 'Vehicle Admin',
+    };
+    return (
+      <div className="flex items-center space-x-3">
+        <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
+        <span className="ml-2 hidden md:inline">{titles[activeTab] || activeTab}</span>
+      </div>
+    );
   };
-  const titleText = titles[activeTab] || activeTab;
-  return (
-    <div className="flex items-center space-x-3">
-      <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
-    </div>
-  );
-};
 
-const getPageDescription = () => {
-  const descriptions = {
-    dashboard: 'Get an overview of your CRM performance',
-    leads: 'Manage and track all your leads in one place',
-    pipeline: 'Visualize and manage your sales pipeline',
-    tasks: 'Keep track of all tasks and deadlines',
-    analytics: 'Analyze your business performance with detailed reports',
-    users: 'Manage user accounts and permissions',
-    attendance: 'Track and manage employee attendance',
-    invoice: 'Generate invoices for your services',
-    'vehicle-admin': 'Manage all vehicle administration tasks', // Correct key
+  const getPageDescription = () => {
+    const descriptions = {
+      dashboard: 'Get an overview of your CRM performance',
+      leads: 'Manage and track all your leads in one place',
+      pipeline: 'Visualize and manage your sales pipeline',
+      tasks: 'Keep track of all tasks and deadlines',
+      analytics: 'Analyze your business performance with detailed reports',
+      users: 'Manage user accounts and permissions',
+      attendance: 'Track and manage employee attendance',
+      invoice: 'Generate invoices for your services',
+      'vehicle-admin': 'Manage all vehicle administration tasks',
+    };
+    return descriptions[activeTab] || 'Manage your CRM efficiently';
   };
-  return descriptions[activeTab] || 'Manage your CRM efficiently';
-};
 
-
+  // ----------------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex relative">
-      {/* Mobile toggle */}
+      {/* Mobile toggle button */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow"
@@ -131,11 +154,15 @@ const getPageDescription = () => {
         {isSidebarOpen ? <FiX size={24} /> : <FiMenu size={24} />}
       </button>
 
+      {/* Mobile overlay */}
       {isSidebarOpen && (
-        <div className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30" onClick={() => setIsSidebarOpen(false)} />
+        <div
+          className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+          onClick={() => setIsSidebarOpen(false)}
+        />
       )}
 
-      {/* Sidebar */}
+      {/* Sidebar – now receives username */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -143,11 +170,17 @@ const getPageDescription = () => {
         isSidebarOpen={isSidebarOpen}
         setIsSidebarOpen={setIsSidebarOpen}
         handleLogout={handleAdminLogout}
+        username={username}
       />
 
-      {/* Main Content */}
-      <div className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-16'} ml-0`}>
+      {/* Main content area */}
+      <div
+        className={`flex-1 transition-all duration-300 ${
+          isSidebarOpen ? 'md:ml-64' : 'md:ml-16'
+        } ml-0`}
+      >
         <div className="p-4 sm:p-6 lg:p-8 pt-16 md:pt-8">
+          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -159,8 +192,11 @@ const getPageDescription = () => {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight flex items-center space-x-2">
                   {getPageTitle()}
                 </h1>
-                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">{getPageDescription()}</p>
+                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">
+                  {getPageDescription()}
+                </p>
               </div>
+
               <div className="flex items-center space-x-4 mt-4 sm:mt-0">
                 <motion.div
                   initial={{ opacity: 0, scale: 0.9 }}
@@ -170,6 +206,7 @@ const getPageDescription = () => {
                 >
                   Last updated: {new Date().toLocaleTimeString()}
                 </motion.div>
+
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
@@ -183,6 +220,7 @@ const getPageDescription = () => {
             </div>
           </motion.div>
 
+          {/* Page content */}
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -210,7 +248,12 @@ const getPageDescription = () => {
                 </DndContext>
               )}
               {activeTab === 'tasks' && (
-                <TaskList tasks={taskList} newTask={newTask} setNewTask={setNewTask} handleAddTask={handleAddTask} />
+                <TaskList
+                  tasks={taskList}
+                  newTask={newTask}
+                  setNewTask={setNewTask}
+                  handleAddTask={handleAddTask}
+                />
               )}
               {activeTab === 'analytics' && <Analytics leads={leads} />}
               {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
@@ -222,6 +265,7 @@ const getPageDescription = () => {
         </div>
       </div>
 
+      {/* Lead modal */}
       <AnimatePresence>
         {selectedLead && (
           <LeadModal

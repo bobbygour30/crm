@@ -1,54 +1,76 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { FiMail, FiLock, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiMail, FiLock, FiEye, FiEyeOff, FiUser } from 'react-icons/fi';
 
-function Login({ setIsAuthenticated, setIsAdmin }) {
+function SignUp({ setIsAuthenticated, setIsAdmin }) {
+  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
+  const handleSignUp = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
-    // Trim inputs to avoid whitespace issues
-    const trimmedEmail = email.trim();
-    const trimmedPassword = password.trim();
-
-    if (!trimmedEmail || !trimmedPassword) {
-      setError('Please enter both email and password');
+    // Client-side validation
+    if (username.length < 3) {
+      setError('Username must be at least 3 characters');
+      setIsLoading(false);
+      return;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters');
+      setIsLoading(false);
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
       setIsLoading(false);
       return;
     }
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/login`, {
+      // Determine role based on email
+      const role = email === 'admin@example.com' ? 'admin' : 'user';
+
+      // Register user
+      const registerResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
+        body: JSON.stringify({ username, email, password, role }),
       });
-      const data = await response.json();
-      if (response.ok) {
-        if (!data.token || !data.username) {
-          throw new Error('Invalid response from server');
+      const registerData = await registerResponse.json();
+
+      if (registerResponse.ok) {
+        // Auto-login after successful registration
+        const loginResponse = await fetch(`${import.meta.env.VITE_BACKEND_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const loginData = await loginResponse.json();
+
+        if (loginResponse.ok) {
+          localStorage.setItem('token', loginData.token);
+          localStorage.setItem('username', loginData.username); // Optional: store username
+          setIsAuthenticated(true);
+          setIsAdmin(loginData.isAdmin);
+          navigate(loginData.isAdmin ? '/admin' : '/');
+        } else {
+          setError(loginData.msg || 'Auto-login failed after registration');
         }
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('username', data.username);
-        localStorage.setItem('isAdmin', data.isAdmin);
-        setIsAuthenticated(true);
-        setIsAdmin(data.isAdmin);
-        navigate(data.isAdmin ? '/admin' : '/');
       } else {
-        setError(data.msg || 'Invalid credentials');
+        setError(registerData.msg || 'Registration failed');
       }
     } catch (err) {
       console.error('Fetch error:', err);
-      setError(err.message || 'Server error');
+      setError('Server error');
     }
     setIsLoading(false);
   };
@@ -68,13 +90,13 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
             transition={{ delay: 0.2 }}
             className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-4"
           >
-            <span className="text-white text-2xl font-bold">{localStorage.getItem('username') || 'CRM'}</span>
+            <span className="text-white text-2xl font-bold">CRM</span>
           </motion.div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
-          <p className="text-gray-600 text-sm sm:text-base">Sign in to continue to your dashboard</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Create Account</h1>
+          <p className="text-gray-600 text-sm sm:text-base">Sign up to get started with your dashboard</p>
         </div>
 
-        <form onSubmit={handleLogin} className="space-y-5">
+        <form onSubmit={handleSignUp} className="space-y-5">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -84,6 +106,21 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
               {error}
             </motion.div>
           )}
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
+            <div className="relative">
+              <FiUser className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="Enter your username"
+                required
+              />
+            </div>
+          </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
@@ -122,14 +159,26 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
             </div>
           </div>
 
-          <div className="flex items-center justify-between text-sm">
-            <label className="flex items-center">
-              <input type="checkbox" className="mr-2 rounded" />
-              <span className="text-gray-600">Remember me</span>
-            </label>
-            <a href="/forgot-password" className="text-indigo-600 hover:text-indigo-700 font-medium">
-              Forgot password?
-            </a>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Confirm Password</label>
+            <div className="relative">
+              <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type={showPassword ? 'text' : 'password'}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                placeholder="Confirm your password"
+                required
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <FiEyeOff /> : <FiEye />}
+              </button>
+            </div>
           </div>
 
           <motion.button
@@ -145,18 +194,18 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
                   <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                 </svg>
-                Signing in...
+                Signing up...
               </span>
             ) : (
-              'Sign In'
+              'Sign Up'
             )}
           </motion.button>
         </form>
 
         <div className="text-center mt-4 text-sm">
-          <span className="text-gray-600">Don't have an account? </span>
-          <Link to="/signup" className="text-indigo-600 hover:text-indigo-700 font-medium">
-            Sign Up
+          <span className="text-gray-600">Already have an account? </span>
+          <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+            Sign In
           </Link>
         </div>
       </motion.div>
@@ -164,4 +213,4 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
   );
 }
 
-export default Login;
+export default SignUp;

@@ -4,7 +4,7 @@ import {
   FaUserCog, FaClock, FaSignOutAlt, FaCarSide 
 } from 'react-icons/fa';
 
-function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout }) {
+function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout, username }) {
   const tabs = [
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Leads', icon: FaUsers, key: 'leads' },
@@ -39,7 +39,10 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
         data-open={isSidebarOpen}
       >
         <div className="flex items-center justify-between p-4">
-          <h1 className="text-xl md:text-2xl font-bold tracking-tight">Lead CRM</h1>
+          {/* Dynamic username instead of static "Lead CRM" */}
+          <h1 className="text-xl md:text-2xl font-bold tracking-tight">
+            {username || 'Lead CRM'}
+          </h1>
           {isSidebarOpen && (
             <button
               onClick={() => setIsSidebarOpen(false)}

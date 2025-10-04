@@ -9,7 +9,7 @@ import UserActivity from "./UserActivity";
 import HomePage from "./HomePage";
 import Attendance from "./Attendance";
 import UserCampaigns from "./UserCampaigns";
-import VehicleQuote from "./VehicleQuote"; // 🚗 Import new page
+import VehicleQuote from "./VehicleQuote";
 import {
   leads,
   tasks,
@@ -32,34 +32,51 @@ function UserApp({ handleLogout }) {
   const [campaignList, setCampaignList] = useState(campaigns);
   const navigate = useNavigate();
 
+  // ----------------------------------------------------------------------
+  // NEW: read username from localStorage (fallback to generic name)
+  // ----------------------------------------------------------------------
+  const username = localStorage.getItem('username') || 'User';
+
+  // ----------------------------------------------------------------------
+  // Task handling
+  // ----------------------------------------------------------------------
   const handleAddTask = (e) => {
     e.preventDefault();
     setTaskList([...taskList, { id: `${taskList.length + 1}`, ...newTask }]);
     setNewTask({ title: "", dueDate: "", priority: "Medium" });
   };
 
+  // ----------------------------------------------------------------------
+  // Logout (clears everything)
+  // ----------------------------------------------------------------------
   const handleUserLogout = () => {
     handleLogout();
+    localStorage.removeItem('username'); // explicit clear
     navigate("/login");
   };
 
+  // ----------------------------------------------------------------------
+  // Mock logged-in user (replace with real data when you fetch from API)
+  // ----------------------------------------------------------------------
   const loggedInUser = users.find((user) => user.role === "User") || users[1];
 
+  // ----------------------------------------------------------------------
+  // Render
+  // ----------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-gray-100 flex">
+      {/* Navbar – you can also pass username here if you want it displayed */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        handleLogout={handleLogout}
+        handleLogout={handleUserLogout}
+        username={username}   
       />
 
       <div className="flex-1 flex flex-col">
         <div>
           <Routes>
-            <Route
-              path="/"
-              element={<HomePage handleLogout={handleUserLogout} />}
-            />
+            <Route path="/" element={<HomePage handleLogout={handleUserLogout} />} />
             <Route
               path="/dashboard"
               element={
@@ -95,10 +112,7 @@ function UserApp({ handleLogout }) {
                 />
               }
             />
-            <Route
-              path="/profile"
-              element={<UserProfile user={loggedInUser} />}
-            />
+            <Route path="/profile" element={<UserProfile user={loggedInUser} />} />
             <Route
               path="/activity"
               element={
@@ -114,18 +128,12 @@ function UserApp({ handleLogout }) {
                 />
               }
             />
-            <Route
-              path="/attendance"
-              element={<Attendance user={loggedInUser} />}
-            />
+            <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
             <Route
               path="/mycampaigns"
-              element={
-                <UserCampaigns campaigns={campaignList} user={loggedInUser} />
-              }
+              element={<UserCampaigns campaigns={campaignList} user={loggedInUser} />}
             />
-            <Route path="/vehicle-quote" element={<VehicleQuote />} />{" "}
-            {/* 🚗 New Route */}
+            <Route path="/vehicle-quote" element={<VehicleQuote />} />
           </Routes>
         </div>
       </div>

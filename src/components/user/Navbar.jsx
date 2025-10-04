@@ -17,7 +17,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import assets from "../../assets/assets";
 
-function Navbar({ activeTab, setActiveTab, handleLogout }) {
+function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -53,11 +53,11 @@ function Navbar({ activeTab, setActiveTab, handleLogout }) {
 
   return (
     <header className="w-full bg-gradient-to-r from-indigo-900 to-indigo-700 text-white shadow-md fixed top-0 left-0 z-50">
-      <div className=" flex justify-between items-center px-6 py-3">
-        {/* Logo */}
+      <div className="flex justify-between items-center px-6 py-3">
+        {/* Logo and dynamic username */}
         <div className="flex items-center space-x-2 cursor-pointer">
-          <img src={assets.logo} className="w-36 rounded-2xl" alt="" />
-          <span className="font-semibold text-lg">CRM</span>
+          <img src={assets.logo} className="w-36 rounded-2xl" alt="Logo" />
+          <span className="font-semibold text-lg">{username || "CRM"}</span>
         </div>
 
         {/* Desktop Menu */}

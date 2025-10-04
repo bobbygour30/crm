@@ -1,7 +1,7 @@
-// App.jsx
 import { useState, useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
+import SignUp from './components/SignUp'; // Import SignUp component
 import AdminApp from './components/admin/AdminApp';
 import UserApp from './components/user/UserApp';
 
@@ -26,6 +26,8 @@ function App() {
     setIsAdmin(false);
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('isAdmin');
+    localStorage.removeItem('token'); 
+    localStorage.removeItem('username');
   };
 
   return (
@@ -35,9 +37,19 @@ function App() {
           path="/login"
           element={
             isAuthenticated ? (
-              <Navigate to={isAdmin ? "/admin" : "/"} />
+              <Navigate to={isAdmin ? '/admin' : '/'} />
             ) : (
               <Login setIsAuthenticated={setIsAuthenticated} setIsAdmin={setIsAdmin} />
+            )
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            isAuthenticated ? (
+              <Navigate to={isAdmin ? '/admin' : '/'} />
+            ) : (
+              <SignUp setIsAuthenticated={setIsAuthenticated} setIsAdmin={setIsAdmin} />
             )
           }
         />
