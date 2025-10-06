@@ -4,40 +4,101 @@ import { useState, useRef, useEffect } from 'react';
 import * as XLSX from 'xlsx';
 
 function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [], onAssignLead, onAddLead }) {
+  const lobOptions = [
+    'Private Car-OD',
+    'Private Car-SOD',
+    'Private Car-Comprehensive',
+    'Private Car-TP',
+    'Taxi-Comprehensive',
+    'Taxi-TP',
+    'Commerical Vehicle-Comprehensive',
+    'Commerical Vehicle-TP',
+    'E-Rikshaw-TP',
+    'E-Rikshaw-Comprehensive',
+    'Two-Wheeler-TP',
+    'My home',
+    'Mediclaim Health Insurance',
+    'Bharat Sookshma Udyam Suraksha',
+    'Bharat Laghu Udyam Suraksha',
+    'Bharat Grih Raksha',
+    'Burglary',
+    'MARINE-OPEN',
+    'MARINE-SPECIFIC',
+    'MARINE-STOP',
+    'PERSONAL ACCIDENT',
+    'Employee Compensation',
+    'Group Health Insurance',
+    'Terms Insurance',
+    'Ulip Plan',
+    'Treditional Plan',
+    'Travel Insurance',
+    'New Vehicle Insurance',
+    'New Two Wheeler Insurance',
+    'Other Insurance'
+  ];
+   const insurerOptions = [
+    'Bajaj Allianz Gengeral Insurance Co Ltd',
+    'Tata Aig General Insurance Co Ltd',
+    'HDFC Ergo General Insurance Co Ltd',
+    'ICICI Lombard General Insurance Co Ltd',
+    'Digit General Insurance Co Ltd',
+    'Reliance General Insurance Co Ltd',
+    'SBI General Insurance Co Ltd',
+    'Future General General Insurance Co Ltd',
+    'Magma HDI General Insurance Co Ltd',
+    'Royal Sundram Genetal Insurance Co Ltd',
+    'kotak Mahinrda General Insurance Co Ltd',
+    'Liberty General Insurance Co Ltd',
+    'Shriram General Insurance Co Ltd',
+    'United India General Insurance Co Ltd',
+    'Oriental General Insurance Co Ltd',
+    'National General Insurance Co Ltd',
+    'New India General Insurance Co Ltd',
+    'Chola MS General Insurance Co Ltd',
+    'Universal Sompo General Insurance Co Ltd',
+    'Iffco tokio General Insurance Co Ltd',
+    'ICICI Prudential Life Insurance',
+    'TATA AIA Life Insurance',
+    'HDFC  Life Insurance',
+    'Reliance Nippon Life Insurance',
+    'Axis Max Life Insurance',
+    'Niva Bupa Health Insurance',
+    'Care Health Insurance',
+    'Star Health Insurance',
+    'Aditya Birla Health Insurance',
+    'Bajaj Allianz Life Insurance',
+  ];
+
+  const gstOptions = [0, 5, 12, 18];
+  const assignOptions = ['Sales Manager', 'Self', 'Admin', 'User'];
+
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [newLead, setNewLead] = useState({
     name: '',
     email: '',
     source: '',
     status: 'New',
-    
+    openStatus: '',
     policyNumber: '',
-    lob: '',
+    lobOption: '',
+    lobCustom: '',
     sumInsured: 0,
     endorsement: '',
+    payoutPercent: 0,
     payoutStatus: '',
-    payout: 0,
     cashBack: 0,
     netPremium: 0,
-    gst: 0,
-    totalPremium: 0,
+    gstPercent: 0,
     policyStartDate: '',
     policyExpiryDate: '',
     mobileNo: '',
     insurer: '',
     remarks: '',
-    assignedTo: []
+    assignedTo: [],
   });
   const [selectedUsers, setSelectedUsers] = useState([]);
   const [showDropdown, setShowDropdown] = useState(null);
   const dropdownRef = useRef(null);
-
-  // Normalize assignedTo to always be an array
-  const normalizeAssignedTo = (assignedTo) => {
-    if (Array.isArray(assignedTo)) return assignedTo;
-    if (assignedTo === null || assignedTo === undefined) return [];
-    return [assignedTo];
-  };
 
   // Handle click outside to close dropdown
   useEffect(() => {
@@ -50,29 +111,86 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle manual lead creation
+  const normalizeAssignedTo = (assignedTo) => {
+    if (Array.isArray(assignedTo)) return assignedTo;
+    if (!assignedTo) return [];
+    return [assignedTo];
+  };
+
+  const clampPercent = (val) => {
+    let n = parseFloat(val);
+    if (Number.isNaN(n)) return 0;
+    if (n < 0) n = 0;
+    if (n > 100) n = 100;
+    return Math.round(n);
+  };
+
+  const formatCurrency = (value) => {
+    const v = parseFloat(value) || 0;
+    return v.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const computePayoutValue = (netPremium, payoutPercent) => {
+    const net = parseFloat(netPremium) || 0;
+    const pct = parseFloat(payoutPercent) || 0;
+    return (net * pct) / 100;
+  };
+
+  const computeGSTAmount = (amount, gstPercent) => {
+    const a = parseFloat(amount) || 0;
+    const g = parseFloat(gstPercent) || 0;
+    return (a * g) / 100;
+  };
+
+  const computeTotalPayout = (payoutValue, gstPercent) => {
+    const gstAmt = computeGSTAmount(payoutValue, gstPercent);
+    return payoutValue + gstAmt;
+  };
+
+  // Called when user submits the form
   const handleAddLead = (e) => {
     e.preventDefault();
+
+    const payoutValue = computePayoutValue(newLead.netPremium, newLead.payoutPercent);
+    const totalPayout = computeTotalPayout(payoutValue, newLead.gstPercent);
+
+    const finalLOB = newLead.lobOption === 'Other Insurance' ? (newLead.lobCustom || '') : newLead.lobOption;
+
+    const finalLead = {
+      ...newLead,
+      lob: finalLOB,
+      payout: newLead.payoutPercent, // keep old field name compatibility (percentage)
+      payoutValue,
+      gst: newLead.gstPercent,
+      totalPayout,
+      assignedTo: selectedUsers
+    };
+
+    // remove helper keys
+    delete finalLead.lobOption;
+    delete finalLead.lobCustom;
+
     if (typeof onAddLead === 'function') {
-      onAddLead({ ...newLead, assignedTo: selectedUsers });
-    } else {
-      console.warn('onAddLead is not a function. Manual lead creation skipped.');
+      onAddLead(finalLead);
     }
+
+    // reset
     setNewLead({
       name: '',
       email: '',
       source: '',
       status: 'New',
+      openStatus: '',
       policyNumber: '',
-      lob: '',
-      sumInsured: 0,
+      lobOption: '',
+      lobCustom: '',
+      sumInsured: "",
       endorsement: '',
+      payoutPercent: "",
       payoutStatus: '',
-      payout: 0,
-      cashBack: 0,
-      netPremium: 0,
-      gst: 0,
-      totalPremium: 0,
+      cashBack: "",
+      netPremium: "",
+      gstPercent: "",
       policyStartDate: '',
       policyExpiryDate: '',
       mobileNo: '',
@@ -84,13 +202,12 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     setShowLeadForm(false);
   };
 
-  // Handle Excel file upload
+  // Excel upload
   const handleFileUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     const reader = new FileReader();
-    
     reader.onload = (event) => {
       try {
         const data = new Uint8Array(event.target.result);
@@ -98,21 +215,15 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
-        
-        // Map Excel data to lead format
-        const newLeads = jsonData.map(row => {
-          let assignedTo = [];
-          if (row.Agent) {
-            const usernames = row.Agent.split(',').map(name => name.trim());
-            assignedTo = usernames
-              .map(name => users.find(user => user.name.toLowerCase() === name.toLowerCase())?.id)
-              .filter(id => id !== undefined);
-          }
-          // Helper function to parse numbers safely
-          const parseNumber = (value) => {
-            const parsed = parseFloat(value);
-            return isNaN(parsed) || value === null || value === undefined ? 0 : parsed;
-          };
+
+        const newLeads = jsonData.map((row) => {
+          const netPremium = parseFloat(row['Net Premium']) || parseFloat(row['netPremium']) || 0;
+          // prefer an explicit payout percent column, otherwise fall back to 'Payout'
+          const payoutPercent = parseFloat(row['Payout Percent'] ?? row['Payout']) || 0;
+          const gstPercent = parseFloat(row['GST'] ?? row['GST Percent']) || 0;
+          const payoutValue = computePayoutValue(netPremium, payoutPercent);
+          const totalPayout = computeTotalPayout(payoutValue, gstPercent);
+
           return {
             name: row['Insured Name'] || '',
             email: row['Email ID'] || '',
@@ -120,62 +231,70 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
             status: row['Status'] || 'New',
             policyNumber: row['Policy Number'] || '',
             lob: row['LOB'] || '',
-            sumInsured: parseNumber(row['Sum Insured']),
+            sumInsured: parseFloat(row['Sum Insured']) || 0,
             endorsement: row['Endorsement'] || '',
             payoutStatus: row['Payout Status'] || '',
-            payout: parseNumber(row['Payout']),
-            cashBack: parseNumber(row['Cash Back']),
-            netPremium: parseNumber(row['Net Premium']),
-            gst: parseNumber(row['GST']),
-            totalPremium: parseNumber(row['Total Premium']),
-            policyStartDate: row['Policy Start date'] ? new Date((row['Policy Start date'] - 25569) * 86400 * 1000).toISOString().split('T')[0] : '',
-            policyExpiryDate: row['Policy Expiry Date'] ? new Date((row['Policy Expiry Date'] - 25569) * 86400 * 1000).toISOString().split('T')[0] : '',
-            mobileNo: row['Mobile No'] ? String(row['Mobile No']) : '',
+            payout: payoutPercent,
+            payoutValue,
+            netPremium,
+            cashBack: parseFloat(row['Cash Back']) || 0,
+            gst: gstPercent,
+            totalPayout,
+            policyStartDate: '',
+            policyExpiryDate: '',
+            mobileNo: String(row['Mobile No'] || ''),
             insurer: row['Insurer'] || '',
             remarks: row['Remarks'] || '',
-            assignedTo
+            assignedTo: []
           };
         });
-        
+
         if (typeof onAddLead === 'function') {
-          newLeads.forEach(lead => onAddLead(lead));
-        } else {
-          console.warn('onAddLead is not a function. Excel data not processed.');
+          newLeads.forEach((lead) => onAddLead(lead));
         }
       } catch (error) {
         console.error('Error processing Excel file:', error);
       }
     };
-    
     reader.readAsArrayBuffer(file);
   };
 
-  // Helper function to format numbers safely
   const formatNumber = (value) => {
     if (value === null || value === undefined || isNaN(value)) return '0';
     return typeof value === 'number' ? value.toLocaleString() : '0';
   };
 
-  // Handle multiple user assignment
-  const handleMultiAssign = (leadId, selectedUserIds) => {
+  const toggleUserSelection = (leadId, userId) => {
+    const currentAssigned = normalizeAssignedTo(
+      leads.find((lead) => lead.id === leadId)?.assignedTo || []
+    );
+    const updatedAssigned = currentAssigned.includes(userId)
+      ? currentAssigned.filter((id) => id !== userId)
+      : [...currentAssigned, userId];
     if (typeof onAssignLead === 'function') {
-      onAssignLead(leadId, selectedUserIds);
-      setShowDropdown(null);
-    } else {
-      console.warn('onAssignLead is not a function. Assignment skipped.');
+      onAssignLead(leadId, updatedAssigned);
     }
   };
 
-  // Toggle user selection in dropdown
-  const toggleUserSelection = (leadId, userId) => {
-    const currentAssigned = normalizeAssignedTo(
-      leads.find(lead => lead.id === leadId)?.assignedTo || []
-    );
-    const updatedAssigned = currentAssigned.includes(userId)
-      ? currentAssigned.filter(id => id !== userId)
-      : [...currentAssigned, userId];
-    handleMultiAssign(leadId, updatedAssigned);
+  // helpers for table display when older data may not have new fields
+  const getLeadPayoutPercent = (lead) => {
+    if (lead.payoutPercent !== undefined) return lead.payoutPercent;
+    if (lead.payout !== undefined) return lead.payout; // older field
+    return 0;
   };
+
+  const getLeadNetPremium = (lead) => {
+    return parseFloat(lead.netPremium || lead.netpremium || lead.NetPremium || 0) || 0;
+  };
+
+  const getLeadGSTPercent = (lead) => {
+    if (lead.gstPercent !== undefined) return lead.gstPercent;
+    if (lead.gst !== undefined) return lead.gst; // older field
+    return 0;
+  };
+
+  const leadPayoutValue = (lead) => computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
+  const leadTotalPayout = (lead) => computeTotalPayout(leadPayoutValue(lead), getLeadGSTPercent(lead));
 
   return (
     <motion.div
@@ -184,7 +303,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
       transition={{ duration: 0.5 }}
       className="space-y-4"
     >
-      {/* Lead Creation and Upload Controls */}
+      {/* Controls */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -200,16 +319,13 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
           </button>
           <label className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all cursor-pointer">
             Upload Excel
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
+            <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" />
           </label>
         </div>
         <div className="w-full sm:w-auto">
-          <label className="text-sm font-medium text-gray-700 mb-1 block sm:hidden">Filter Leads</label>
+          <label className="text-sm font-medium text-gray-700 mb-1 block sm:hidden">
+            Filter Leads
+          </label>
           <select
             className="w-full sm:w-48 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 transition-all"
             value={filter || 'All'}
@@ -233,6 +349,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
           className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6"
         >
           <form onSubmit={handleAddLead} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Basic Fields */}
             <div>
               <label className="text-sm font-medium text-gray-700">Name</label>
               <input
@@ -241,6 +358,15 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 required
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mobile No</label>
+              <input
+                type="text"
+                value={newLead.mobileNo}
+                onChange={(e) => setNewLead({ ...newLead, mobileNo: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
@@ -262,6 +388,8 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
+            {/* Status Field */}
             <div>
               <label className="text-sm font-medium text-gray-700">Status</label>
               <select
@@ -269,13 +397,31 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
+                <option value="Policy Issued">Policy Issued</option>
+                <option value="Closed Without Issuance">Closed Without Issuance</option>
+                <option value="Open">Open</option>
                 <option value="New">New</option>
                 <option value="Contacted">Contacted</option>
                 <option value="Qualified">Qualified</option>
-                <option value="Closed">Closed</option>
               </select>
             </div>
-            
+
+            {/* Conditional Next Step */}
+            {newLead.status === 'Open' && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Next Step</label>
+                <select
+                  value={newLead.openStatus}
+                  onChange={(e) => setNewLead({ ...newLead, openStatus: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select Option</option>
+                  <option value="Closed">Closed</option>
+                  <option value="Policy Issued">Policy Issued</option>
+                </select>
+              </div>
+            )}
+
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Number</label>
               <input
@@ -285,15 +431,31 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
+            {/* LOB select  + Other option */}
             <div>
-              <label className="text-sm font-medium text-gray-700">LOB</label>
-              <input
-                type="text"
-                value={newLead.lob}
-                onChange={(e) => setNewLead({ ...newLead, lob: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
+              <label className="text-sm font-medium text-gray-700">LOB </label>
+              <select
+                value={newLead.lobOption}
+                onChange={(e) => setNewLead({ ...newLead, lobOption: e.target.value, lobCustom: '' })}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">-- Select LOB --</option>
+                {lobOptions.map((lob) => (
+                  <option key={lob} value={lob}>{lob}</option>
+                ))}
+              </select>
+              {newLead.lobOption === 'Other Insurance' && (
+                <input
+                  type="text"
+                  placeholder="Enter LOB manually"
+                  value={newLead.lobCustom}
+                  onChange={(e) => setNewLead({ ...newLead, lobCustom: e.target.value })}
+                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
+                />
+              )}
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">Sum Insured</label>
               <input
@@ -312,33 +474,8 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout Status</label>
-              <input
-                type="text"
-                value={newLead.payoutStatus}
-                onChange={(e) => setNewLead({ ...newLead, payoutStatus: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout</label>
-              <input
-                type="number"
-                value={newLead.payout}
-                onChange={(e) => setNewLead({ ...newLead, payout: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Cash Back</label>
-              <input
-                type="number"
-                value={newLead.cashBack}
-                onChange={(e) => setNewLead({ ...newLead, cashBack: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+
+            {/* Net Premium */}
             <div>
               <label className="text-sm font-medium text-gray-700">Net Premium</label>
               <input
@@ -348,24 +485,86 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
+            {/* Payout controls: percentage -> payout value (calculated) -> gst -> total payout */}
             <div>
-              <label className="text-sm font-medium text-gray-700">GST</label>
+              <label className="text-sm font-medium text-gray-700">Payout (%)</label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={newLead.payoutPercent}
+                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
+                  className="w-full"
+                />
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  value={newLead.payoutPercent}
+                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
+                  className="w-20 p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Payout Value (calculated)</label>
+              <input
+                type="text"
+                readOnly
+                value={formatCurrency(computePayoutValue(newLead.netPremium, newLead.payoutPercent))}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">GST %</label>
+              <select
+                value={newLead.gstPercent}
+                onChange={(e) => setNewLead({ ...newLead, gstPercent: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                {gstOptions.map(g => (
+                  <option key={g} value={g}>{g}%</option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Total Payout (Payout + GST)</label>
+              <input
+                type="text"
+                readOnly
+                value={formatCurrency(computeTotalPayout(computePayoutValue(newLead.netPremium, newLead.payoutPercent), newLead.gstPercent))}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Payout Status</label>
+              <select
+                value={newLead.payoutStatus}
+                onChange={(e) => setNewLead({ ...newLead, payoutStatus: e.target.value })}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">-- Select Payout Status --</option>
+                <option value="Pending">Pending</option>
+                <option value="Received">Received</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Cash Back</label>
               <input
                 type="number"
-                value={newLead.gst}
-                onChange={(e) => setNewLead({ ...newLead, gst: parseFloat(e.target.value) || 0 })}
+                value={newLead.cashBack}
+                onChange={(e) => setNewLead({ ...newLead, cashBack: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Total Premium</label>
-              <input
-                type="number"
-                value={newLead.totalPremium}
-                onChange={(e) => setNewLead({ ...newLead, totalPremium: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
               <input
@@ -384,79 +583,57 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
+            {/* Insurance Company Dropdown */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Mobile No</label>
-              <input
-                type="text"
-                value={newLead.mobileNo}
-                onChange={(e) => setNewLead({ ...newLead, mobileNo: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Insurer</label>
-              <input
-                type="text"
+              <label className="text-sm font-medium text-gray-700">Insurance Company</label>
+              <select
                 value={newLead.insurer}
                 onChange={(e) => setNewLead({ ...newLead, insurer: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">-- Select Insurance Company --</option>
+                {insurerOptions.map((ins, idx) => (
+                  <option key={idx} value={ins}>
+                    {ins}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {/* Assign To */}
             <div>
+              <label className="text-sm font-medium text-gray-700">Assign To</label>
+              <select
+                value={selectedUsers}
+                onChange={(e) => setSelectedUsers([e.target.value])}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                <option value="">-- Select Assign To --</option>
+                {assignOptions.map((opt, idx) => (
+                  <option key={idx} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Remarks */}
+            <div className="sm:col-span-2">
               <label className="text-sm font-medium text-gray-700">Remarks</label>
-              <input
-                type="text"
+              <textarea
                 value={newLead.remarks}
                 onChange={(e) => setNewLead({ ...newLead, remarks: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div className="relative">
-              <label className="text-sm font-medium text-gray-700">Assign To</label>
-              <div
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 cursor-pointer"
-                onClick={() => setShowDropdown(showDropdown === 'new' ? null : 'new')}
-              >
-                {selectedUsers.length > 0
-                  ? selectedUsers
-                      .map(userId => users.find(user => user.id === userId)?.name || 'Unknown')
-                      .join(', ')
-                  : 'Select Users'}
-              </div>
-              {showDropdown === 'new' && (
-                <div
-                  ref={dropdownRef}
-                  className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto"
-                >
-                  {users.map(user => (
-                    <label
-                      key={user.id}
-                      className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedUsers.includes(user.id)}
-                        onChange={() => {
-                          setSelectedUsers(prev =>
-                            prev.includes(user.id)
-                              ? prev.filter(id => id !== user.id)
-                              : [...prev, user.id]
-                          );
-                        }}
-                        className="mr-2"
-                      />
-                      {user.name}
-                    </label>
-                  ))}
-                </div>
-              )}
+                rows="2"
+              ></textarea>
             </div>
             <div className="sm:col-span-2">
               <button
                 type="submit"
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
               >
-                Create Lead
+                Submit
               </button>
             </div>
           </form>
@@ -475,8 +652,11 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 <th className="p-4 font-medium text-gray-700">Policy Number</th>
                 <th className="p-4 font-medium text-gray-700">LOB</th>
                 <th className="p-4 font-medium text-gray-700">Sum Insured</th>
+                <th className="p-4 font-medium text-gray-700">Payout %</th>
+                <th className="p-4 font-medium text-gray-700">Payout Value</th>
+                <th className="p-4 font-medium text-gray-700">GST %</th>
+                <th className="p-4 font-medium text-gray-700">Total Payout</th>
                 <th className="p-4 font-medium text-gray-700">Payout Status</th>
-                <th className="p-4 font-medium text-gray-700">Payout</th>
                 <th className="p-4 font-medium text-gray-700">Total Premium</th>
                 <th className="p-4 font-medium text-gray-700">Insurer</th>
                 <th className="p-4 font-medium text-gray-700">Source</th>
@@ -502,8 +682,11 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                     <td className="p-4">{lead.policyNumber || ''}</td>
                     <td className="p-4">{lead.lob || ''}</td>
                     <td className="p-4">{formatNumber(lead.sumInsured)}</td>
+                    <td className="p-4">{getLeadPayoutPercent(lead)}%</td>
+                    <td className="p-4">{formatCurrency(leadPayoutValue(lead))}</td>
+                    <td className="p-4">{getLeadGSTPercent(lead)}%</td>
+                    <td className="p-4">{formatCurrency(leadTotalPayout(lead))}</td>
                     <td className="p-4">{lead.payoutStatus || ''}</td>
-                    <td className="p-4">{formatNumber(lead.payout)}</td>
                     <td className="p-4">{formatNumber(lead.totalPremium)}</td>
                     <td className="p-4">{lead.insurer || ''}</td>
                     <td className="p-4">{lead.source || ''}</td>
@@ -595,8 +778,11 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                   <div><span className="font-medium text-gray-700">Policy Number:</span> {lead.policyNumber || ''}</div>
                   <div><span className="font-medium text-gray-700">LOB:</span> {lead.lob || ''}</div>
                   <div><span className="font-medium text-gray-700">Sum Insured:</span> {formatNumber(lead.sumInsured)}</div>
+                  <div><span className="font-medium text-gray-700">Payout %:</span> {getLeadPayoutPercent(lead)}%</div>
+                  <div><span className="font-medium text-gray-700">Payout Value:</span> {formatCurrency(leadPayoutValue(lead))}</div>
+                  <div><span className="font-medium text-gray-700">GST %:</span> {getLeadGSTPercent(lead)}%</div>
+                  <div><span className="font-medium text-gray-700">Total Payout:</span> {formatCurrency(leadTotalPayout(lead))}</div>
                   <div><span className="font-medium text-gray-700">Payout Status:</span> {lead.payoutStatus || ''}</div>
-                  <div><span className="font-medium text-gray-700">Payout:</span> {formatNumber(lead.payout)}</div>
                   <div><span className="font-medium text-gray-700">Total Premium:</span> {formatNumber(lead.totalPremium)}</div>
                   <div><span className="font-medium text-gray-700">Insurer:</span> {lead.insurer || ''}</div>
                   <div><span className="font-medium text-gray-700">Source:</span> {lead.source || ''}</div>
