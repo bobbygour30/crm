@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, 
-  FaUserCog, FaClock, FaSignOutAlt, FaCarSide 
+  FaUserCog, FaClock, FaSignOutAlt, FaCarSide ,FaFileInvoice, FaMoneyCheckAlt
 } from 'react-icons/fa';
 
 function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout, username }) {
@@ -9,14 +9,14 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Leads', icon: FaUsers, key: 'leads' },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
-    { name: 'Invoice', icon: FaClipboardList, key: 'invoice' },
+    { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },   // ✅ updated
+    { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },  // ✅ updated
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog, key: 'users' },
       { name: 'Attendance', icon: FaClock, key: 'attendance' }
     ] : []),
   ];
-
   return (
     <>
       {isSidebarOpen && (

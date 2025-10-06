@@ -1,5 +1,6 @@
+// AdminApp.jsx
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
@@ -14,6 +15,7 @@ import LeadModal from './LeadModal';
 import { tasks, users, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import assets from '../../assets/assets';
+import SalarySlipGenerator from './SalarySlipGenerator';
 
 function AdminApp({ handleLogout }) {
   const [leads, setLeads] = useState([]);
@@ -27,13 +29,33 @@ function AdminApp({ handleLogout }) {
   const [userList, setUserList] = useState(users);
 
   const navigate = useNavigate();
+  const location = useLocation();
 
   // ----------------------------------------------------------------------
   // NEW: read username from localStorage (fallback to generic name)
   // ----------------------------------------------------------------------
   const username = localStorage.getItem('username') || 'Admin';
 
-  
+  // ----------------------------------------------------------------------
+  // Map logical tabs <-> URL paths
+  // ----------------------------------------------------------------------
+  const tabPathMap = {
+    dashboard: '/admin', // adjust if your admin root differs
+    leads: '/admin/leads',
+    tasks: '/admin/tasks',
+    analytics: '/admin/analytics',
+    users: '/admin/users',
+    attendance: '/admin/attendance',
+    invoice: '/admin/invoice',
+    'vehicle-admin': '/admin/vehicle-admin',
+    'salary-slip': '/admin/salary-slip' // ✅ SalarySlip route
+  };
+
+  // inverse mapping helper (path -> tab)
+  const pathToTab = (pathname) => {
+    const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
+    return entry ? entry[0] : null;
+  };
 
   // ----------------------------------------------------------------------
   // Sidebar open/close on resize
@@ -43,6 +65,28 @@ function AdminApp({ handleLogout }) {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // ----------------------------------------------------------------------
+  // Keep activeTab in sync with URL (so direct links like /salary-slip work)
+  // ----------------------------------------------------------------------
+  useEffect(() => {
+    const pathname = location.pathname;
+    const mappedTab = pathToTab(pathname);
+    if (mappedTab && mappedTab !== activeTab) {
+      setActiveTab(mappedTab);
+    }
+    // If pathname not recognized, do not change activeTab (leave current tab)
+    // This keeps other routes (if any) stable.
+  }, [location.pathname]);
+
+  // When activeTab changes in-app (sidebar click), update URL
+  useEffect(() => {
+    const desiredPath = tabPathMap[activeTab];
+    if (desiredPath && desiredPath !== location.pathname) {
+      navigate(desiredPath, { replace: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   // ----------------------------------------------------------------------
   // Logout handler (clears everything and redirects)
@@ -103,10 +147,14 @@ function AdminApp({ handleLogout }) {
       attendance: 'Attendance Tracking',
       invoice: 'Invoice Generator',
       'vehicle-admin': 'Vehicle Admin',
+      'salary-slip': 'Salary Slip Generator'
     };
     return (
       <div className="flex items-center space-x-3">
         <img src={assets.logo} alt="Logo" className="w-64 object-contain" />
+        <div className="hidden md:block">
+          <div className="text-lg font-semibold">{titles[activeTab] || 'Admin'}</div>
+        </div>
       </div>
     );
   };
@@ -121,6 +169,7 @@ function AdminApp({ handleLogout }) {
       attendance: 'Track and manage employee attendance',
       invoice: 'Generate invoices for your services',
       'vehicle-admin': 'Manage all vehicle administration tasks',
+      'salary-slip': 'Generate detailed employee salary slips'
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   };
@@ -159,9 +208,7 @@ function AdminApp({ handleLogout }) {
 
       {/* Main content area */}
       <div
-        className={`flex-1 transition-all duration-300 ${
-          isSidebarOpen ? 'md:ml-64' : 'md:ml-16'
-        } ml-0`}
+        className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-16'} ml-0`}
       >
         <div className="p-4 sm:p-6 lg:p-8 pt-16 md:pt-8">
           {/* Header */}
@@ -176,7 +223,7 @@ function AdminApp({ handleLogout }) {
                 <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-gray-900 tracking-tight flex items-center space-x-2">
                   {getPageTitle()}
                 </h1>
-                <p className="text-gray-600 mt-2 text-sm sm:text-base text-center">
+                <p className="text-gray-600 mt-2 text-sm sm:text-base">
                   {getPageDescription()}
                 </p>
               </div>
@@ -239,6 +286,9 @@ function AdminApp({ handleLogout }) {
               {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
               {activeTab === 'invoice' && <InvoiceGenerator />}
               {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
+
+              {/* Salary Slip */}
+              {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} /> }
             </motion.div>
           </AnimatePresence>
         </div>
