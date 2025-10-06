@@ -2,8 +2,14 @@ import { motion } from 'framer-motion';
 import { Bar } from 'react-chartjs-2';
 import ActivityTimeline from '../admin/ActivityTimeline';
 
-function UserDashboard({ leads, activities, user }) {
+function UserDashboard({ leads, activities, user, leaves }) {
   const userLeads = leads.filter((lead) => lead.assignedTo === user.id);
+
+  // Leaves Pending Count
+  const pendingLeaves = leaves
+    ? leaves.filter((leave) => leave.userId === user.id && leave.status === 'Pending').length
+    : 0;
+
   const leadSourceData = {
     labels: ['Website', 'Social Media', 'Referral', 'Email'],
     datasets: [
@@ -27,7 +33,9 @@ function UserDashboard({ leads, activities, user }) {
       <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 sm:mb-8 tracking-tight">
         Dashboard
       </h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+
+      {/* Top Stats Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-green-500"
@@ -35,6 +43,7 @@ function UserDashboard({ leads, activities, user }) {
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Your Leads</h2>
           <p className="text-2xl sm:text-3xl font-bold text-green-600">{userLeads.length}</p>
         </motion.div>
+
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-blue-500"
@@ -44,6 +53,7 @@ function UserDashboard({ leads, activities, user }) {
             {userLeads.filter((l) => l.status !== 'Closed').length}
           </p>
         </motion.div>
+
         <motion.div
           whileHover={{ scale: 1.05 }}
           className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-yellow-500"
@@ -51,7 +61,18 @@ function UserDashboard({ leads, activities, user }) {
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Tasks Due</h2>
           <p className="text-2xl sm:text-3xl font-bold text-yellow-600">3</p>
         </motion.div>
+
+        {/* New Leaves Pending Section */}
+        <motion.div
+          whileHover={{ scale: 1.05 }}
+          className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border-l-4 border-red-500"
+        >
+          <h2 className="text-lg sm:text-xl font-semibold text-gray-800">Leaves Pending</h2>
+          <p className="text-2xl sm:text-3xl font-bold text-red-600">{pendingLeaves}</p>
+        </motion.div>
       </div>
+
+      {/* Charts and Activity Timeline */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
           <h2 className="text-lg sm:text-xl font-semibold text-gray-800 mb-4">Your Leads by Source</h2>
@@ -66,6 +87,7 @@ function UserDashboard({ leads, activities, user }) {
             />
           </div>
         </div>
+
         <ActivityTimeline
           activities={activities.filter((activity) =>
             userLeads.some((lead) => lead.id === activity.leadId)
