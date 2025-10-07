@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
-import SignUp from './components/SignUp'; // Import SignUp component
+import SignUp from './components/SignUp';
 import AdminApp from './components/admin/AdminApp';
 import UserApp from './components/user/UserApp';
+import ForgotPassword from './components/ForgotPassword'; // 👈 add this
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
@@ -26,13 +27,14 @@ function App() {
     setIsAdmin(false);
     localStorage.removeItem('isAuthenticated');
     localStorage.removeItem('isAdmin');
-    localStorage.removeItem('token'); 
+    localStorage.removeItem('token');
     localStorage.removeItem('username');
   };
 
   return (
     <BrowserRouter>
       <Routes>
+        {/* Login */}
         <Route
           path="/login"
           element={
@@ -43,6 +45,8 @@ function App() {
             )
           }
         />
+
+        {/* Signup */}
         <Route
           path="/signup"
           element={
@@ -53,6 +57,11 @@ function App() {
             )
           }
         />
+
+        {/* Forgot Password (OTP route) */}
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* Admin */}
         <Route
           path="/admin/*"
           element={
@@ -63,6 +72,8 @@ function App() {
             )
           }
         />
+
+        {/* User */}
         <Route
           path="/*"
           element={

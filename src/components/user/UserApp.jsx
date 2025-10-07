@@ -8,6 +8,7 @@ import UserProfile from "./UserProfile";
 import UserActivity from "./UserActivity";
 import Attendance from "./Attendance";
 import VehicleQuote from "./VehicleQuote";
+import Quote from "./Quote";
 import {
   leads,
   tasks,
@@ -127,7 +128,8 @@ function UserApp({ handleLogout }) {
             />
             <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
 
-            <Route path="/vehicle-quote" element={<VehicleQuote />} />
+            <Route path="/vehicle-quote" element={<VehicleQuote user={loggedInUser} />} />
+            <Route path="/quote" element={<Quote user={loggedInUser} />} />
           </Routes>
         </div>
       </div>

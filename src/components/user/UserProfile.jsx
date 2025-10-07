@@ -13,6 +13,8 @@ function UserProfile({ user }) {
     managerName: user.managerName || '',
     dateOfJoining: user.dateOfJoining || '',
     image: user.image || '',
+    aadhaarCard: null,
+    idProof: null,
   });
 
   const handleImageChange = (e) => {
@@ -26,8 +28,21 @@ function UserProfile({ user }) {
     }
   };
 
+  const handleFileChange = (e) => {
+    const { name, files } = e.target;
+    if (files[0]) {
+      setProfile({ ...profile, [name]: files[0] });
+    }
+  };
+
   const handleUpdate = (e) => {
     e.preventDefault();
+    // Log or send profile data including files to backend
+    console.log('Profile data:', {
+      ...profile,
+      aadhaarCard: profile.aadhaarCard ? profile.aadhaarCard.name : 'Not uploaded',
+      idProof: profile.idProof ? profile.idProof.name : 'Not uploaded',
+    });
     alert('Profile updated successfully!');
   };
 
@@ -41,19 +56,28 @@ function UserProfile({ user }) {
         <form onSubmit={handleUpdate} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Profile Image</label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleImageChange}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
-            />
-            {profile.image && (
-              <img
-                src={profile.image}
-                alt="Profile"
-                className="mt-2 w-24 h-24 rounded-full object-cover"
-              />
-            )}
+            <div className="mt-1 flex flex-col items-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+              <div className="space-y-1 text-center">
+                <p className="text-sm text-gray-600">Drop your image here or click to upload</p>
+                <p className="text-xs text-gray-500">Upload up to 1 image file (JPEG, PNG)</p>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="w-full mt-2"
+                />
+              </div>
+              {profile.image && (
+                <div className="mt-4">
+                  <p className="text-sm text-gray-600 mb-2">Image Preview:</p>
+                  <img
+                    src={profile.image}
+                    alt="Profile Preview"
+                    className="w-32 h-32 rounded-full object-cover border-2 border-indigo-500"
+                  />
+                </div>
+              )}
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
@@ -135,6 +159,45 @@ function UserProfile({ user }) {
               onChange={(e) => setProfile({ ...profile, dateOfJoining: e.target.value })}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar Card</label>
+            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+              <div className="space-y-1 text-center">
+                <p className="text-sm text-gray-600">Drop your file here or click to upload</p>
+                <p className="text-xs text-gray-500">Upload up to 1 file (image or PDF)</p>
+                <input
+                  type="file"
+                  name="aadhaarCard"
+                  onChange={handleFileChange}
+                  className="w-full mt-2"
+                  accept="image/*,application/pdf"
+                />
+              </div>
+            </div>
+            {profile.aadhaarCard && (
+              <p className="mt-2 text-sm text-gray-600">Uploaded: {profile.aadhaarCard.name}</p>
+            )}
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">ID Proof (Passport/Driver's License)</label>
+            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
+              <div className="space-y-1 text-center">
+                <p className="text-sm text-gray-600">Drop your file here or click to upload</p>
+                <p className="text-xs text-gray-500">Upload up to 1 file (image or PDF)</p>
+                <input
+                  type="file"
+                  name="idProof"
+                  onChange={handleFileChange}
+                  className="w-full mt-2"
+                  accept="image/*,application/pdf"
+                />
+              </div>
+            </div>
+            {profile.idProof && (
+              <p className="mt-2 text-sm text-gray-600">Uploaded: {profile.idProof.name}</p>
+            )}
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
