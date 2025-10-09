@@ -1,4 +1,4 @@
-// src/pages/Dashboard.jsx
+// src/pages/Dashboard.jsx (Updated calendar to reflect holidays and leave status colors)
 import React, { useState, useMemo, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Bar } from 'react-chartjs-2';
@@ -13,16 +13,29 @@ import {
 } from 'chart.js';
 import ActivityTimeline from './ActivityTimeline';
 import Analytics from './Analytics';
+import axios from 'axios';
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
-/**
- * Dashboard
- * - preserves your pipeline and charts
- * - adds responsive Officials Leaves calendar, leave modal, attendance modal
- * - fixes collapsing by adding explicit min-heights, overflow behaviors, and responsive layout rules
- */
-function Dashboard({ leads = [], activities = [], users = [] }) {
+function Dashboard({ leads = [], activities = [] }) {
+  const token = localStorage.getItem('token');
+  const [users, setUsers] = useState([]);
+
+  // Fetch users for attendance
+  useEffect(() => {
+    async function fetchUsers() {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUsers(res.data);
+      } catch (err) {
+        console.error('Fetch users error:', err);
+      }
+    }
+    fetchUsers();
+  }, []);
+
   // ---------- Existing pipeline state ----------
   const [pipeline, setPipeline] = useState({
     New: leads.filter((lead) => lead.status === 'New'),
@@ -73,7 +86,7 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
     }
   };
 
-  // =================== New Attendance / Leaves State ===================
+  // =================== Attendance / Leaves State ===================
   const [leaves, setLeaves] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState({});
   const [publicHolidays, setPublicHolidays] = useState([]);
@@ -89,6 +102,7 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [editingLeave, setEditingLeave] = useState(null);
   const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [attendanceUpdates, setAttendanceUpdates] = useState({});
 
   // prevent body scroll when modal open
   useEffect(() => {
@@ -98,6 +112,33 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
       document.body.style.overflow = '';
     };
   }, [showLeaveModal, showAttendanceModal]);
+
+  // Fetch data from backend
+  const refetch = async () => {
+    try {
+      const [leavesRes, holidaysRes, attendanceRes] = await Promise.all([
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/holidays`, { headers: { Authorization: `Bearer ${token}` } }),
+        axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/attendance`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      setLeaves(leavesRes.data);
+      setPublicHolidays(holidaysRes.data);
+      const attendanceDict = {};
+      attendanceRes.data.forEach(a => {
+        const dateStr = formatDate(a.date);
+        if (!attendanceDict[dateStr]) attendanceDict[dateStr] = {};
+        attendanceDict[dateStr][a.user._id] = a.status;
+      });
+      setAttendanceRecords(attendanceDict);
+    } catch (err) {
+      console.error('Fetch error:', err);
+      alert('Error fetching attendance data.');
+    }
+  };
+
+  useEffect(() => {
+    refetch();
+  }, []);
 
   // ---------- Helpers ----------
   function pad(n) {
@@ -162,39 +203,68 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
     return false;
   }
 
-  function markAttendance(userId, dateStr, status = 'Present') {
-    setAttendanceRecords((prev) => {
-      const day = { ...(prev[dateStr] || {}) };
-      day[userId] = status;
-      return { ...prev, [dateStr]: day };
-    });
+  async function markAttendance(userId, dateStr, status = 'Present') {
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/attendance`, {
+        user: userId,
+        date: dateStr,
+        status,
+      }, { headers: { Authorization: `Bearer ${token}` } });
+      refetch(); // Refetch to update state
+    } catch (err) {
+      console.error('Mark attendance error:', err);
+      alert('Error marking attendance.');
+    }
   }
 
-  function deleteLeave(id) {
-    setLeaves((prev) => prev.filter((l) => l.id !== id));
-    setEditingLeave(null);
-    setShowLeaveModal(false);
+  async function deleteLeave(id) {
+    try {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      refetch();
+      setEditingLeave(null);
+      setShowLeaveModal(false);
+    } catch (err) {
+      console.error('Delete leave error:', err);
+      alert('Error deleting leave.');
+    }
   }
 
-  function saveLeave(e) {
+  async function saveLeave(e) {
     e.preventDefault();
     const form = e.target;
     const title = form.title.value.trim() || 'Official Leave';
     const from = form.from.value;
     const to = form.to.value || from;
-    const userId = form.user.value;
+    const user = form.user.value === 'ALL' ? null : form.user.value;
     const notes = form.notes.value.trim();
 
-    if (!from) return alert('Please select a from date');
+    if (!from) return alert("Please select a from date");
 
-    if (editingLeave && editingLeave.id) {
-      setLeaves((prev) => prev.map((l) => (l.id === editingLeave.id ? { ...l, title, from, to, userId, notes } : l)));
+    try {
+      if (editingLeave && editingLeave._id) {
+        await axios.put(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves/${editingLeave._id}`, {
+          title,
+          from,
+          to,
+          user,
+          notes,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      } else {
+        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves`, {
+          title,
+          from,
+          to,
+          user,
+          notes,
+        }, { headers: { Authorization: `Bearer ${token}` } });
+      }
+      refetch();
+      setShowLeaveModal(false);
       setEditingLeave(null);
-    } else {
-      const newLeave = { id: 'l-' + Date.now(), title, from, to, userId, notes };
-      setLeaves((prev) => [newLeave, ...prev]);
+    } catch (err) {
+      console.error('Save leave error:', err);
+      alert('Error saving leave.');
     }
-    setShowLeaveModal(false);
   }
 
   function openEditLeave(lv) {
@@ -202,29 +272,49 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
     setShowLeaveModal(true);
   }
 
-  function handleAttendanceSubmit(e) {
-    e.preventDefault();
-    const userId = e.target.user.value;
-    const date = e.target.date.value;
-    const status = e.target.status.value;
-    if (!userId || !date) return alert('Select user and date');
-    markAttendance(userId, date, status);
-    setShowAttendanceModal(false);
+  async function handleAttendanceSave() {
+    try {
+      for (const [userId, status] of Object.entries(attendanceUpdates)) {
+        await markAttendance(userId, selectedDate, status);
+      }
+      setAttendanceUpdates({});
+      setShowAttendanceModal(false);
+      refetch();
+    } catch (err) {
+      console.error('Save attendance error:', err);
+      alert('Error saving attendance.');
+    }
   }
 
-  function addPublicHoliday(e) {
+  async function addPublicHoliday(e) {
     e.preventDefault();
     const name = e.target.hname.value.trim() || 'Holiday';
     const date = e.target.hdate.value;
     if (!date) return alert('Select date');
-    setPublicHolidays((prev) => [{ id: 'h-' + Date.now(), name, date }, ...prev]);
-    e.target.reset();
+    try {
+      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/holidays`, { name, date }, { headers: { Authorization: `Bearer ${token}` } });
+      refetch();
+      e.target.reset();
+    } catch (err) {
+      console.error('Add holiday error:', err);
+      alert('Error adding holiday.');
+    }
+  }
+
+  async function deletePublicHoliday(id) {
+    try {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/holidays/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+      refetch();
+    } catch (err) {
+      console.error('Delete holiday error:', err);
+      alert('Error deleting holiday.');
+    }
   }
 
   function userNameById(id) {
     if (id === 'ALL') return 'All';
     const u = users?.find((x) => x.id === id || x._id === id);
-    return u ? u.name || u.fullName || u.email || u.username : 'Unknown';
+    return u ? u.username || u.email : 'Unknown';
   }
 
   // ================= Render =================
@@ -329,7 +419,6 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
           <div className="overflow-auto" style={{ maxHeight: '640px' }}>
             <div
               className="grid grid-cols-7 gap-1 text-sm"
-              // ensure rows don't collapse (keeps cards stable)
               style={{ gridAutoRows: 'minmax(84px, auto)' }}
             >
               {['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((d) => (
@@ -363,12 +452,16 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
                     <div className="mt-2 space-y-1 overflow-hidden">
                       {cellLeaves.slice(0, 2).map((lv) => (
                         <button
-                          key={lv.id}
+                          key={lv._id}
                           onClick={(e) => { e.stopPropagation(); openEditLeave(lv); }}
-                          className="w-full text-left text-xs bg-red-50 text-red-700 px-2 py-1 rounded-md cursor-pointer hover:bg-red-100"
-                          title={`${lv.title} — ${userNameById(lv.userId)}`}
+                          className={`w-full text-left text-xs px-2 py-1 rounded-md cursor-pointer ${
+                            lv.status === 'Pending' ? 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100' :
+                            lv.status === 'Approved' ? 'bg-green-50 text-green-700 hover:bg-green-100' :
+                            'bg-red-50 text-red-700 hover:bg-red-100'
+                          }`}
+                          title={`${lv.title} (${lv.status}) — ${userNameById(lv.user ? lv.user._id : 'ALL')}`}
                         >
-                          <div className="truncate">{lv.title} {lv.userId !== 'ALL' ? `(${userNameById(lv.userId)})` : ''}</div>
+                          <div className="truncate">{lv.title} {lv.user ? `(${userNameById(lv.user._id)})` : '(All)'}</div>
                         </button>
                       ))}
                       {cellLeaves.length > 2 && (
@@ -393,7 +486,7 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
                   Mark Attendance
                 </button>
                 <button
-                  onClick={() => { setShowLeaveModal(true); setEditingLeave({ from: selectedDate, to: selectedDate, userId: 'ALL', title: '' }); }}
+                  onClick={() => { setShowLeaveModal(true); setEditingLeave({ from: selectedDate, to: selectedDate, user: 'ALL', title: '' }); }}
                   className="px-3 py-2 rounded-md bg-indigo-600 text-white w-full md:w-auto"
                 >
                   Add Leave on {selectedDate}
@@ -414,14 +507,14 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
                     <span className="text-gray-500">No official leaves</span>
                   ) : (
                     leavesForDate(selectedDate).map((lv) => (
-                      <div key={lv.id} className="flex items-center justify-between gap-2 py-1">
+                      <div key={lv._id} className="flex items-center justify-between gap-2 py-1">
                         <div>
-                          <div className="text-sm font-medium truncate">{lv.title}</div>
-                          <div className="text-xs text-gray-500 truncate">{userNameById(lv.userId)} {lv.notes ? `— ${lv.notes}` : ''}</div>
+                          <div className="text-sm font-medium truncate">{lv.title} ({lv.status})</div>
+                          <div className="text-xs text-gray-500 truncate">{lv.user ? userNameById(lv.user._id) : 'All'} {lv.notes ? `— ${lv.notes}` : ''}</div>
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => openEditLeave(lv)} className="text-xs px-2 py-1 rounded border">Edit</button>
-                          <button onClick={() => deleteLeave(lv.id)} className="text-xs px-2 py-1 rounded border text-red-600">Delete</button>
+                          <button onClick={() => deleteLeave(lv._id)} className="text-xs px-2 py-1 rounded border text-red-600">Delete</button>
                         </div>
                       </div>
                     ))
@@ -474,13 +567,13 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
               ) : (
                 <div className="space-y-2 mt-2 max-h-48 overflow-auto">
                   {publicHolidays.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
+                    <div key={h._id} className="flex items-center justify-between text-sm bg-gray-50 p-2 rounded">
                       <div>
                         <div className="font-medium">{h.name}</div>
-                        <div className="text-xs text-gray-500">{h.date}</div>
+                        <div className="text-xs text-gray-500">{formatDate(h.date)}</div>
                       </div>
                       <div className="text-xs">
-                        <button onClick={() => setPublicHolidays((prev) => prev.filter((x) => x.id !== h.id))} className="px-2 py-1 rounded border text-red-600">Remove</button>
+                        <button onClick={() => deletePublicHoliday(h._id)} className="px-2 py-1 rounded border text-red-600">Remove</button>
                       </div>
                     </div>
                   ))}
@@ -521,10 +614,10 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
             className="relative z-50 w-full max-w-full sm:max-w-2xl bg-white rounded-2xl shadow-lg p-4 sm:p-6 mx-2"
           >
             <div className="flex items-center justify-between mb-4 gap-2">
-              <h3 className="text-lg font-semibold">{editingLeave && editingLeave.id ? 'Edit Leave' : 'Add Official Leave'}</h3>
+              <h3 className="text-lg font-semibold">{editingLeave && editingLeave._id ? 'Edit Leave' : 'Add Official Leave'}</h3>
               <div className="flex items-center gap-2">
-                {editingLeave && editingLeave.id && (
-                  <button type="button" onClick={() => deleteLeave(editingLeave.id)} className="px-3 py-1 rounded border text-red-600">Delete</button>
+                {editingLeave && editingLeave._id && (
+                  <button type="button" onClick={() => deleteLeave(editingLeave._id)} className="px-3 py-1 rounded border text-red-600">Delete</button>
                 )}
                 <button type="button" onClick={() => { setShowLeaveModal(false); setEditingLeave(null); }} className="px-3 py-1 rounded border">Close</button>
               </div>
@@ -538,20 +631,20 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
 
               <div>
                 <label className="block text-sm text-gray-600">User</label>
-                <select name="user" defaultValue={editingLeave?.userId || 'ALL'} className="mt-1 px-3 py-2 border rounded w-full">
+                <select name="user" defaultValue={editingLeave?.user ? editingLeave.user._id : 'ALL'} className="mt-1 px-3 py-2 border rounded w-full">
                   <option value="ALL">All Users</option>
-                  {users?.map((u) => <option key={u.id || u._id} value={u.id || u._id}>{u.name || u.fullName || u.email}</option>)}
+                  {users.map((u) => <option key={u._id} value={u._id}>{u.username || u.email}</option>)}
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm text-gray-600">From</label>
-                <input name="from" type="date" defaultValue={editingLeave?.from || selectedDate} className="mt-1 px-3 py-2 border rounded w-full" />
+                <input name="from" type="date" defaultValue={editingLeave?.from ? formatDate(editingLeave.from) : selectedDate} className="mt-1 px-3 py-2 border rounded w-full" />
               </div>
 
               <div>
                 <label className="block text-sm text-gray-600">To (optional)</label>
-                <input name="to" type="date" defaultValue={editingLeave?.to || selectedDate} className="mt-1 px-3 py-2 border rounded w-full" />
+                <input name="to" type="date" defaultValue={editingLeave?.to ? formatDate(editingLeave.to) : selectedDate} className="mt-1 px-3 py-2 border rounded w-full" />
               </div>
 
               <div className="md:col-span-2">
@@ -572,40 +665,37 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
       {showAttendanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="absolute inset-0 bg-black/40" onClick={() => setShowAttendanceModal(false)} />
-          <motion.form
+          <motion.div
             initial={{ y: 20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
-            onSubmit={handleAttendanceSubmit}
-            className="relative z-50 w-full max-w-md bg-white rounded-2xl shadow-lg p-4 sm:p-6 mx-2"
+            className="relative z-50 w-full max-w-lg bg-white rounded-2xl shadow-lg p-4 sm:p-6 mx-2"
           >
-            <h3 className="text-lg font-semibold mb-3">Mark Attendance</h3>
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm text-gray-600">User</label>
-                <select name="user" className="mt-1 px-3 py-2 border rounded w-full">
-                  <option value="">Select user</option>
-                  {users?.map((u) => <option key={u.id || u._id} value={u.id || u._id}>{u.name || u.fullName || u.email}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600">Date</label>
-                <input name="date" type="date" defaultValue={selectedDate} className="mt-1 px-3 py-2 border rounded w-full" />
-              </div>
-              <div>
-                <label className="block text-sm text-gray-600">Status</label>
-                <select name="status" defaultValue="Present" className="mt-1 px-3 py-2 border rounded w-full">
-                  <option value="Present">Present</option>
-                  <option value="Absent">Absent</option>
-                  <option value="On Leave">On Leave</option>
-                </select>
-              </div>
+            <h3 className="text-lg font-semibold mb-3">Mark Attendance for {selectedDate}</h3>
+            <div className="space-y-3 max-h-64 overflow-auto">
+              {users.map(u => {
+                const uid = u._id;
+                const currentStatus = attendanceRecords[selectedDate]?.[uid] || 'Present';
+                return (
+                  <div key={uid} className="flex items-center justify-between">
+                    <div className="text-sm">{u.username || u.email}</div>
+                    <select
+                      value={attendanceUpdates[uid] || currentStatus}
+                      onChange={(e) => setAttendanceUpdates({ ...attendanceUpdates, [uid]: e.target.value })}
+                      className="px-3 py-1 border rounded"
+                    >
+                      <option value="Present">Present</option>
+                      <option value="Absent">Absent</option>
+                      <option value="On Leave">On Leave</option>
+                    </select>
+                  </div>
+                );
+              })}
             </div>
-
             <div className="mt-4 flex items-center justify-end gap-2">
               <button type="button" onClick={() => setShowAttendanceModal(false)} className="px-3 py-2 rounded border">Cancel</button>
-              <button type="submit" className="px-4 py-2 rounded bg-green-600 text-white">Save</button>
+              <button onClick={handleAttendanceSave} className="px-4 py-2 rounded bg-green-600 text-white">Save</button>
             </div>
-          </motion.form>
+          </motion.div>
         </div>
       )}
     </motion.div>
@@ -613,3 +703,11 @@ function Dashboard({ leads = [], activities = [], users = [] }) {
 }
 
 export default Dashboard;
+
+function formatDate(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}

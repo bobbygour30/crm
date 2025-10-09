@@ -1,22 +1,50 @@
 import { motion } from 'framer-motion';
 import { 
-  FaHome, FaUsers, FaChartBar, FaClipboardList, FaChartPie, 
-  FaUserCog, FaClock, FaSignOutAlt, FaCarSide ,FaFileInvoice, FaMoneyCheckAlt
+  FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt 
 } from 'react-icons/fa';
+import { useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 
 function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout, username }) {
   const tabs = [
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Leads', icon: FaUsers, key: 'leads' },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
-    { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },   // ✅ updated
-    { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },  // ✅ updated
+    { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
+    { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog, key: 'users' },
       { name: 'Attendance', icon: FaClock, key: 'attendance' }
     ] : []),
   ];
+
+  const navigate = useNavigate();
+
+const tabPathMap = {
+  dashboard: '/admin',
+  leads: '/admin/leads',
+  tasks: '/admin/tasks',
+  analytics: '/admin/analytics',
+  users: '/admin/users',
+  attendance: '/admin/attendance',
+  invoice: '/admin/invoice',
+  'vehicle-admin': '/admin/vehicle-admin',
+  'salary-slip': '/admin/salary-slip',
+};
+
+const handleTabClick = useCallback((tabKey) => {
+  if (tabKey !== activeTab) {
+    console.log(`Sidebar: Setting activeTab to ${tabKey}`);
+    setActiveTab(tabKey);
+    navigate(tabPathMap[tabKey]); // ✅ navigate on tab click
+  }
+  if (window.innerWidth < 768) {
+    setIsSidebarOpen(false);
+  }
+}, [activeTab, setActiveTab, setIsSidebarOpen, navigate]);
+
   return (
     <>
       {isSidebarOpen && (
@@ -37,7 +65,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
         data-open={isSidebarOpen}
       >
         <div className="flex items-center justify-between p-4">
-          {/* Dynamic username instead of static "Lead CRM" */}
           <h1 className="text-xl md:text-2xl font-bold tracking-tight">
             {username || 'Lead CRM'}
           </h1>
@@ -62,10 +89,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
                 className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
                   activeTab === tab.key ? 'bg-indigo-600 shadow-md' : 'hover:bg-indigo-700'
                 }`}
-                onClick={() => {
-                  setActiveTab(tab.key);
-                  if (window.innerWidth < 768) setIsSidebarOpen(false);
-                }}
+                onClick={() => handleTabClick(tab.key)}
               >
                 <tab.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
                 {isSidebarOpen && <span>{tab.name}</span>}

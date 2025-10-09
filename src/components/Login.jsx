@@ -34,12 +34,13 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
       });
       const data = await response.json();
       if (response.ok) {
-        if (!data.token || !data.username) { // Changed from data.username to data.name
+        if (!data.token || !data.username) {
           throw new Error('Invalid response from server');
         }
         localStorage.setItem('token', data.token);
-        localStorage.setItem('username', data.username); // Changed to data.name
+        localStorage.setItem('username', data.username);
         localStorage.setItem('isAdmin', data.isAdmin);
+        localStorage.setItem('userId', data.id);
         setIsAuthenticated(true);
         setIsAdmin(data.isAdmin);
         navigate(data.isAdmin ? '/admin' : '/');

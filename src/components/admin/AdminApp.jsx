@@ -1,7 +1,7 @@
-// AdminApp.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import axios from 'axios';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
 import LeadTable from './LeadTable';
@@ -12,98 +12,136 @@ import AdminAttendance from './AdminAttendance';
 import InvoiceGenerator from './InvoiceGenerator';
 import VehicleAdmin from './VehicleAdmin';
 import LeadModal from './LeadModal';
-import { tasks, users, activities } from '../../data/mockData';
+import { tasks, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
 
 function AdminApp({ handleLogout }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const token = localStorage.getItem('token');
+  const username = localStorage.getItem('username') || 'Admin';
+
+  // Initialize activeTab based on initial pathname
+  const initialTab = useMemo(() => {
+    const tabPathMap = {
+      dashboard: '/admin',
+      leads: '/admin/leads',
+      tasks: '/admin/tasks',
+      analytics: '/admin/analytics',
+      users: '/admin/users',
+      attendance: '/admin/attendance',
+      invoice: '/admin/invoice',
+      'vehicle-admin': '/admin/vehicle-admin',
+      'salary-slip': '/admin/salary-slip',
+    };
+    const pathToTab = (pathname) => {
+      const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
+      return entry ? entry[0] : 'dashboard';
+    };
+    return pathToTab(location.pathname);
+  }, [location.pathname]);
+
   const [leads, setLeads] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeTab, setActiveTab] = useState(initialTab);
   const [filter, setFilter] = useState('All');
   const [isAdmin] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
   const [selectedLead, setSelectedLead] = useState(null);
   const [newTask, setNewTask] = useState({ title: '', dueDate: '', priority: 'Medium' });
   const [taskList, setTaskList] = useState(tasks);
-  const [userList, setUserList] = useState(users);
+  const [userList, setUserList] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [errorUsers, setErrorUsers] = useState('');
 
-  const navigate = useNavigate();
-  const location = useLocation();
+  // Define tabPathMap with useMemo for stability
+  const tabPathMap = useMemo(
+    () => ({
+      dashboard: '/admin',
+      leads: '/admin/leads',
+      tasks: '/admin/tasks',
+      analytics: '/admin/analytics',
+      users: '/admin/users',
+      attendance: '/admin/attendance',
+      invoice: '/admin/invoice',
+      'vehicle-admin': '/admin/vehicle-admin',
+      'salary-slip': '/admin/salary-slip',
+    }),
+    []
+  );
 
-  // ----------------------------------------------------------------------
-  // NEW: read username from localStorage (fallback to generic name)
-  // ----------------------------------------------------------------------
-  const username = localStorage.getItem('username') || 'Admin';
+  // Inverse mapping helper (path -> tab)
+  const pathToTab = useCallback(
+    (pathname) => {
+      const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
+      return entry ? entry[0] : 'dashboard';
+    },
+    [tabPathMap]
+  );
 
-  // ----------------------------------------------------------------------
-  // Map logical tabs <-> URL paths
-  // ----------------------------------------------------------------------
-  const tabPathMap = {
-    dashboard: '/admin', // adjust if your admin root differs
-    leads: '/admin/leads',
-    tasks: '/admin/tasks',
-    analytics: '/admin/analytics',
-    users: '/admin/users',
-    attendance: '/admin/attendance',
-    invoice: '/admin/invoice',
-    'vehicle-admin': '/admin/vehicle-admin',
-    'salary-slip': '/admin/salary-slip' // ✅ SalarySlip route
-  };
+  // Fetch users from backend
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setUserList(res.data);
+        setLoadingUsers(false);
+      } catch (err) {
+        console.error('Fetch users error:', err);
+        setErrorUsers('Failed to fetch users. Please try again.');
+        setLoadingUsers(false);
+      }
+    };
+    if (token) {
+      fetchUsers();
+    } else {
+      setErrorUsers('No authentication token found. Please log in.');
+      setLoadingUsers(false);
+    }
+  }, [token]);
 
-  // inverse mapping helper (path -> tab)
-  const pathToTab = (pathname) => {
-    const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
-    return entry ? entry[0] : null;
-  };
+  // Sync activeTab with URL and navigate
+  useEffect(() => {
+    const pathname = location.pathname;
+    const mappedTab = pathToTab(pathname);
 
-  // ----------------------------------------------------------------------
+    // Only update activeTab if it doesn't match the current pathname
+    if (mappedTab !== activeTab) {
+      console.log(`Syncing activeTab to ${mappedTab} for pathname ${pathname}`);
+      setActiveTab(mappedTab);
+    } else {
+      // Only navigate if pathname doesn't match the desired path for activeTab
+      const desiredPath = tabPathMap[activeTab];
+      if (desiredPath && desiredPath !== pathname) {
+        console.log(`Navigating to ${desiredPath} for activeTab ${activeTab}`);
+        navigate(desiredPath, { replace: true });
+      }
+    }
+  }, [location.pathname, activeTab, navigate, pathToTab, tabPathMap]);
+
   // Sidebar open/close on resize
-  // ----------------------------------------------------------------------
   useEffect(() => {
     const handleResize = () => setIsSidebarOpen(window.innerWidth >= 768);
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // ----------------------------------------------------------------------
-  // Keep activeTab in sync with URL (so direct links like /salary-slip work)
-  // ----------------------------------------------------------------------
-  useEffect(() => {
-    const pathname = location.pathname;
-    const mappedTab = pathToTab(pathname);
-    if (mappedTab && mappedTab !== activeTab) {
-      setActiveTab(mappedTab);
-    }
-    // If pathname not recognized, do not change activeTab (leave current tab)
-    // This keeps other routes (if any) stable.
-  }, [location.pathname]);
-
-  // When activeTab changes in-app (sidebar click), update URL
-  useEffect(() => {
-    const desiredPath = tabPathMap[activeTab];
-    if (desiredPath && desiredPath !== location.pathname) {
-      navigate(desiredPath, { replace: false });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]);
-
-  // ----------------------------------------------------------------------
-  // Logout handler (clears everything and redirects)
-  // ----------------------------------------------------------------------
-  const handleAdminLogout = () => {
-    handleLogout();               // clears auth state in App.jsx
-    localStorage.removeItem('username'); // explicit clear
+  // Logout handler
+  const handleAdminLogout = useCallback(() => {
+    handleLogout();
+    localStorage.removeItem('username');
     navigate('/login');
-  };
+  }, [handleLogout, navigate]);
 
-  // ----------------------------------------------------------------------
   // Helper CRUD actions
-  // ----------------------------------------------------------------------
-  const handleAddLead = (newLead) =>
+  const handleAddLead = useCallback((newLead) => {
     setLeads((prev) => [...prev, { ...newLead, id: Date.now() }]);
+  }, []);
 
-  const handleDragEnd = (event) => {
+  const handleDragEnd = useCallback((event) => {
     const { active, over } = event;
     if (!over) return;
 
@@ -116,15 +154,15 @@ function AdminApp({ handleLogout }) {
       );
       setLeads(updatedLeads);
     }
-  };
+  }, [leads]);
 
-  const handleAddTask = (e) => {
+  const handleAddTask = useCallback((e) => {
     e.preventDefault();
     setTaskList([...taskList, { id: `${taskList.length + 1}`, ...newTask }]);
     setNewTask({ title: '', dueDate: '', priority: 'Medium' });
-  };
+  }, [taskList, newTask]);
 
-  const handleAssignLead = (leadId, userId) => {
+  const handleAssignLead = useCallback((leadId, userId) => {
     const updatedLeads = leads.map((lead) =>
       lead.id === leadId ? { ...lead, assignedTo: userId } : lead
     );
@@ -132,12 +170,10 @@ function AdminApp({ handleLogout }) {
     if (selectedLead && selectedLead.id === leadId) {
       setSelectedLead({ ...selectedLead, assignedTo: userId });
     }
-  };
+  }, [leads, selectedLead]);
 
-  // ----------------------------------------------------------------------
   // Page title / description helpers
-  // ----------------------------------------------------------------------
-  const getPageTitle = () => {
+  const getPageTitle = useCallback(() => {
     const titles = {
       dashboard: 'Dashboard',
       leads: 'Lead Management',
@@ -147,7 +183,7 @@ function AdminApp({ handleLogout }) {
       attendance: 'Attendance Tracking',
       invoice: 'Invoice Generator',
       'vehicle-admin': 'Vehicle Admin',
-      'salary-slip': 'Salary Slip Generator'
+      'salary-slip': 'Salary Slip Generator',
     };
     return (
       <div className="flex items-center space-x-3">
@@ -157,9 +193,9 @@ function AdminApp({ handleLogout }) {
         </div>
       </div>
     );
-  };
+  }, [activeTab]);
 
-  const getPageDescription = () => {
+  const getPageDescription = useCallback(() => {
     const descriptions = {
       dashboard: 'Get an overview of your CRM performance',
       leads: 'Manage and track all your leads in one place',
@@ -169,14 +205,12 @@ function AdminApp({ handleLogout }) {
       attendance: 'Track and manage employee attendance',
       invoice: 'Generate invoices for your services',
       'vehicle-admin': 'Manage all vehicle administration tasks',
-      'salary-slip': 'Generate detailed employee salary slips'
+      'salary-slip': 'Generate detailed employee salary slips',
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
-  };
+  }, [activeTab]);
 
-  // ----------------------------------------------------------------------
   // Render
-  // ----------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex relative">
       {/* Mobile toggle button */}
@@ -195,7 +229,7 @@ function AdminApp({ handleLogout }) {
         />
       )}
 
-      {/* Sidebar – now receives username */}
+      {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -252,45 +286,47 @@ function AdminApp({ handleLogout }) {
           </motion.div>
 
           {/* Page content */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={activeTab}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              transition={{ duration: 0.3 }}
-              className="min-h-[calc(100vh-200px)]"
-            >
-              {activeTab === 'dashboard' && <Dashboard leads={leads} activities={activities} />}
-              {activeTab === 'leads' && (
-                <LeadTable
-                  leads={leads}
-                  filter={filter}
-                  setFilter={setFilter}
-                  setSelectedLead={setSelectedLead}
-                  users={userList}
-                  onAssignLead={handleAssignLead}
-                  onAddLead={handleAddLead}
-                />
-              )}
-              {activeTab === 'tasks' && (
-                <TaskList
-                  tasks={taskList}
-                  newTask={newTask}
-                  setNewTask={setNewTask}
-                  handleAddTask={handleAddTask}
-                />
-              )}
-              {activeTab === 'analytics' && <Analytics leads={leads} />}
-              {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
-              {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
-              {activeTab === 'invoice' && <InvoiceGenerator />}
-              {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
-
-              {/* Salary Slip */}
-              {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} /> }
-            </motion.div>
-          </AnimatePresence>
+          {loadingUsers && <p>Loading users...</p>}
+          {errorUsers && <p className="text-red-600">{errorUsers}</p>}
+          {!loadingUsers && !errorUsers && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-[calc(100vh-200px)]"
+              >
+                {activeTab === 'dashboard' && <Dashboard leads={leads} activities={activities} />}
+                {activeTab === 'leads' && (
+                  <LeadTable
+                    leads={leads}
+                    filter={filter}
+                    setFilter={setFilter}
+                    setSelectedLead={setSelectedLead}
+                    users={userList}
+                    onAssignLead={handleAssignLead}
+                    onAddLead={handleAddLead}
+                  />
+                )}
+                {activeTab === 'tasks' && (
+                  <TaskList
+                    tasks={taskList}
+                    newTask={newTask}
+                    setNewTask={setNewTask}
+                    handleAddTask={handleAddTask}
+                  />
+                )}
+                {activeTab === 'analytics' && <Analytics leads={leads} />}
+                {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
+                {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
+                {activeTab === 'invoice' && <InvoiceGenerator />}
+                {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
+                {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
+              </motion.div>
+            </AnimatePresence>
+          )}
         </div>
       </div>
 

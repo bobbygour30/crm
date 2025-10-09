@@ -1,33 +1,85 @@
-import { useState } from 'react';
+// src/components/Attendance.jsx (User side - connected to backend)
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaPlus, FaCheckCircle, FaClock } from 'react-icons/fa';
+import axios from 'axios';
 
-function Attendance({ user }) {
+function Attendance() {
+  const token = localStorage.getItem('token');
+  const userId = localStorage.getItem('userId');
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [newLeave, setNewLeave] = useState({ startDate: '', endDate: '', reason: '' });
 
-  const handleMarkAttendance = () => {
+  useEffect(() => {
+    fetchAttendance();
+    fetchLeaves();
+  }, []);
+
+  const fetchAttendance = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/my-attendance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAttendanceRecords(res.data);
+    } catch (err) {
+      console.error('Fetch attendance error:', err);
+      alert('Error fetching attendance records.');
+    }
+  };
+
+  const fetchLeaves = async () => {
+    try {
+      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/my-leaves`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setLeaveRequests(res.data);
+    } catch (err) {
+      console.error('Fetch leaves error:', err);
+      alert('Error fetching leave requests.');
+    }
+  };
+
+  const handleMarkAttendance = async () => {
     const today = new Date().toISOString().split('T')[0];
     if (!attendanceRecords.some((record) => record.date === today)) {
-      setAttendanceRecords([...attendanceRecords, { id: `${attendanceRecords.length + 1}`, date: today, status: 'Present' }]);
-      alert(`Attendance marked for ${today}. Notification sent to manager and admin.`);
+      try {
+        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/attendance`, {
+          date: today,
+          status: 'Present',
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        fetchAttendance();
+        alert(`Attendance marked for ${today}. Notification sent to manager and admin.`);
+      } catch (err) {
+        console.error('Mark attendance error:', err);
+        alert('Error marking attendance.');
+      }
     } else {
       alert('Attendance already marked for today.');
     }
   };
 
-  const handleApplyLeave = (e) => {
+  const handleApplyLeave = async (e) => {
     e.preventDefault();
     if (newLeave.startDate && newLeave.endDate && newLeave.reason) {
-      setLeaveRequests([...leaveRequests, { 
-        id: `${leaveRequests.length + 1}`, 
-        ...newLeave, 
-        status: 'Pending',
-        appliedDate: new Date().toISOString().split('T')[0]
-      }]);
-      setNewLeave({ startDate: '', endDate: '', reason: '' });
-      alert('Leave request submitted. Notification sent to manager and admin.');
+      try {
+        await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves`, {
+          title: 'Leave',
+          from: newLeave.startDate,
+          to: newLeave.endDate,
+          notes: newLeave.reason,
+        }, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        fetchLeaves();
+        setNewLeave({ startDate: '', endDate: '', reason: '' });
+        alert('Leave request submitted. Notification sent to manager and admin.');
+      } catch (err) {
+        console.error('Apply leave error:', err);
+        alert('Error applying for leave.');
+      }
     } else {
       alert('Please fill all leave request fields.');
     }
@@ -100,14 +152,14 @@ function Attendance({ user }) {
         <ul className="space-y-3">
           {attendanceRecords.map((record) => (
             <motion.li
-              key={record.id}
+              key={record._id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3 }}
               className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
             >
               <div>
-                <p className="font-semibold text-gray-800">Date: {record.date}</p>
+                <p className="font-semibold text-gray-800">Date: {formatDate(record.date)}</p>
                 <p className="text-sm text-gray-600">Status: {record.status}</p>
               </div>
               <FaCheckCircle className="text-green-600 h-4 w-4 sm:h-5 sm:w-5 mt-2 sm:mt-0" />
@@ -120,16 +172,16 @@ function Attendance({ user }) {
         <ul className="space-y-3">
           {leaveRequests.map((leave) => (
             <motion.li
-              key={leave.id}
+              key={leave._id}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.3 }}
               className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
             >
               <div>
-                <p className="font-semibold text-gray-800">From: {leave.startDate} To: {leave.endDate}</p>
-                <p className="text-sm text-gray-600">Reason: {leave.reason}</p>
-                <p className="text-sm text-gray-600">Applied: {leave.appliedDate}</p>
+                <p className="font-semibold text-gray-800">From: {formatDate(leave.from)} To: {formatDate(leave.to)}</p>
+                <p className="text-sm text-gray-600">Reason: {leave.notes}</p>
+                <p className="text-sm text-gray-600">Applied: {formatDate(leave.createdAt)}</p>
               </div>
               <p
                 className={`text-sm font-medium px-2 sm:px-3 py-1 rounded-full mt-2 sm:mt-0 ${
@@ -151,3 +203,11 @@ function Attendance({ user }) {
 }
 
 export default Attendance;
+
+function formatDate(date) {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
