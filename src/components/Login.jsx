@@ -1,3 +1,4 @@
+// src/components/Login.jsx
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -16,7 +17,6 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
     setError('');
     setIsLoading(true);
 
-    // Trim inputs to avoid whitespace issues
     const trimmedEmail = email.trim();
     const trimmedPassword = password.trim();
 
@@ -34,11 +34,11 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
       });
       const data = await response.json();
       if (response.ok) {
-        if (!data.token || !data.username) {
+        if (!data.token || !data.username) { // Changed from data.username to data.name
           throw new Error('Invalid response from server');
         }
         localStorage.setItem('token', data.token);
-        localStorage.setItem('username', data.username);
+        localStorage.setItem('username', data.username); // Changed to data.name
         localStorage.setItem('isAdmin', data.isAdmin);
         setIsAuthenticated(true);
         setIsAdmin(data.isAdmin);
