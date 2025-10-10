@@ -1,6 +1,11 @@
-// src/components/UserManagement.jsx
 import { motion } from "framer-motion";
-import { FaPencilAlt, FaTrash, FaTimes, FaEye, FaEyeSlash } from "react-icons/fa";
+import {
+  FaPencilAlt,
+  FaTrash,
+  FaTimes,
+  FaEye,
+  FaEyeSlash,
+} from "react-icons/fa";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { jwtDecode } from "jwt-decode";
@@ -34,9 +39,12 @@ function UserManagement() {
         alert("Please log in as admin.");
         return;
       }
-      const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/users`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       setUsers(res.data);
     } catch (err) {
       console.error("Fetch users error:", err);
@@ -49,11 +57,13 @@ function UserManagement() {
     if (token) {
       try {
         const decoded = jwtDecode(token);
-        if (decoded.role.toLowerCase() === 'admin') {
+        if (decoded.role.toLowerCase() === "admin") {
           setIsAdmin(true);
           fetchUsers();
         } else {
-          alert("You are not authorized to access this page. Please log in as an admin.");
+          alert(
+            "You are not authorized to access this page. Please log in as an admin."
+          );
         }
       } catch (err) {
         console.error("Token decode error:", err);
@@ -70,7 +80,12 @@ function UserManagement() {
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (!newUser.username || !newUser.email || !newUser.mobile || !newUser.password) {
+    if (
+      !newUser.username ||
+      !newUser.email ||
+      !newUser.mobile ||
+      !newUser.password
+    ) {
       alert("Please fill in all required fields.");
       return;
     }
@@ -84,12 +99,16 @@ function UserManagement() {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/auth/register`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await axios.post(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       fetchUsers();
       setNewUser({
         username: "",
@@ -115,10 +134,9 @@ function UserManagement() {
   const handleEditUser = (user) => {
     setEditUser({
       ...user,
-      username: user.username,
-      password: "",
-      cancelCheck: null,
-      gstCertificate: null,
+      password: "", // Don't prefill password
+      cancelCheck: null, // Reset file input
+      gstCertificate: null, // Reset file input
     });
     setIsModalOpen(true);
   };
@@ -127,19 +145,27 @@ function UserManagement() {
     e.preventDefault();
     const formData = new FormData();
     Object.keys(editUser).forEach((key) => {
-      if (editUser[key] !== null && editUser[key] !== undefined && key !== "_id") {
+      if (
+        editUser[key] !== null &&
+        editUser[key] !== undefined &&
+        key !== "_id"
+      ) {
         formData.append(key, editUser[key]);
       }
     });
 
     try {
       const token = localStorage.getItem("token");
-      await axios.put(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${editUser._id}`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      await axios.put(
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${editUser._id}`,
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       fetchUsers();
       setIsModalOpen(false);
       setEditUser(null);
@@ -153,9 +179,12 @@ function UserManagement() {
     if (window.confirm("Are you sure you want to delete this user?")) {
       try {
         const token = localStorage.getItem("token");
-        await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${userId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.delete(
+          `${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${userId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
         fetchUsers();
       } catch (err) {
         console.error("Delete user error:", err);
@@ -190,7 +219,9 @@ function UserManagement() {
             type="text"
             placeholder="Username"
             value={newUser.username}
-            onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+            onChange={(e) =>
+              setNewUser({ ...newUser, username: e.target.value })
+            }
             className="p-3 border rounded-lg"
             required
           />
@@ -215,7 +246,9 @@ function UserManagement() {
               type={showPassword ? "text" : "password"}
               placeholder="Password"
               value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              onChange={(e) =>
+                setNewUser({ ...newUser, password: e.target.value })
+              }
               className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
               required
             />
@@ -231,7 +264,9 @@ function UserManagement() {
             type="text"
             placeholder="Designation"
             value={newUser.designation}
-            onChange={(e) => setNewUser({ ...newUser, designation: e.target.value })}
+            onChange={(e) =>
+              setNewUser({ ...newUser, designation: e.target.value })
+            }
             className="p-3 border rounded-lg"
           />
           <select
@@ -249,47 +284,74 @@ function UserManagement() {
                 type="text"
                 placeholder="GST"
                 value={newUser.gst}
-                onChange={(e) => setNewUser({ ...newUser, gst: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, gst: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <input
                 type="text"
                 placeholder="PAN Card"
                 value={newUser.pan}
-                onChange={(e) => setNewUser({ ...newUser, pan: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, pan: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <input
                 type="text"
                 placeholder="Store/Outlet Name"
                 value={newUser.storeName}
-                onChange={(e) => setNewUser({ ...newUser, storeName: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, storeName: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <input
                 type="text"
                 placeholder="Owner Name"
                 value={newUser.ownerName}
-                onChange={(e) => setNewUser({ ...newUser, ownerName: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({ ...newUser, ownerName: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cancel Check
+                  Cancel Check (Image)
                 </label>
                 <input
                   type="file"
-                  onChange={(e) => setNewUser({ ...newUser, cancelCheck: e.target.files[0] })}
+                  accept="image/*"
+                  onChange={(e) =>
+                    setNewUser({ ...newUser, cancelCheck: e.target.files[0] })
+                  }
                   className="p-3 border rounded-lg w-full"
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  GST Certificate
+                  GST Certificate (PDF)
                 </label>
                 <input
                   type="file"
-                  onChange={(e) => setNewUser({ ...newUser, gstCertificate: e.target.files[0] })}
+                  accept="application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (
+                        file.type !== "application/pdf" ||
+                        !file.name.toLowerCase().endsWith(".pdf")
+                      ) {
+                        alert(
+                          "Please select a valid PDF file (must have .pdf extension and correct format)."
+                        );
+                        e.target.value = ""; // Clear the input
+                        return;
+                      }
+                      setNewUser({ ...newUser, gstCertificate: file });
+                    }
+                  }}
                   className="p-3 border rounded-lg w-full"
                 />
               </div>
@@ -297,7 +359,12 @@ function UserManagement() {
                 type="text"
                 placeholder="Assign to Salesperson"
                 value={newUser.assignedSalesperson}
-                onChange={(e) => setNewUser({ ...newUser, assignedSalesperson: e.target.value })}
+                onChange={(e) =>
+                  setNewUser({
+                    ...newUser,
+                    assignedSalesperson: e.target.value,
+                  })
+                }
                 className="p-3 border rounded-lg"
               />
             </>
@@ -374,26 +441,35 @@ function UserManagement() {
                 <FaTimes />
               </motion.button>
             </div>
-            <form onSubmit={handleUpdateUser} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form
+              onSubmit={handleUpdateUser}
+              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            >
               <input
                 type="text"
                 placeholder="Username"
                 value={editUser.username || ""}
-                onChange={(e) => setEditUser({ ...editUser, username: e.target.value })}
+                onChange={(e) =>
+                  setEditUser({ ...editUser, username: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <input
                 type="email"
                 placeholder="Email"
                 value={editUser.email || ""}
-                onChange={(e) => setEditUser({ ...editUser, email: e.target.value })}
+                onChange={(e) =>
+                  setEditUser({ ...editUser, email: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <input
                 type="text"
                 placeholder="Mobile Number"
                 value={editUser.mobile || ""}
-                onChange={(e) => setEditUser({ ...editUser, mobile: e.target.value })}
+                onChange={(e) =>
+                  setEditUser({ ...editUser, mobile: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <div className="relative">
@@ -401,7 +477,9 @@ function UserManagement() {
                   type={showPassword ? "text" : "password"}
                   placeholder="New Password (optional)"
                   value={editUser.password || ""}
-                  onChange={(e) => setEditUser({ ...editUser, password: e.target.value })}
+                  onChange={(e) =>
+                    setEditUser({ ...editUser, password: e.target.value })
+                  }
                   className="w-full p-3 border rounded-lg"
                 />
                 <button
@@ -416,12 +494,16 @@ function UserManagement() {
                 type="text"
                 placeholder="Designation"
                 value={editUser.designation || ""}
-                onChange={(e) => setEditUser({ ...editUser, designation: e.target.value })}
+                onChange={(e) =>
+                  setEditUser({ ...editUser, designation: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               />
               <select
                 value={editUser.role || "Employee"}
-                onChange={(e) => setEditUser({ ...editUser, role: e.target.value })}
+                onChange={(e) =>
+                  setEditUser({ ...editUser, role: e.target.value })
+                }
                 className="p-3 border rounded-lg"
               >
                 <option value="Employee">Employee</option>
@@ -434,37 +516,63 @@ function UserManagement() {
                     type="text"
                     placeholder="GST"
                     value={editUser.gst || ""}
-                    onChange={(e) => setEditUser({ ...editUser, gst: e.target.value })}
+                    onChange={(e) =>
+                      setEditUser({ ...editUser, gst: e.target.value })
+                    }
                     className="p-3 border rounded-lg"
                   />
                   <input
                     type="text"
                     placeholder="PAN Card"
                     value={editUser.pan || ""}
-                    onChange={(e) => setEditUser({ ...editUser, pan: e.target.value })}
+                    onChange={(e) =>
+                      setEditUser({ ...editUser, pan: e.target.value })
+                    }
                     className="p-3 border rounded-lg"
                   />
                   <input
                     type="text"
                     placeholder="Store/Outlet Name"
                     value={editUser.storeName || ""}
-                    onChange={(e) => setEditUser({ ...editUser, storeName: e.target.value })}
+                    onChange={(e) =>
+                      setEditUser({ ...editUser, storeName: e.target.value })
+                    }
                     className="p-3 border rounded-lg"
                   />
                   <input
                     type="text"
                     placeholder="Owner Name"
                     value={editUser.ownerName || ""}
-                    onChange={(e) => setEditUser({ ...editUser, ownerName: e.target.value })}
+                    onChange={(e) =>
+                      setEditUser({ ...editUser, ownerName: e.target.value })
+                    }
                     className="p-3 border rounded-lg"
                   />
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       Cancel Check (re-upload to change)
                     </label>
+                    {editUser.cancelCheck && (
+                      <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Current Cancel Check:
+                        </label>
+                        <img
+                          src={editUser.cancelCheck}
+                          alt="Cancel Check"
+                          className="w-32 h-32 object-cover"
+                        />
+                      </div>
+                    )}
                     <input
                       type="file"
-                      onChange={(e) => setEditUser({ ...editUser, cancelCheck: e.target.files[0] })}
+                      accept="image/*"
+                      onChange={(e) =>
+                        setEditUser({
+                          ...editUser,
+                          cancelCheck: e.target.files[0],
+                        })
+                      }
                       className="p-3 border rounded-lg w-full"
                     />
                   </div>
@@ -472,9 +580,40 @@ function UserManagement() {
                     <label className="block text-sm font-medium text-gray-700 mb-1">
                       GST Certificate (re-upload to change)
                     </label>
+                    {editUser.gstCertificate && (
+                      <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Current GST Certificate:
+                        </label>
+                        <a
+                          href={editUser.gstCertificate}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:underline"
+                        >
+                          View PDF
+                        </a>
+                      </div>
+                    )}
                     <input
                       type="file"
-                      onChange={(e) => setEditUser({ ...editUser, gstCertificate: e.target.files[0] })}
+                      accept="application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          if (
+                            file.type !== "application/pdf" ||
+                            !file.name.toLowerCase().endsWith(".pdf")
+                          ) {
+                            alert(
+                              "Please select a valid PDF file (must have .pdf extension and correct format)."
+                            );
+                            e.target.value = ""; // Clear the input
+                            return;
+                          }
+                          setEditUser({ ...editUser, gstCertificate: file });
+                        }
+                      }}
                       className="p-3 border rounded-lg w-full"
                     />
                   </div>
@@ -482,7 +621,12 @@ function UserManagement() {
                     type="text"
                     placeholder="Assign to Salesperson"
                     value={editUser.assignedSalesperson || ""}
-                    onChange={(e) => setEditUser({ ...editUser, assignedSalesperson: e.target.value })}
+                    onChange={(e) =>
+                      setEditUser({
+                        ...editUser,
+                        assignedSalesperson: e.target.value,
+                      })
+                    }
                     className="p-3 border rounded-lg"
                   />
                 </>
