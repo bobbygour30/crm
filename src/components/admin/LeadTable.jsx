@@ -77,7 +77,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     name: '',
     email: '',
     source: '',
-    status: 'New',
+    status: 'Open',
     openStatus: '',
     policyNumber: '',
     lobOption: '',
@@ -86,7 +86,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     endorsement: '',
     payoutPercent: 0,
     payoutStatus: '',
-    cashBack: 0,
+    additionalPayout: 0,
     netPremium: 0,
     gstPercent: 0,
     policyStartDate: '',
@@ -142,9 +142,16 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     return (a * g) / 100;
   };
 
-  const computeTotalPayout = (payoutValue, gstPercent) => {
-    const gstAmt = computeGSTAmount(payoutValue, gstPercent);
-    return payoutValue + gstAmt;
+  const computeGrossPremium = (netPremium, gstPercent) => {
+    const net = parseFloat(netPremium) || 0;
+    const gstAmt = computeGSTAmount(net, gstPercent);
+    return net + gstAmt;
+  };
+
+  const computeTotalPayment = (payoutValue, additionalPayout) => {
+    const payout = parseFloat(payoutValue) || 0;
+    const additional = parseFloat(additionalPayout) || 0;
+    return payout + additional;
   };
 
   // Called when user submits the form
@@ -152,7 +159,8 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     e.preventDefault();
 
     const payoutValue = computePayoutValue(newLead.netPremium, newLead.payoutPercent);
-    const totalPayout = computeTotalPayout(payoutValue, newLead.gstPercent);
+    const grossPremium = computeGrossPremium(newLead.netPremium, newLead.gstPercent);
+    const totalPayment = computeTotalPayment(payoutValue, newLead.additionalPayout);
 
     const finalLOB = newLead.lobOption === 'Other Insurance' ? (newLead.lobCustom || '') : newLead.lobOption;
 
@@ -161,8 +169,9 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
       lob: finalLOB,
       payout: newLead.payoutPercent, // keep old field name compatibility (percentage)
       payoutValue,
+      grossPremium,
       gst: newLead.gstPercent,
-      totalPayout,
+      totalPayment,
       assignedTo: selectedUsers
     };
 
@@ -179,7 +188,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
       name: '',
       email: '',
       source: '',
-      status: 'New',
+      status: 'Open',
       openStatus: '',
       policyNumber: '',
       lobOption: '',
@@ -188,7 +197,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
       endorsement: '',
       payoutPercent: "",
       payoutStatus: '',
-      cashBack: "",
+      additionalPayout: "",
       netPremium: "",
       gstPercent: "",
       policyStartDate: '',
@@ -221,14 +230,16 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
           // prefer an explicit payout percent column, otherwise fall back to 'Payout'
           const payoutPercent = parseFloat(row['Payout Percent'] ?? row['Payout']) || 0;
           const gstPercent = parseFloat(row['GST'] ?? row['GST Percent']) || 0;
+          const additionalPayout = parseFloat(row['Additional Payout'] ?? row['Cash Back']) || 0;
           const payoutValue = computePayoutValue(netPremium, payoutPercent);
-          const totalPayout = computeTotalPayout(payoutValue, gstPercent);
+          const grossPremium = computeGrossPremium(netPremium, gstPercent);
+          const totalPayment = computeTotalPayment(payoutValue, additionalPayout);
 
           return {
             name: row['Insured Name'] || '',
             email: row['Email ID'] || '',
             source: row['Reference'] || '',
-            status: row['Status'] || 'New',
+            status: row['Status'] || 'Open',
             policyNumber: row['Policy Number'] || '',
             lob: row['LOB'] || '',
             sumInsured: parseFloat(row['Sum Insured']) || 0,
@@ -237,9 +248,10 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
             payout: payoutPercent,
             payoutValue,
             netPremium,
-            cashBack: parseFloat(row['Cash Back']) || 0,
+            additionalPayout,
             gst: gstPercent,
-            totalPayout,
+            grossPremium,
+            totalPayment,
             policyStartDate: '',
             policyExpiryDate: '',
             mobileNo: String(row['Mobile No'] || ''),
@@ -293,8 +305,13 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
     return 0;
   };
 
+  const getLeadAdditionalPayout = (lead) => {
+    return parseFloat(lead.additionalPayout || lead.cashBack || 0) || 0;
+  };
+
   const leadPayoutValue = (lead) => computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
-  const leadTotalPayout = (lead) => computeTotalPayout(leadPayoutValue(lead), getLeadGSTPercent(lead));
+  const leadGrossPremium = (lead) => lead.grossPremium || computeGrossPremium(getLeadNetPremium(lead), getLeadGSTPercent(lead));
+  const leadTotalPayment = (lead) => lead.totalPayment || computeTotalPayment(leadPayoutValue(lead), getLeadAdditionalPayout(lead));
 
   return (
     <motion.div
@@ -332,10 +349,9 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
             onChange={(e) => setFilter && setFilter(e.target.value)}
           >
             <option value="All">All Leads</option>
-            <option value="New">New</option>
-            <option value="Contacted">Contacted</option>
-            <option value="Qualified">Qualified</option>
-            <option value="Closed">Closed</option>
+            <option value="Open">Open</option>
+            <option value="Policy Issued">Policy Issued</option>
+            <option value="Closed Without Issuance">Closed Without Issuance</option>
           </select>
         </div>
       </motion.div>
@@ -400,9 +416,6 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 <option value="Policy Issued">Policy Issued</option>
                 <option value="Closed Without Issuance">Closed Without Issuance</option>
                 <option value="Open">Open</option>
-                <option value="New">New</option>
-                <option value="Contacted">Contacted</option>
-                <option value="Qualified">Qualified</option>
               </select>
             </div>
 
@@ -486,7 +499,32 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
               />
             </div>
 
-            {/* Payout controls: percentage -> payout value (calculated) -> gst -> total payout */}
+            {/* GST % */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">GST %</label>
+              <select
+                value={newLead.gstPercent}
+                onChange={(e) => setNewLead({ ...newLead, gstPercent: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
+              >
+                {gstOptions.map(g => (
+                  <option key={g} value={g}>{g}%</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Gross Premium (calculated) */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Gross Premium (calculated)</label>
+              <input
+                type="text"
+                readOnly
+                value={formatCurrency(computeGrossPremium(newLead.netPremium, newLead.gstPercent))}
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+
+            {/* Payout Percentage */}
             <div>
               <label className="text-sm font-medium text-gray-700">Payout (%)</label>
               <div className="flex items-center gap-3">
@@ -509,8 +547,9 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
               </div>
             </div>
 
+            {/* Payout (calculated) */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Payout Value (calculated)</label>
+              <label className="text-sm font-medium text-gray-700">Payout (calculated)</label>
               <input
                 type="text"
                 readOnly
@@ -519,25 +558,24 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
               />
             </div>
 
+            {/* Additional Payout */}
             <div>
-              <label className="text-sm font-medium text-gray-700">GST %</label>
-              <select
-                value={newLead.gstPercent}
-                onChange={(e) => setNewLead({ ...newLead, gstPercent: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg bg-white"
-              >
-                {gstOptions.map(g => (
-                  <option key={g} value={g}>{g}%</option>
-                ))}
-              </select>
+              <label className="text-sm font-medium text-gray-700">Additional Payout</label>
+              <input
+                type="number"
+                value={newLead.additionalPayout}
+                onChange={(e) => setNewLead({ ...newLead, additionalPayout: parseFloat(e.target.value) || 0 })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
             </div>
 
+            {/* Total Payment (calculated) */}
             <div>
-              <label className="text-sm font-medium text-gray-700">Total Payout (Payout + GST)</label>
+              <label className="text-sm font-medium text-gray-700">Total Payment (calculated)</label>
               <input
                 type="text"
                 readOnly
-                value={formatCurrency(computeTotalPayout(computePayoutValue(newLead.netPremium, newLead.payoutPercent), newLead.gstPercent))}
+                value={formatCurrency(computeTotalPayment(computePayoutValue(newLead.netPremium, newLead.payoutPercent), newLead.additionalPayout))}
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
@@ -553,16 +591,6 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 <option value="Pending">Pending</option>
                 <option value="Received">Received</option>
               </select>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-700">Cash Back</label>
-              <input
-                type="number"
-                value={newLead.cashBack}
-                onChange={(e) => setNewLead({ ...newLead, cashBack: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
             </div>
 
             <div>
@@ -605,7 +633,7 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
             <div>
               <label className="text-sm font-medium text-gray-700">Assign To</label>
               <select
-                value={selectedUsers}
+                value={selectedUsers[0] || ''}
                 onChange={(e) => setSelectedUsers([e.target.value])}
                 className="w-full p-2 border border-gray-300 rounded-lg bg-white"
               >
@@ -652,12 +680,14 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                 <th className="p-4 font-medium text-gray-700">Policy Number</th>
                 <th className="p-4 font-medium text-gray-700">LOB</th>
                 <th className="p-4 font-medium text-gray-700">Sum Insured</th>
+                <th className="p-4 font-medium text-gray-700">Net Premium</th>
+                <th className="p-4 font-medium text-gray-700">GST %</th>
+                <th className="p-4 font-medium text-gray-700">Gross Premium</th>
                 <th className="p-4 font-medium text-gray-700">Payout %</th>
                 <th className="p-4 font-medium text-gray-700">Payout Value</th>
-                <th className="p-4 font-medium text-gray-700">GST %</th>
-                <th className="p-4 font-medium text-gray-700">Total Payout</th>
+                <th className="p-4 font-medium text-gray-700">Additional Payout</th>
+                <th className="p-4 font-medium text-gray-700">Total Payment</th>
                 <th className="p-4 font-medium text-gray-700">Payout Status</th>
-                <th className="p-4 font-medium text-gray-700">Total Premium</th>
                 <th className="p-4 font-medium text-gray-700">Insurer</th>
                 <th className="p-4 font-medium text-gray-700">Source</th>
                 <th className="p-4 font-medium text-gray-700">Status</th>
@@ -682,27 +712,29 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                     <td className="p-4">{lead.policyNumber || ''}</td>
                     <td className="p-4">{lead.lob || ''}</td>
                     <td className="p-4">{formatNumber(lead.sumInsured)}</td>
+                    <td className="p-4">{formatCurrency(getLeadNetPremium(lead))}</td>
+                    <td className="p-4">{getLeadGSTPercent(lead)}%</td>
+                    <td className="p-4">{formatCurrency(leadGrossPremium(lead))}</td>
                     <td className="p-4">{getLeadPayoutPercent(lead)}%</td>
                     <td className="p-4">{formatCurrency(leadPayoutValue(lead))}</td>
-                    <td className="p-4">{getLeadGSTPercent(lead)}%</td>
-                    <td className="p-4">{formatCurrency(leadTotalPayout(lead))}</td>
+                    <td className="p-4">{formatCurrency(getLeadAdditionalPayout(lead))}</td>
+                    <td className="p-4">{formatCurrency(leadTotalPayment(lead))}</td>
                     <td className="p-4">{lead.payoutStatus || ''}</td>
-                    <td className="p-4">{formatNumber(lead.totalPremium)}</td>
                     <td className="p-4">{lead.insurer || ''}</td>
                     <td className="p-4">{lead.source || ''}</td>
                     <td className="p-4">
                       <span
                         className={`px-3 py-1 rounded-full text-sm ${
-                          lead.status === 'New'
-                            ? 'bg-blue-100 text-blue-800'
-                            : lead.status === 'Contacted'
+                          lead.status === 'Open'
                             ? 'bg-yellow-100 text-yellow-800'
-                            : lead.status === 'Qualified'
+                            : lead.status === 'Policy Issued'
                             ? 'bg-green-100 text-green-800'
+                            : lead.status === 'Closed Without Issuance'
+                            ? 'bg-red-100 text-red-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {lead.status || 'New'}
+                        {lead.status || 'Open'}
                       </span>
                     </td>
                     <td className="p-4">
@@ -778,28 +810,30 @@ function LeadTable({ leads = [], filter, setFilter, setSelectedLead, users = [],
                   <div><span className="font-medium text-gray-700">Policy Number:</span> {lead.policyNumber || ''}</div>
                   <div><span className="font-medium text-gray-700">LOB:</span> {lead.lob || ''}</div>
                   <div><span className="font-medium text-gray-700">Sum Insured:</span> {formatNumber(lead.sumInsured)}</div>
+                  <div><span className="font-medium text-gray-700">Net Premium:</span> {formatCurrency(getLeadNetPremium(lead))}</div>
+                  <div><span className="font-medium text-gray-700">GST %:</span> {getLeadGSTPercent(lead)}%</div>
+                  <div><span className="font-medium text-gray-700">Gross Premium:</span> {formatCurrency(leadGrossPremium(lead))}</div>
                   <div><span className="font-medium text-gray-700">Payout %:</span> {getLeadPayoutPercent(lead)}%</div>
                   <div><span className="font-medium text-gray-700">Payout Value:</span> {formatCurrency(leadPayoutValue(lead))}</div>
-                  <div><span className="font-medium text-gray-700">GST %:</span> {getLeadGSTPercent(lead)}%</div>
-                  <div><span className="font-medium text-gray-700">Total Payout:</span> {formatCurrency(leadTotalPayout(lead))}</div>
+                  <div><span className="font-medium text-gray-700">Additional Payout:</span> {formatCurrency(getLeadAdditionalPayout(lead))}</div>
+                  <div><span className="font-medium text-gray-700">Total Payment:</span> {formatCurrency(leadTotalPayment(lead))}</div>
                   <div><span className="font-medium text-gray-700">Payout Status:</span> {lead.payoutStatus || ''}</div>
-                  <div><span className="font-medium text-gray-700">Total Premium:</span> {formatNumber(lead.totalPremium)}</div>
                   <div><span className="font-medium text-gray-700">Insurer:</span> {lead.insurer || ''}</div>
                   <div><span className="font-medium text-gray-700">Source:</span> {lead.source || ''}</div>
                   <div>
                     <span className="font-medium text-gray-700">Status:</span>
                     <span
                       className={`ml-2 px-3 py-1 rounded-full text-xs ${
-                        lead.status === 'New'
-                          ? 'bg-blue-100 text-blue-800'
-                          : lead.status === 'Contacted'
+                        lead.status === 'Open'
                           ? 'bg-yellow-100 text-yellow-800'
-                          : lead.status === 'Qualified'
+                          : lead.status === 'Policy Issued'
                           ? 'bg-green-100 text-green-800'
+                          : lead.status === 'Closed Without Issuance'
+                          ? 'bg-red-100 text-red-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}
                     >
-                      {lead.status || 'New'}
+                      {lead.status || 'Open'}
                     </span>
                   </div>
                   <div>
