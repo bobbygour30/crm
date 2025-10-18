@@ -3,43 +3,9 @@ import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import assets from "../../assets/assets"; // Ensure your logo is correctly imported
 
-const vendorOptions = [
-  "Bajaj Allianz Gengeral Insurance Co Ltd",
-  "Tata Aig General Insurance Co Ltd",
-  "HDFC Ergo General Insurance Co Ltd",
-  "ICICI Lombard General Insurance Co Ltd",
-  "Digit General Insurance Co Ltd",
-  "Reliance General Insurance Co Ltd",
-  "SBI General Insurance Co Ltd",
-  "Future General General Insurance Co Ltd",
-  "Magma HDI General Insurance Co Ltd",
-  "Royal Sundram Genetal Insurance Co Ltd",
-  "kotak Mahinrda General Insurance Co Ltd",
-  "Liberty General Insurance Co Ltd",
-  "Shriram General Insurance Co Ltd",
-  "United India General Insurance Co Ltd",
-  "Oriental General Insurance Co Ltd",
-  "National General Insurance Co Ltd",
-  "New India General Insurance Co Ltd",
-  "Chola MS General Insurance Co Ltd",
-  "Universal Sompo General Insurance Co Ltd",
-  "Iffco tokio General Insurance Co Ltd",
-  "ICICI Prudential Life Insurance",
-  "TATA AIA Life Insurance",
-  "HDFC Life Insurance",
-  "Reliance Nippon Life Insurance",
-  "Axis Max Life Insurance",
-  "Niva Bupa Health Insurance",
-  "Care Health Insurance",
-  "Star Health Insurance",
-  "Aditya Birla Health Insurance",
-  "Bajaj Allianz Life Insurance"
-];
-
 const InvoiceGenerator = () => {
   const [invoiceCount, setInvoiceCount] = useState(1);
   const [invoiceNo, setInvoiceNo] = useState(`ARYN/2025-26/${String(1).padStart(4, "0")}`);
-  const [invoiceDate, setInvoiceDate] = useState("");
   const [vendorCode, setVendorCode] = useState("");
   const [customerName, setCustomerName] = useState("");
   const [refNo, setRefNo] = useState("OG-26-1149-4014-00000028");
@@ -68,18 +34,20 @@ const InvoiceGenerator = () => {
 
   const invoiceRef = useRef();
 
+  // Get current date in DD-MM-YYYY format
+  const getCurrentDate = () => {
+    return new Date().toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    }).split('/').join('-');
+  };
+
   const handleVendorInputChange = (e) => {
     const { name, value } = e.target;
     setVendorForm({ ...vendorForm, [name]: value });
     if (name === "name") {
-      const selectedVendor = vendors.find((v) => v.name === value);
-      if (selectedVendor) {
-        setVendorCode(selectedVendor.code);
-        setVendorForm({ ...vendorForm, name: value, code: selectedVendor.code });
-      } else {
-        setVendorCode("");
-        setVendorForm({ ...vendorForm, name: value, code: "" });
-      }
+      setBillToCompany(value); // Sync vendor name with bill to company
     }
   };
 
@@ -119,6 +87,7 @@ const InvoiceGenerator = () => {
       };
       setVendors([...vendors, newVendor]);
       setVendorCode(newVendor.code);
+      setBillToCompany(newVendor.name); // Sync new vendor name with bill to company
     }
 
     setVendorForm({
@@ -137,6 +106,7 @@ const InvoiceGenerator = () => {
     setVendorForm(vendors[index]);
     setVendorCode(vendors[index].code);
     setEditingIndex(index);
+    setBillToCompany(vendors[index].name); // Sync when editing
   };
 
   // PDF and number-to-words logic
@@ -175,16 +145,19 @@ const InvoiceGenerator = () => {
 
   const generatePDF = async () => {
     if (!billToCompany) {
-      alert("Please select a Bill To Company");
+      alert("Please enter a Bill To Company");
       return;
     }
-    if (!vendorCode) {
+    if (!vendorCode && vendors.length > 0) {
       alert("Please select a vendor with a valid vendor code");
       return;
     }
 
     const element = invoiceRef.current;
-    if (!element) return;
+    if (!element) {
+      console.error("Invoice element not found");
+      return;
+    }
 
     try {
       const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
@@ -197,7 +170,7 @@ const InvoiceGenerator = () => {
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const yPosition = (pageHeight - imgHeight) / 2 > margin ? (pageHeight - imgHeight) / 2 : margin;
       pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
-      pdf.save("invoice.pdf");
+      pdf.save(`invoice-${invoiceNo}.pdf`);
 
       // Increment invoice number after generating PDF
       setInvoiceCount((prev) => {
@@ -207,95 +180,92 @@ const InvoiceGenerator = () => {
       });
     } catch (err) {
       console.error("PDF generation failed:", err);
+      alert("Failed to generate PDF. Please try again.");
     }
   };
 
   return (
     <div className="p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-center text-[#000000]">
+      <h2 className="text-2xl font-bold mb-4 text-center text-gray-900">
         Generate Invoice
       </h2>
-      <div className="border p-4 rounded-md mb-6 bg-[#f9f9f9]">
-        <h3 className="font-bold mb-2 text-[#000000]">Add Vendor</h3>
-        <div className="grid grid-cols-2 gap-4">
+      <div className="border p-4 rounded-md mb-6 bg-gray-50">
+        <h3 className="font-bold mb-2 text-gray-900">Add Vendor</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm font-medium text-[#000000]">Vendor Name</label>
-            <select
+            <label className="block text-sm font-medium text-gray-700">Vendor Name</label>
+            <input
+              type="text"
               name="name"
               value={vendorForm.name}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
-            >
-              <option value="">Select Vendor</option>
-              {vendorOptions.map((vendor, idx) => (
-                <option key={idx} value={vendor}>{vendor}</option>
-              ))}
-            </select>
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
+            />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">GST Number</label>
+            <label className="block text-sm font-medium text-gray-700">GST Number</label>
             <input
               type="text"
               name="gst"
               value={vendorForm.gst}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">PAN Number</label>
+            <label className="block text-sm font-medium text-gray-700">PAN Number</label>
             <input
               type="text"
               name="pan"
               value={vendorForm.pan}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">Address</label>
+            <label className="block text-sm font-medium text-gray-700">Address</label>
             <input
               type="text"
               name="address"
               value={vendorForm.address}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">Mobile Number</label>
+            <label className="block text-sm font-medium text-gray-700">Mobile Number</label>
             <input
               type="text"
               name="mobile"
               value={vendorForm.mobile}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">Email</label>
+            <label className="block text-sm font-medium text-gray-700">Email</label>
             <input
               type="email"
               name="email"
               value={vendorForm.email}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-[#000000]">State Code</label>
+            <label className="block text-sm font-medium text-gray-700">State Code</label>
             <input
               type="text"
               name="stateCode"
               value={vendorForm.stateCode}
               onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
             />
           </div>
         </div>
         <button
           onClick={addOrUpdateVendor}
-          className="mt-3 bg-[#4b0082] text-white px-4 py-2 rounded-md hover:bg-[#3f0071]"
+          className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
         >
           {editingIndex !== null ? "Update Vendor" : "Add Vendor"}
         </button>
@@ -303,200 +273,198 @@ const InvoiceGenerator = () => {
         {/* Vendors List */}
         {vendors.length > 0 && (
           <div className="mt-4">
-            <h4 className="font-bold mb-2 text-[#000000]">Vendors List</h4>
-            <table className="w-full border border-[#000000] text-sm">
-              <thead className="bg-[#e5e7eb]">
-                <tr>
-                  <th className="border p-2">Code</th>
-                  <th className="border p-2">Name</th>
-                  <th className="border p-2">GST</th>
-                  <th className="border p-2">PAN</th>
-                  <th className="border p-2">Mobile</th>
-                  <th className="border p-2">Email</th>
-                  <th className="border p-2">State Code</th>
-                  <th className="border p-2">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {vendors.map((v, idx) => (
-                  <tr key={idx}>
-                    <td className="border p-1 text-center">{v.code}</td>
-                    <td className="border p-1">{v.name}</td>
-                    <td className="border p-1">{v.gst}</td>
-                    <td className="border p-1">{v.pan}</td>
-                    <td className="border p-1">{v.mobile}</td>
-                    <td className="border p-1">{v.email}</td>
-                    <td className="border p-1 text-center">{v.stateCode}</td>
-                    <td className="border p-1 text-center">
-                      <button
-                        onClick={() => editVendor(idx)}
-                        className="bg-[#4b0082] text-white px-2 py-1 rounded hover:bg-[#3f0071]"
-                      >
-                        Edit
-                      </button>
-                    </td>
+            <h4 className="font-bold mb-2 text-gray-900">Vendors List</h4>
+            <div className="overflow-x-auto">
+              <table className="w-full border border-gray-300 text-sm">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th className="border border-gray-300 p-2 text-left">Code</th>
+                    <th className="border border-gray-300 p-2 text-left">Name</th>
+                    <th className="border border-gray-300 p-2 text-left">GST</th>
+                    <th className="border border-gray-300 p-2 text-left">PAN</th>
+                    <th className="border border-gray-300 p-2 text-left">Mobile</th>
+                    <th className="border border-gray-300 p-2 text-left">Email</th>
+                    <th className="border border-gray-300 p-2 text-left">State Code</th>
+                    <th className="border border-gray-300 p-2 text-left">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {vendors.map((v, idx) => (
+                    <tr key={idx}>
+                      <td className="border border-gray-300 p-2">{v.code}</td>
+                      <td className="border border-gray-300 p-2">{v.name}</td>
+                      <td className="border border-gray-300 p-2">{v.gst}</td>
+                      <td className="border border-gray-300 p-2">{v.pan}</td>
+                      <td className="border border-gray-300 p-2">{v.mobile}</td>
+                      <td className="border border-gray-300 p-2">{v.email}</td>
+                      <td className="border border-gray-300 p-2">{v.stateCode}</td>
+                      <td className="border border-gray-300 p-2">
+                        <button
+                          onClick={() => editVendor(idx)}
+                          className="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
       </div>
 
       {/* Input Form */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Invoice No
           </label>
           <input
             type="text"
             value={invoiceNo}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Invoice Date
           </label>
           <input
             type="text"
-            value={invoiceDate}
-            onChange={(e) => setInvoiceDate(e.target.value)}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+            value={getCurrentDate()}
+            readOnly
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Vendor Code
           </label>
           <input
             type="text"
             value={vendorCode}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Customer Name
           </label>
           <input
             type="text"
             value={customerName}
             onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Base Amount (INR)
           </label>
           <input
             type="number"
             value={baseAmount}
             onChange={(e) => setBaseAmount(parseInt(e.target.value) || 0)}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Reference No
           </label>
           <input
             type="text"
             value={refNo}
             onChange={(e) => setRefNo(e.target.value)}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To Company
           </label>
-          <select
+          <input
+            type="text"
             value={billToCompany}
             onChange={handleBillToCompanyChange}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
-          >
-            <option value="">Select Company</option>
-            {vendorOptions.map((vendor, idx) => (
-              <option key={idx} value={vendor}>{vendor}</option>
-            ))}
-          </select>
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To Address
           </label>
           <input
             type="text"
             value={billToAddress}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To Mobile
           </label>
           <input
             type="text"
             value={billToMobile}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To Email
           </label>
           <input
             type="email"
             value={billToEmail}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To GSTIN
           </label>
           <input
             type="text"
             value={billToGSTIN}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-[#000000]">
+          <label className="block text-sm font-medium text-gray-700">
             Bill To PAN
           </label>
           <input
             type="text"
             value={billToPAN}
             readOnly
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] bg-gray-100"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
           />
         </div>
-        <div className="col-span-2">
-          <label className="block text-sm font-medium text-[#000000]">
+        <div className="col-span-1 sm:col-span-2">
+          <label className="block text-sm font-medium text-gray-700">
             Service Description
           </label>
           <input
             type="text"
             value={serviceDescription}
             onChange={(e) => setServiceDescription(e.target.value)}
-            className="mt-1 block w-full border border-[#000000] rounded-md shadow-sm text-[#000000] focus:ring-[#4b0082] focus:border-[#4b0082]"
+            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
       </div>
 
       <button
         onClick={generatePDF}
-        className="w-full bg-[#4b0082] text-white p-2 rounded-md hover:bg-[#3f0071]"
+        className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-colors"
       >
         Generate PDF
       </button>
@@ -504,7 +472,7 @@ const InvoiceGenerator = () => {
       {/* Invoice Template */}
       <div
         ref={invoiceRef}
-        className="text-sm mx-auto"
+        className="text-sm mx-auto mt-6"
         style={{
           width: "800px",
           minHeight: "1120px",
@@ -515,19 +483,18 @@ const InvoiceGenerator = () => {
         }}
       >
         {/* Header */}
-        <div className="flex justify-between items-center border-b border-[#000000] pb-2">
+        <div className="flex justify-between items-center border-b border-gray-900 pb-2">
           <img
             src={assets.logo}
             alt="Arshyan Insurance Logo"
             className="h-16"
           />
-          <div className="text-right text-[#000000]">
-            <h1 className="font-bold text-[#000080] text-lg">
+          <div className="text-right text-gray-900">
+            <h1 className="font-bold text-blue-900 text-lg">
               Arshyan Insurance Marketing & Services Pvt. Ltd
             </h1>
             <p>
-              Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New
-              Delhi-110089
+              Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089
             </p>
             <p>
               Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com
@@ -539,13 +506,13 @@ const InvoiceGenerator = () => {
         </div>
 
         {/* Tax Invoice Label */}
-        <div className="bg-[#e5e7eb] text-center font-bold py-2 border-y border-[#000000] mt-2 text-[#000000]">
+        <div className="bg-gray-100 text-center font-bold py-2 border-y border-gray-900 mt-2 text-gray-900">
           TAX INVOICE
         </div>
 
         {/* Company & Invoice Info */}
-        <div className="grid grid-cols-2 border border-[#000000] mt-2">
-          <div className="p-2 text-[#000000] border-r border-[#000000]">
+        <div className="grid grid-cols-2 border border-gray-900 mt-2">
+          <div className="p-2 text-gray-900 border-r border-gray-900">
             <p>
               <strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong>
             </p>
@@ -553,19 +520,19 @@ const InvoiceGenerator = () => {
             <p>07ABCCA0500H1ZD</p>
             <p>ABCCA0500H</p>
           </div>
-          <div className="p-2 text-[#000000]">
+          <div className="p-2 text-gray-900">
             <p>
               <strong>INVOICE NO:</strong> {invoiceNo}
             </p>
             <p>
-              <strong>INVOICE DATE:</strong> {invoiceDate}
+              <strong>INVOICE DATE:</strong> {getCurrentDate()}
             </p>
           </div>
         </div>
 
         {/* Bill To & Vendor Info */}
-        <div className="grid grid-cols-2 border border-[#000000] mt-2">
-          <div className="p-2 text-[#000000] border-r border-[#000000]">
+        <div className="grid grid-cols-2 border border-gray-900 mt-2">
+          <div className="p-2 text-gray-900 border-r border-gray-900">
             <p>
               <strong>Bill To</strong>
             </p>
@@ -584,7 +551,7 @@ const InvoiceGenerator = () => {
               <strong>PAN:</strong> {billToPAN}
             </p>
           </div>
-          <div className="p-2 text-[#000000]">
+          <div className="p-2 text-gray-900">
             <p>
               <strong>Vendor Code:</strong> {vendorCode}
             </p>
@@ -598,17 +565,17 @@ const InvoiceGenerator = () => {
         </div>
 
         {/* Particulars Table */}
-        <table className="w-full mt-2 border border-[#000000] text-sm">
+        <table className="w-full mt-2 border border-gray-900 text-sm">
           <thead>
-            <tr className="bg-[#e5e7eb] text-[#000000]">
-              <th className="border border-[#000000] p-2">Particulars</th>
-              <th className="border border-[#000000] p-2">HSN/SAC</th>
-              <th className="border border-[#000000] p-2">Amount (INR)</th>
+            <tr className="bg-gray-100 text-gray-900">
+              <th className="border border-gray-900 p-2">Particulars</th>
+              <th className="border border-gray-900 p-2">HSN/SAC</th>
+              <th className="border border-gray-900 p-2">Amount (INR)</th>
             </tr>
           </thead>
           <tbody>
             <tr>
-              <td className="border border-[#000000] p-2 text-[#000000]">
+              <td className="border border-gray-900 p-2 text-gray-900">
                 <div className="space-y-1">
                   <div>{serviceDescription}</div>
                   <div>
@@ -619,41 +586,41 @@ const InvoiceGenerator = () => {
                   </div>
                 </div>
               </td>
-              <td className="border border-[#000000] p-2 text-center text-[#000000]">
+              <td className="border border-gray-900 p-2 text-center text-gray-900">
                 <div className="space-y-1">
                   <div>998311</div>
                   <div>CGST 9%</div>
                   <div>SGST 9%</div>
                 </div>
               </td>
-              <td className="border border-[#000000] p-2 text-right text-[#000000]">
+              <td className="border border-gray-900 p-2 text-right text-gray-900">
                 <div className="space-y-1">
-                  <div>₹ {baseAmount}</div>
-                  <div>₹ {cgst}</div>
-                  <div>₹ {sgst}</div>
+                  <div>₹ {baseAmount.toLocaleString('en-IN')}</div>
+                  <div>₹ {cgst.toLocaleString('en-IN')}</div>
+                  <div>₹ {sgst.toLocaleString('en-IN')}</div>
                 </div>
               </td>
             </tr>
             <tr>
-              <td className="border border-[#000000] p-2"></td>
-              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">
+              <td className="border border-gray-900 p-2"></td>
+              <td className="border border-gray-900 p-2 font-bold text-right text-gray-900">
                 Total Amount
               </td>
-              <td className="border border-[#000000] p-2 font-bold text-right text-[#000000]">
-                ₹ {totalAmount}
+              <td className="border border-gray-900 p-2 font-bold text-right text-gray-900">
+                ₹ {totalAmount.toLocaleString('en-IN')}
               </td>
             </tr>
           </tbody>
         </table>
 
         {/* Amount in Words */}
-        <div className="border border-[#000000] p-2 mt-2 text-[#000000]">
+        <div className="border border-gray-900 p-2 mt-2 text-gray-900">
           {numberToWords(totalAmount)}
         </div>
 
         {/* Bank Details & Sign */}
-        <div className="grid grid-cols-2 border border-[#000000] mt-2">
-          <div className="p-2 text-[#000000] border-r border-[#000000]">
+        <div className="grid grid-cols-2 border border-gray-900 mt-2">
+          <div className="p-2 text-gray-900 border-r border-gray-900">
             <p>
               <strong>COMPANY BANK ACCOUNT DETAILS :-</strong>
             </p>
@@ -673,7 +640,7 @@ const InvoiceGenerator = () => {
               <strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085
             </p>
           </div>
-          <div className="p-2 text-right text-[#000000] flex flex-col justify-end">
+          <div className="p-2 text-right text-gray-900 flex flex-col justify-end">
             <p>For Arshyan Insurance Marketing & Service Pvt Ltd</p>
             <div className="h-12" />
             <p>

@@ -5,6 +5,7 @@ import assets from "../../assets/assets"; // Assumes assets module exists
 
 const defaultEarnings = {
   Basic: 10000,
+  Incentive: 0, // New incentive field
   Conveyance: 1600,
   "Allowance HRA": 5000,
   "Leave Travel": 833.33,
@@ -371,6 +372,7 @@ const SalarySlipGenerator = () => {
                         onChange={(e) => setEarningValue(key, e.target.value)}
                         className="w-32 border border-[#d1d5db] p-1 rounded-md text-right text-sm"
                         step="0.01"
+                        min="0"
                       />
                     </div>
                   ))}
@@ -389,6 +391,7 @@ const SalarySlipGenerator = () => {
                         onChange={(e) => setDeductionValue(key, e.target.value)}
                         className="w-32 border border-[#d1d5db] p-1 rounded-md text-right text-sm"
                         step="0.01"
+                        min="0"
                       />
                     </div>
                   ))}
