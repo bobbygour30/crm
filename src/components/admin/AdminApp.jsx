@@ -11,6 +11,7 @@ import UserManagement from './UserManagement';
 import AdminAttendance from './AdminAttendance';
 import InvoiceGenerator from './InvoiceGenerator';
 import VehicleAdmin from './VehicleAdmin';
+import PolicyUpload from './PolicyUpload';
 import LeadModal from './LeadModal';
 import { tasks, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
@@ -35,6 +36,7 @@ function AdminApp({ handleLogout }) {
       invoice: '/admin/invoice',
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
+      'policy-upload': '/admin/policy-upload',
     };
     const pathToTab = (pathname) => {
       const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
@@ -67,6 +69,7 @@ function AdminApp({ handleLogout }) {
       invoice: '/admin/invoice',
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
+      'policy-upload': '/admin/policy-upload',
     }),
     []
   );
@@ -108,12 +111,10 @@ function AdminApp({ handleLogout }) {
     const pathname = location.pathname;
     const mappedTab = pathToTab(pathname);
 
-    // Only update activeTab if it doesn't match the current pathname
     if (mappedTab !== activeTab) {
       console.log(`Syncing activeTab to ${mappedTab} for pathname ${pathname}`);
       setActiveTab(mappedTab);
     } else {
-      // Only navigate if pathname doesn't match the desired path for activeTab
       const desiredPath = tabPathMap[activeTab];
       if (desiredPath && desiredPath !== pathname) {
         console.log(`Navigating to ${desiredPath} for activeTab ${activeTab}`);
@@ -184,6 +185,7 @@ function AdminApp({ handleLogout }) {
       invoice: 'Invoice Generator',
       'vehicle-admin': 'Vehicle Admin',
       'salary-slip': 'Salary Slip Generator',
+      'policy-upload': 'Policy Upload',
     };
     return (
       <div className="flex items-center space-x-3">
@@ -206,6 +208,7 @@ function AdminApp({ handleLogout }) {
       invoice: 'Generate invoices for your services',
       'vehicle-admin': 'Manage all vehicle administration tasks',
       'salary-slip': 'Generate detailed employee salary slips',
+      'policy-upload': 'Upload and manage policy documents',
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   }, [activeTab]);
@@ -213,7 +216,6 @@ function AdminApp({ handleLogout }) {
   // Render
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex relative">
-      {/* Mobile toggle button */}
       <button
         onClick={() => setIsSidebarOpen(!isSidebarOpen)}
         className="md:hidden fixed top-4 left-4 z-50 p-2 bg-white rounded-lg shadow-lg hover:shadow-xl transition-shadow"
@@ -221,7 +223,6 @@ function AdminApp({ handleLogout }) {
         {isSidebarOpen ? <FiX size={24} /> : <FiMenu size={24} />}
       </button>
 
-      {/* Mobile overlay */}
       {isSidebarOpen && (
         <div
           className="md:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
@@ -229,7 +230,6 @@ function AdminApp({ handleLogout }) {
         />
       )}
 
-      {/* Sidebar */}
       <Sidebar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -240,12 +240,10 @@ function AdminApp({ handleLogout }) {
         username={username}
       />
 
-      {/* Main content area */}
       <div
         className={`flex-1 transition-all duration-300 ${isSidebarOpen ? 'md:ml-64' : 'md:ml-16'} ml-0`}
       >
         <div className="p-4 sm:p-6 lg:p-8 pt-16 md:pt-8">
-          {/* Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
@@ -285,7 +283,6 @@ function AdminApp({ handleLogout }) {
             </div>
           </motion.div>
 
-          {/* Page content */}
           {loadingUsers && <p>Loading users...</p>}
           {errorUsers && <p className="text-red-600">{errorUsers}</p>}
           {!loadingUsers && !errorUsers && (
@@ -324,13 +321,13 @@ function AdminApp({ handleLogout }) {
                 {activeTab === 'invoice' && <InvoiceGenerator />}
                 {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
                 {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
+                {activeTab === 'policy-upload' && <PolicyUpload />}
               </motion.div>
             </AnimatePresence>
           )}
         </div>
       </div>
 
-      {/* Lead modal */}
       <AnimatePresence>
         {selectedLead && (
           <LeadModal

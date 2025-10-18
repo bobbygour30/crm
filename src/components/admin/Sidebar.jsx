@@ -1,7 +1,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt 
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload 
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,6 +14,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
+    { name: 'Policy Upload', icon: FaFileUpload, key: 'policy-upload' },
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog, key: 'users' },
       { name: 'Attendance', icon: FaClock, key: 'attendance' }
@@ -22,28 +23,29 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
 
   const navigate = useNavigate();
 
-const tabPathMap = {
-  dashboard: '/admin',
-  leads: '/admin/leads',
-  tasks: '/admin/tasks',
-  analytics: '/admin/analytics',
-  users: '/admin/users',
-  attendance: '/admin/attendance',
-  invoice: '/admin/invoice',
-  'vehicle-admin': '/admin/vehicle-admin',
-  'salary-slip': '/admin/salary-slip',
-};
+  const tabPathMap = {
+    dashboard: '/admin',
+    leads: '/admin/leads',
+    tasks: '/admin/tasks',
+    analytics: '/admin/analytics',
+    users: '/admin/users',
+    attendance: '/admin/attendance',
+    invoice: '/admin/invoice',
+    'vehicle-admin': '/admin/vehicle-admin',
+    'salary-slip': '/admin/salary-slip',
+    'policy-upload': '/admin/policy-upload',
+  };
 
-const handleTabClick = useCallback((tabKey) => {
-  if (tabKey !== activeTab) {
-    console.log(`Sidebar: Setting activeTab to ${tabKey}`);
-    setActiveTab(tabKey);
-    navigate(tabPathMap[tabKey]); // ✅ navigate on tab click
-  }
-  if (window.innerWidth < 768) {
-    setIsSidebarOpen(false);
-  }
-}, [activeTab, setActiveTab, setIsSidebarOpen, navigate]);
+  const handleTabClick = useCallback((tabKey) => {
+    if (tabKey !== activeTab) {
+      console.log(`Sidebar: Setting activeTab to ${tabKey}`);
+      setActiveTab(tabKey);
+      navigate(tabPathMap[tabKey]);
+    }
+    if (window.innerWidth < 768) {
+      setIsSidebarOpen(false);
+    }
+  }, [activeTab, setActiveTab, setIsSidebarOpen, navigate]);
 
   return (
     <>
