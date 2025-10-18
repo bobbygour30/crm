@@ -26,6 +26,7 @@ function UserManagement() {
     ownerName: "",
     cancelCheck: null,
     gstCertificate: null,
+    aadharCard: null, // New field for Aadhar upload
     assignedSalesperson: "",
   });
   const [editUser, setEditUser] = useState(null);
@@ -123,6 +124,7 @@ function UserManagement() {
         ownerName: "",
         cancelCheck: null,
         gstCertificate: null,
+        aadharCard: null, // Reset new field
         assignedSalesperson: "",
       });
     } catch (err) {
@@ -137,6 +139,7 @@ function UserManagement() {
       password: "", // Don't prefill password
       cancelCheck: null, // Reset file input
       gstCertificate: null, // Reset file input
+      aadharCard: null, // Reset new file input
     });
     setIsModalOpen(true);
   };
@@ -350,6 +353,33 @@ function UserManagement() {
                         return;
                       }
                       setNewUser({ ...newUser, gstCertificate: file });
+                    }
+                  }}
+                  className="p-3 border rounded-lg w-full"
+                />
+              </div>
+              {/* New Aadhar Upload Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Aadhar Card (Image/PDF)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*,application/pdf"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      if (
+                        !file.type.startsWith('image/') &&
+                        file.type !== 'application/pdf'
+                      ) {
+                        alert(
+                          "Please select a valid image or PDF file for Aadhar Card."
+                        );
+                        e.target.value = ""; // Clear the input
+                        return;
+                      }
+                      setNewUser({ ...newUser, aadharCard: file });
                     }
                   }}
                   className="p-3 border rounded-lg w-full"
@@ -612,6 +642,52 @@ function UserManagement() {
                             return;
                           }
                           setEditUser({ ...editUser, gstCertificate: file });
+                        }
+                      }}
+                      className="p-3 border rounded-lg w-full"
+                    />
+                  </div>
+                  {/* New Aadhar Upload Field in Edit Modal */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Aadhar Card (re-upload to change)
+                    </label>
+                    {editUser.aadharCard && (
+                      <div className="mb-2">
+                        <label className="block text-sm font-medium text-gray-700">
+                          Current Aadhar Card:
+                        </label>
+                        {editUser.aadharCard.startsWith('http') ? (
+                          <a
+                            href={editUser.aadharCard}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:underline"
+                          >
+                            View File
+                          </a>
+                        ) : (
+                          <span className="text-gray-500">File uploaded</span>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (file) {
+                          if (
+                            !file.type.startsWith('image/') &&
+                            file.type !== 'application/pdf'
+                          ) {
+                            alert(
+                              "Please select a valid image or PDF file for Aadhar Card."
+                            );
+                            e.target.value = ""; // Clear the input
+                            return;
+                          }
+                          setEditUser({ ...editUser, aadharCard: file });
                         }
                       }}
                       className="p-3 border rounded-lg w-full"
