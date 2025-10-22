@@ -1,4 +1,3 @@
-// src/components/Attendance.jsx (User side - connected to backend)
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { FaPlus, FaCheckCircle, FaClock } from 'react-icons/fa';
@@ -6,15 +5,38 @@ import axios from 'axios';
 
 function Attendance() {
   const token = localStorage.getItem('token');
-  const userId = localStorage.getItem('userId');
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [leaveRequests, setLeaveRequests] = useState([]);
-  const [newLeave, setNewLeave] = useState({ startDate: '', endDate: '', reason: '' });
+  const [newLeave, setNewLeave] = useState({ 
+    startDate: '', 
+    endDate: '', 
+    reasonType: '', 
+    remarks: '', 
+    customReason: '' 
+  });
+  const [showCustomReason, setShowCustomReason] = useState(false);
 
   useEffect(() => {
     fetchAttendance();
     fetchLeaves();
   }, []);
+
+  const reasonOptions = [
+    { value: 'Sick Leave', label: 'Sick Leave' },
+    { value: 'Casual Leave', label: 'Casual Leave' },
+    { value: 'Half Day', label: 'Half Day' },
+    { value: 'Forget to Punch', label: 'Forget to Punch' },
+    { value: 'Others', label: 'Others' }
+  ];
+
+  const handleReasonTypeChange = (e) => {
+    const value = e.target.value;
+    setNewLeave({ ...newLeave, reasonType: value });
+    setShowCustomReason(value === 'Others');
+    if (value !== 'Others') {
+      setNewLeave(prev => ({ ...prev, customReason: '' }));
+    }
+  };
 
   const fetchAttendance = async () => {
     try {
@@ -63,25 +85,32 @@ function Attendance() {
 
   const handleApplyLeave = async (e) => {
     e.preventDefault();
-    if (newLeave.startDate && newLeave.endDate && newLeave.reason) {
+    if (newLeave.startDate && newLeave.endDate && newLeave.reasonType && newLeave.remarks) {
+      let notes = newLeave.remarks;
+      if (newLeave.reasonType === 'Others' && newLeave.customReason) {
+        notes = `${newLeave.customReason} - ${newLeave.remarks}`;
+      } else {
+        notes = `${newLeave.reasonType} - ${newLeave.remarks}`;
+      }
       try {
         await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/leaves`, {
-          title: 'Leave',
+          title: newLeave.reasonType,
           from: newLeave.startDate,
           to: newLeave.endDate,
-          notes: newLeave.reason,
+          notes: notes,
         }, {
           headers: { Authorization: `Bearer ${token}` },
         });
         fetchLeaves();
-        setNewLeave({ startDate: '', endDate: '', reason: '' });
+        setNewLeave({ startDate: '', endDate: '', reasonType: '', remarks: '', customReason: '' });
+        setShowCustomReason(false);
         alert('Leave request submitted. Notification sent to manager and admin.');
       } catch (err) {
         console.error('Apply leave error:', err);
         alert('Error applying for leave.');
       }
     } else {
-      alert('Please fill all leave request fields.');
+      alert('Please fill all required fields.');
     }
   };
 
@@ -125,13 +154,42 @@ function Attendance() {
             />
           </div>
           <div className="sm:col-span-2 lg:col-span-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-            <input
-              type="text"
-              placeholder="Reason for leave"
-              value={newLeave.reason}
-              onChange={(e) => setNewLeave({ ...newLeave, reason: e.target.value })}
+            <label className="block text-sm font-medium text-gray-700 mb-1">Reason Type</label>
+            <select
+              value={newLeave.reasonType}
+              onChange={handleReasonTypeChange}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all text-sm sm:text-base"
+              required
+            >
+              <option value="">Select Reason Type</option>
+              {reasonOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
+          {showCustomReason && (
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Custom Reason (for Others)</label>
+              <input
+                type="text"
+                placeholder="Enter custom reason"
+                value={newLeave.customReason}
+                onChange={(e) => setNewLeave({ ...newLeave, customReason: e.target.value })}
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all text-sm sm:text-base"
+                required
+              />
+            </div>
+          )}
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Remarks *</label>
+            <textarea
+              placeholder="Enter remarks (mandatory)"
+              value={newLeave.remarks}
+              onChange={(e) => setNewLeave({ ...newLeave, remarks: e.target.value })}
+              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 transition-all text-sm sm:text-base"
+              rows={3}
               required
             />
           </div>
@@ -202,8 +260,6 @@ function Attendance() {
   );
 }
 
-export default Attendance;
-
 function formatDate(date) {
   const d = new Date(date);
   const year = d.getFullYear();
@@ -211,3 +267,5 @@ function formatDate(date) {
   const day = String(d.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 }
+
+export default Attendance;
