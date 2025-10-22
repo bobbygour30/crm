@@ -1,7 +1,6 @@
-// src/pages/VehicleQuote.jsx
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCar, FaUser, FaEnvelope, FaMobileAlt, FaCity } from "react-icons/fa";
+import { FaCar, FaUser, FaEnvelope, FaMobileAlt, FaCity, FaTrash } from "react-icons/fa";
 
 const initialState = {
   regNumber: "",
@@ -67,6 +66,12 @@ export default function VehicleQuote() {
     }
   }
 
+  function handleRemoveFile(fileKey) {
+    setFiles((prev) => ({ ...prev, [fileKey]: fileKey === "vehiclePhotos" ? [] : null }));
+    setPreviews((prev) => ({ ...prev, [fileKey]: fileKey === "vehiclePhotos" ? [] : null }));
+    setErrors((prev) => ({ ...prev, [fileKey]: "" }));
+  }
+
   function validate() {
     const err = {};
     if (!form.regNumber || form.regNumber.trim().length < 4)
@@ -119,10 +124,6 @@ export default function VehicleQuote() {
 
   return (
     <div className="max-w-5xl mx-auto p-6 bg-gray-50 rounded-lg shadow-lg mt-20">
-      <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">🚗 Vehicle Quotation Request</h2>
-      <p className="text-center text-gray-600 mb-6">
-        Fill vehicle details and upload the required documents. We will contact you with quotes.
-      </p>
 
       {Object.keys(errors).length > 0 && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded shadow-sm">
@@ -301,43 +302,101 @@ export default function VehicleQuote() {
         </div>
 
         {/* File Uploads */}
-        <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
+        <div className="bg-white p-6 rounded-lg shadow-md space-y-6">
           <h3 className="text-xl font-semibold text-gray-700 mb-3">Upload Documents</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <p className="text-sm text-gray-600 mb-4">
+            Please upload the required documents below. Accepted formats: JPG, PNG, or PDF.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {["rcCopy", "drivingLicense", "oldPolicy", "idProof"].map((fileKey) => (
-              <div key={fileKey}>
-                <label className="block text-sm font-medium capitalize">{fileKey.replace(/([A-Z])/g, " $1")}</label>
-                <input
-                  type="file"
-                  name={fileKey}
-                  accept="image/*,application/pdf"
-                  onChange={handleFileChange}
-                  className="mt-1 block w-full"
-                />
-                {previews[fileKey] && (
-                  <div className="mt-2">
-                    <a href={previews[fileKey]} target="_blank" rel="noreferrer" className="text-indigo-600 text-sm hover:underline">
-                      Preview
-                    </a>
+              <div key={fileKey} className="space-y-2">
+                <label className="block text-sm font-medium capitalize">
+                  {fileKey.replace(/([A-Z])/g, " $1")} {fileKey === "rcCopy" || fileKey === "drivingLicense" ? "*" : ""}
+                </label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-500 transition-colors">
+                  <div className="space-y-1 text-center">
+                    <p className="text-sm text-gray-600">
+                      {files[fileKey] ? files[fileKey].name : "Drop your file here or click to upload"}
+                    </p>
+                    <p className="text-xs text-gray-500">
+                      Upload 1 file (JPG, PNG, or PDF)
+                    </p>
+                    <input
+                      type="file"
+                      name={fileKey}
+                      accept="image/*,application/pdf"
+                      onChange={handleFileChange}
+                      className="mt-2 w-full h-full absolute opacity-0 cursor-pointer"
+                    />
                   </div>
-                )}
-                {errors[fileKey] && <p className="text-red-600 text-sm mt-1">{errors[fileKey]}</p>}
+                </div>
+                <div className="flex items-center justify-between mt-2">
+                  {previews[fileKey] && (
+                    <div className="flex items-center space-x-2">
+                      <a
+                        href={previews[fileKey]}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-indigo-600 text-sm hover:underline"
+                      >
+                        Preview
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveFile(fileKey)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash className="h-4 w-4" />
+                      </button>
+                    </div>
+                  )}
+                  {errors[fileKey] && (
+                    <p className="text-red-600 text-sm">{errors[fileKey]}</p>
+                  )}
+                </div>
               </div>
             ))}
 
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium">Vehicle Photos (up to 3)</label>
-              <input
-                type="file"
-                name="vehiclePhotos"
-                accept="image/*"
-                onChange={handleFileChange}
-                multiple
-                className="mt-1 block w-full"
-              />
-              <div className="flex gap-3 mt-3">
+            <div className="md:col-span-2 space-y-2">
+              <label className="block text-sm font-medium">
+                Vehicle Photos (up to 3)
+              </label>
+              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-indigo-500 transition-colors">
+                <div className="space-y-1 text-center">
+                  <p className="text-sm text-gray-600">
+                    {files.vehiclePhotos.length > 0
+                      ? `${files.vehiclePhotos.length} file(s) selected`
+                      : "Drop your files here or click to upload"}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    Upload up to 3 images (JPG, PNG)
+                  </p>
+                  <input
+                    type="file"
+                    name="vehiclePhotos"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    multiple
+                    className="mt-2 w-full h-full absolute opacity-0 cursor-pointer"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-3 flex-wrap">
                 {previews.vehiclePhotos.map((p, i) => (
-                  <img key={i} src={p} alt={`vehicle-${i}`} className="w-24 h-16 object-cover rounded-lg border shadow-sm" />
+                  <div key={i} className="relative">
+                    <img
+                      src={p}
+                      alt={`vehicle-${i}`}
+                      className="w-24 h-16 object-cover rounded-lg border shadow-sm"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveFile("vehiclePhotos")}
+                      className="absolute top-0 right-0 -mr-2 -mt-2 text-red-600 hover:text-red-800 bg-white rounded-full p-1"
+                    >
+                      <FaTrash className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>

@@ -8,11 +8,11 @@ import {
 } from "react-icons/fa";
 import { motion } from "framer-motion";
 import emailjs from "@emailjs/browser";
+import VehicleQuote from "./VehicleQuote";
 
 function Quote() {
   const [insuranceType, setInsuranceType] = useState("");
   const [vehicleType, setVehicleType] = useState("");
-  const [rcNumber, setRcNumber] = useState("");
   const [healthType, setHealthType] = useState("");
   const [name, setName] = useState("");
   const [mobile, setMobile] = useState("");
@@ -63,7 +63,7 @@ function Quote() {
   };
 
   const companies = [
-    "Bajaj Allianz Gengeral Insurance Co Ltd",
+    "Bajaj Allianz General Insurance Co Ltd",
     "Tata Aig General Insurance Co Ltd",
     "HDFC Ergo General Insurance Co Ltd",
     "ICICI Lombard General Insurance Co Ltd",
@@ -72,8 +72,8 @@ function Quote() {
     "SBI General Insurance Co Ltd",
     "Future General General Insurance Co Ltd",
     "Magma HDI General Insurance Co Ltd",
-    "Royal Sundram Genetal Insurance Co Ltd",
-    "kotak Mahinrda General Insurance Co Ltd",
+    "Royal Sundram General Insurance Co Ltd",
+    "Kotak Mahindra General Insurance Co Ltd",
     "Liberty General Insurance Co Ltd",
     "Shriram General Insurance Co Ltd",
     "United India General Insurance Co Ltd",
@@ -82,7 +82,7 @@ function Quote() {
     "New India General Insurance Co Ltd",
     "Chola MS General Insurance Co Ltd",
     "Universal Sompo General Insurance Co Ltd",
-    "Iffco tokio General Insurance Co Ltd",
+    "Iffco Tokio General Insurance Co Ltd",
     "ICICI Prudential Life Insurance",
     "TATA AIA Life Insurance",
     "HDFC Life Insurance",
@@ -253,13 +253,13 @@ function Quote() {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Handle form submission for motor and health insurance
+    // Handle form submission for health insurance
     console.log("Form submitted");
   };
 
   return (
     <div className="min-h-screen bg-gray-100 py-10 px-4 sm:px-6 lg:px-8 mt-10">
-      <div className="max-w-3xl mx-auto bg-white shadow-lg rounded-lg p-8">
+      <div className="max-w-5xl mx-auto bg-white shadow-lg rounded-lg p-8">
         <h1 className="text-3xl font-bold text-indigo-900 mb-6 text-center">
           Generate New Quote
         </h1>
@@ -309,19 +309,7 @@ function Quote() {
                   <option value="commercial-vehicle">Commercial Vehicle</option>
                 </select>
               </div>
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  RC Number (Mandatory)
-                </label>
-                <input
-                  type="text"
-                  value={rcNumber}
-                  onChange={(e) => setRcNumber(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                  placeholder="Enter RC Number"
-                  required
-                />
-              </div>
+              {vehicleType && <VehicleQuote />}
             </>
           )}
 
