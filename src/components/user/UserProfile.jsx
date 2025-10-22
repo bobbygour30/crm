@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { FaTrash } from 'react-icons/fa';
 
 function UserProfile({ user }) {
   const [profile, setProfile] = useState({
@@ -13,8 +14,6 @@ function UserProfile({ user }) {
     managerName: user.managerName || '',
     dateOfJoining: user.dateOfJoining || '',
     image: user.image || '',
-    aadhaarCard: null,
-    idProof: null,
   });
 
   const handleImageChange = (e) => {
@@ -28,53 +27,50 @@ function UserProfile({ user }) {
     }
   };
 
-  const handleFileChange = (e) => {
-    const { name, files } = e.target;
-    if (files[0]) {
-      setProfile({ ...profile, [name]: files[0] });
-    }
-  };
-
   const handleUpdate = (e) => {
     e.preventDefault();
-    // Log or send profile data including files to backend
-    console.log('Profile data:', {
-      ...profile,
-      aadhaarCard: profile.aadhaarCard ? profile.aadhaarCard.name : 'Not uploaded',
-      idProof: profile.idProof ? profile.idProof.name : 'Not uploaded',
-    });
+    // Log or send profile data to backend
+    console.log('Profile data:', { ...profile });
     alert('Profile updated successfully!');
   };
 
   return (
-    <div className="space-y-6 mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-6 sm:mb-8 tracking-tight">
+    <div className="space-y-6 mt-20 max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h1 className="text-3xl font-extrabold text-gray-900 mb-6 tracking-tight">
         Profile
       </h1>
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
-        <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4">Edit Profile</h2>
+        <h2 className="text-xl font-semibold text-gray-900 mb-4">Edit Profile</h2>
         <form onSubmit={handleUpdate} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Profile Image</label>
-            <div className="mt-1 flex flex-col items-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                <p className="text-sm text-gray-600">Drop your image here or click to upload</p>
-                <p className="text-xs text-gray-500">Upload up to 1 image file (JPEG, PNG)</p>
+            <div className="relative w-full border-2 border-gray-300 border-dashed rounded-lg p-3 hover:border-indigo-500 transition-colors">
+              <div className="text-center">
+                <p className="text-sm text-gray-600 truncate">
+                  {profile.image ? 'Image selected' : 'Upload profile image'}
+                </p>
+                <p className="text-xs text-gray-500 mt-1">JPEG, PNG (max 2MB)</p>
                 <input
                   type="file"
                   accept="image/*"
                   onChange={handleImageChange}
-                  className="w-full mt-2"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 />
               </div>
               {profile.image && (
-                <div className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">Image Preview:</p>
+                <div className="mt-2 flex items-center justify-center space-x-2">
                   <img
                     src={profile.image}
                     alt="Profile Preview"
-                    className="w-32 h-32 rounded-full object-cover border-2 border-indigo-500"
+                    className="w-16 h-16 rounded-full object-cover border border-indigo-500"
                   />
+                  <button
+                    type="button"
+                    onClick={() => setProfile({ ...profile, image: '' })}
+                    className="text-red-600 hover:text-red-800"
+                  >
+                    <FaTrash className="h-4 w-4" />
+                  </button>
                 </div>
               )}
             </div>
@@ -159,45 +155,6 @@ function UserProfile({ user }) {
               onChange={(e) => setProfile({ ...profile, dateOfJoining: e.target.value })}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500"
             />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Aadhaar Card</label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                <p className="text-sm text-gray-600">Drop your file here or click to upload</p>
-                <p className="text-xs text-gray-500">Upload up to 1 file (image or PDF)</p>
-                <input
-                  type="file"
-                  name="aadhaarCard"
-                  onChange={handleFileChange}
-                  className="w-full mt-2"
-                  accept="image/*,application/pdf"
-                />
-              </div>
-            </div>
-            {profile.aadhaarCard && (
-              <p className="mt-2 text-sm text-gray-600">Uploaded: {profile.aadhaarCard.name}</p>
-            )}
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">ID Proof (Passport/Driver's License)</label>
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-              <div className="space-y-1 text-center">
-                <p className="text-sm text-gray-600">Drop your file here or click to upload</p>
-                <p className="text-xs text-gray-500">Upload up to 1 file (image or PDF)</p>
-                <input
-                  type="file"
-                  name="idProof"
-                  onChange={handleFileChange}
-                  className="w-full mt-2"
-                  accept="image/*,application/pdf"
-                />
-              </div>
-            </div>
-            {profile.idProof && (
-              <p className="mt-2 text-sm text-gray-600">Uploaded: {profile.idProof.name}</p>
-            )}
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
