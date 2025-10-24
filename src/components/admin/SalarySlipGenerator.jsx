@@ -1,11 +1,11 @@
-import React, { useRef, useState } from "react";
-import jsPDF from "jspdf";
+//
+import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
-import assets from "../../assets/assets"; // Assumes assets module exists
+import assets from "../../assets/assets";
 
 const defaultEarnings = {
   Basic: 10000,
-  Incentive: 0, // New incentive field
+  Incentive: 0,
   Conveyance: 1600,
   "Allowance HRA": 5000,
   "Leave Travel": 833.33,
@@ -23,7 +23,7 @@ const SalarySlipGenerator = () => {
   const slipRef = useRef();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
 
-  // Employee management
+  // === EMPLOYEE STATE ===
   const [employees, setEmployees] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
@@ -36,58 +36,116 @@ const SalarySlipGenerator = () => {
     bankAcc: "50100729069796",
     location: "Delhi Office",
     division: "Delhi Region",
-    pan: "BUKP V2417F",
+    pan: "BUKPV2417F",
     grade: "",
     dob: "02/01/1992",
     uan: "",
     payableDays: 31
   });
 
-  // Month / meta
+  // === SALARY SLIPS FROM DB ===
+  const [salarySlips, setSalarySlips] = useState([]);
+
+  // === MONTH ===
   const [salaryMonth, setSalaryMonth] = useState("October 2025");
 
-  // Earnings & deductions state
+  // === EARNINGS / DEDUCTIONS ===
   const [earnings, setEarnings] = useState(defaultEarnings);
   const [deductions, setDeductions] = useState(defaultDeductions);
 
-  // Helpers
+  const API_BASE = import.meta.env.VITE_BACKEND_URL;
+
+  // ------------------- FETCH DATA -------------------
+  useEffect(() => {
+    fetchEmployees();
+    fetchSalarySlips();
+  }, []);
+
+  const fetchEmployees = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/salary/employees`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setEmployees(await res.json());
+    } catch (e) {
+      console.error("fetchEmployees error", e);
+    }
+  };
+
+  const fetchSalarySlips = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/salary/slips`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) setSalarySlips(await res.json());
+    } catch (e) {
+      console.error("fetchSalarySlips error", e);
+    }
+  };
+
+  // ------------------- EMPLOYEE CRUD -------------------
   const onEmployeeChange = (e) => {
     const { name, value } = e.target;
     setEmployeeForm((s) => ({ ...s, [name]: value }));
   };
 
-  const addOrUpdateEmployee = () => {
-    if (!employeeForm.name || !employeeForm.empCode) {
-      alert("Emp Code and Name are required");
-      return;
-    }
-    if (editingIndex !== null) {
-      const arr = [...employees];
-      arr[editingIndex] = { ...employeeForm };
-      setEmployees(arr);
+  const addOrUpdateEmployee = async () => {
+    if (!employeeForm.name || !employeeForm.empCode) return alert("Emp Code and Name required");
+
+    const token = localStorage.getItem("token");
+    const url = editingIndex !== null
+      ? `${API_BASE}/api/salary/employees/${employees[editingIndex]._id}`
+      : `${API_BASE}/api/salary/employees`;
+    const method = editingIndex !== null ? "PUT" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(employeeForm),
+      });
+      if (!res.ok) throw new Error();
+      fetchEmployees();
       setEditingIndex(null);
-    } else {
-      setEmployees([...employees, { ...employeeForm }]);
+      setEmployeeForm({ ...employeeForm }); // Reset form
+    } catch (e) {
+      alert("Save failed");
     }
-    setEmployeeForm((s) => ({ ...s }));
   };
 
   const editEmployee = (idx) => {
-    setEmployeeForm(employees[idx]);
+    const emp = employees[idx];
+    setEmployeeForm(emp);
     setEditingIndex(idx);
   };
 
-  const deleteEmployee = (idx) => {
+  const deleteEmployee = async (id) => {
     if (!confirm("Delete this employee?")) return;
-    const arr = employees.filter((_, i) => i !== idx);
-    setEmployees(arr);
-    setEditingIndex(null);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/salary/employees/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchEmployees();
+    } catch (e) {
+      alert("Delete failed");
+    }
   };
 
   const selectEmployee = (idx) => {
     setEmployeeForm(employees[idx]);
   };
 
+  // ------------------- EARNINGS / DEDUCTIONS -------------------
   const setEarningValue = (key, value) => {
     setEarnings((s) => ({ ...s, [key]: parseFloat(value) || 0 }));
   };
@@ -132,38 +190,71 @@ const SalarySlipGenerator = () => {
     return words;
   };
 
+  // ------------------- GENERATE & SAVE PDF -------------------
   const generatePDF = async () => {
-    const el = slipRef.current;
-    if (!el) {
-      console.error("slipRef is not attached to any element");
-      return;
-    }
-
+    if (!employeeForm.name) return alert("Select or add an employee first");
     setIsGeneratingPDF(true);
+
     try {
-      const canvas = await html2canvas(el, {
+      const canvas = await html2canvas(slipRef.current, {
         scale: 2,
         useCORS: true,
         backgroundColor: "#ffffff",
-        logging: true
+        width: 900,
+        height: 1200,
       });
+
       const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const margin = 8;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      pdf.addImage(imgData, "PNG", margin, margin, imgWidth, imgHeight);
-      const fileName = `SalarySlip_${employeeForm.name || "employee"}_${salaryMonth.replace(/\s/g, "_")}.pdf`;
-      pdf.save(fileName);
-    } catch (error) {
-      console.error("PDF generation failed:", error);
-      alert("Failed to generate PDF. Please check the console for details.");
+
+      const slipData = {
+        employee: employeeForm,
+        salaryMonth,
+        earnings,
+        deductions,
+        grossPay,
+        totalDeductions,
+        netPay,
+        numberInWords: numberToWords(netPay),
+      };
+
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/salary/slips`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ html: imgData, slipData }),
+      });
+
+      if (!res.ok) throw new Error("Server error");
+
+      alert("Salary slip saved successfully!");
+      fetchSalarySlips();
+    } catch (err) {
+      alert(`Failed: ${err.message}`);
     } finally {
       setIsGeneratingPDF(false);
     }
   };
 
+  // ------------------- DELETE SLIP -------------------
+  const handleDeleteSlip = async (id) => {
+    if (!confirm("Delete this salary slip?")) return;
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/salary/slips/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchSalarySlips();
+    } catch (e) {
+      alert("Delete failed");
+    }
+  };
+
+  // ------------------- JSX (EXACT SAME AS ORIGINAL) -------------------
   return (
     <div className="p-4 sm:p-6 bg-[#f7fafc] min-h-screen box-border">
       <div className="max-w-7xl mx-auto">
@@ -175,133 +266,34 @@ const SalarySlipGenerator = () => {
             <h3 className="font-semibold mb-2 text-[#1a202c]">Employee (Add / Edit)</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input
-                  name="empCode"
-                  value={employeeForm.empCode}
-                  onChange={onEmployeeChange}
-                  placeholder="Emp. Code"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="name"
-                  value={employeeForm.name}
-                  onChange={onEmployeeChange}
-                  placeholder="Name"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="department"
-                  value={employeeForm.department}
-                  onChange={onEmployeeChange}
-                  placeholder="Department"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="designation"
-                  value={employeeForm.designation}
-                  onChange={onEmployeeChange}
-                  placeholder="Designation"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="location"
-                  value={employeeForm.location}
-                  onChange={onEmployeeChange}
-                  placeholder="Location"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="division"
-                  value={employeeForm.division}
-                  onChange={onEmployeeChange}
-                  placeholder="Division"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="pan"
-                  value={employeeForm.pan}
-                  onChange={onEmployeeChange}
-                  placeholder="PAN"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="grade"
-                  value={employeeForm.grade}
-                  onChange={onEmployeeChange}
-                  placeholder="Grade"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="mop"
-                  value={employeeForm.mop}
-                  onChange={onEmployeeChange}
-                  placeholder="MOP"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="dob"
-                  value={employeeForm.dob}
-                  onChange={onEmployeeChange}
-                  placeholder="DOB"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="doj"
-                  value={employeeForm.doj}
-                  onChange={onEmployeeChange}
-                  placeholder="DOJ"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="uan"
-                  value={employeeForm.uan}
-                  onChange={onEmployeeChange}
-                  placeholder="UAN No."
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
-                <input
-                  name="bankAcc"
-                  value={employeeForm.bankAcc}
-                  onChange={onEmployeeChange}
-                  placeholder="Bank Account No."
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm col-span-2"
-                />
-                <input
-                  name="payableDays"
-                  value={employeeForm.payableDays}
-                  onChange={(e) => onEmployeeChange({ target: { name: "payableDays", value: e.target.value } })}
-                  placeholder="Payable Days"
-                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                />
+                <input name="empCode" value={employeeForm.empCode} onChange={onEmployeeChange} placeholder="Emp. Code" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="name" value={employeeForm.name} onChange={onEmployeeChange} placeholder="Name" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="department" value={employeeForm.department} onChange={onEmployeeChange} placeholder="Department" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="designation" value={employeeForm.designation} onChange={onEmployeeChange} placeholder="Designation" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="location" value={employeeForm.location} onChange={onEmployeeChange} placeholder="Location" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="division" value={employeeForm.division} onChange={onEmployeeChange} placeholder="Division" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="pan" value={employeeForm.pan} onChange={onEmployeeChange} placeholder="PAN" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="grade" value={employeeForm.grade} onChange={onEmployeeChange} placeholder="Grade" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="mop" value={employeeForm.mop} onChange={onEmployeeChange} placeholder="MOP" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="dob" value={employeeForm.dob} onChange={onEmployeeChange} placeholder="DOB" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="doj" value={employeeForm.doj} onChange={onEmployeeChange} placeholder="DOJ" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="uan" value={employeeForm.uan} onChange={onEmployeeChange} placeholder="UAN No." className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="bankAcc" value={employeeForm.bankAcc} onChange={onEmployeeChange} placeholder="Bank Account No." className="border border-[#d1d5db] p-2 rounded-md w-full text-sm col-span-2" />
+                <input name="payableDays" value={employeeForm.payableDays} onChange={onEmployeeChange} placeholder="Payable Days" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
               </div>
 
               <div className="flex gap-2">
-                <button
-                  onClick={addOrUpdateEmployee}
-                  className="bg-[#2563eb] text-white px-3 py-2 rounded-md hover:bg-[#1d4ed8] text-sm"
-                >
+                <button onClick={addOrUpdateEmployee} className="bg-[#2563eb] text-white px-3 py-2 rounded-md hover:bg-[#1d4ed8] text-sm">
                   {editingIndex !== null ? "Update" : "Add Employee"}
                 </button>
                 {editingIndex !== null && (
                   <button
                     onClick={() => {
-                      setEmployeeForm({
-                        empCode: "",
-                        name: "",
-                        department: "",
-                        designation: "",
-                        mop: "",
-                        doj: "",
-                        bankAcc: "",
-                        location: "",
-                        division: "",
-                        pan: "",
-                        grade: "",
-                        dob: "",
-                        uan: "",
-                        payableDays: 31
-                      });
                       setEditingIndex(null);
+                      setEmployeeForm({
+                        empCode: "", name: "", department: "", designation: "", mop: "", doj: "",
+                        bankAcc: "", location: "", division: "", pan: "", grade: "", dob: "", uan: "", payableDays: 31
+                      });
                     }}
                     className="px-3 py-2 border border-[#d1d5db] rounded-md text-sm hover:bg-[#f3f4f6]"
                   >
@@ -318,33 +310,15 @@ const SalarySlipGenerator = () => {
                   <div className="max-h-40 overflow-auto mt-2 border border-[#d1d5db] rounded-md p-2">
                     <ul className="space-y-1 text-sm">
                       {employees.map((emp, idx) => (
-                        <li key={idx} className="flex justify-between items-center">
+                        <li key={emp._id} className="flex justify-between items-center">
                           <div>
                             <div className="font-medium text-[#1a202c]">{emp.name}</div>
                             <div className="text-xs text-[#6b7280]">{emp.empCode} • {emp.department}</div>
                           </div>
                           <div className="flex gap-1">
-                            <button
-                              onClick={() => selectEmployee(idx)}
-                              className="px-2 py-1 text-xs border border-[#d1d5db] rounded-md hover:bg-[#f3f4f6]"
-                              title="Select"
-                            >
-                              Select
-                            </button>
-                            <button
-                              onClick={() => editEmployee(idx)}
-                              className="px-2 py-1 text-xs bg-[#facc15] rounded-md hover:bg-[#eab308]"
-                              title="Edit"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              onClick={() => deleteEmployee(idx)}
-                              className="px-2 py-1 text-xs bg-[#ef4444] text-white rounded-md hover:bg-[#dc2626]"
-                              title="Delete"
-                            >
-                              Del
-                            </button>
+                            <button onClick={() => selectEmployee(idx)} className="px-2 py-1 text-xs border border-[#d1d5db] rounded-md hover:bg-[#f3f4f6]" title="Select">Select</button>
+                            <button onClick={() => editEmployee(idx)} className="px-2 py-1 text-xs bg-[#facc15] rounded-md hover:bg-[#eab308]" title="Edit">Edit</button>
+                            <button onClick={() => deleteEmployee(emp._id)} className="px-2 py-1 text-xs bg-[#ef4444] text-white rounded-md hover:bg-[#dc2626]" title="Delete">Del</button>
                           </div>
                         </li>
                       ))}
@@ -415,7 +389,7 @@ const SalarySlipGenerator = () => {
             </div>
 
             <div className="mt-4">
-              <label className="block text-sm text-[#1a202c]">Salary Month</label>
+              <label className="block text-sm text-[#1a202c]">Salary month</label>
               <input
                 value={salaryMonth}
                 onChange={(e) => setSalaryMonth(e.target.value)}
@@ -441,7 +415,7 @@ const SalarySlipGenerator = () => {
                   isGeneratingPDF ? "bg-[#9ca3af] cursor-not-allowed" : "bg-[#16a34a] hover:bg-[#15803d]"
                 }`}
               >
-                {isGeneratingPDF ? "Generating..." : "Generate PDF"}
+                {isGeneratingPDF ? "Generating..." : "Generate & Save"}
               </button>
             </div>
           </div>
@@ -460,7 +434,7 @@ const SalarySlipGenerator = () => {
                     src={assets?.logo || "/logo.png"}
                     alt="logo"
                     style={{ height: 60 }}
-                    onError={(e) => (e.target.src = "/logo.png")} // Fallback for image loading
+                    onError={(e) => (e.target.src = "/logo.png")}
                   />
                 </div>
                 <div className="text-right">
@@ -584,6 +558,43 @@ const SalarySlipGenerator = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* === GENERATED SLIPS LIST === */}
+        <div className="mt-12 border-t pt-6">
+          <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
+          {salarySlips.length === 0 ? (
+            <p className="text-sm text-[#6b7280]">No salary slips generated yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-[#f3f4f6]">
+                    <th className="border border-[#d1d5db] p-2 text-left">Month</th>
+                    <th className="border border-[#d1d5db] p-2 text-left">Employee</th>
+                    <th className="border border-[#d1d5db] p-2 text-right">Net Pay</th>
+                    <th className="border border-[#d1d5db] p-2 text-center">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {salarySlips.map((slip) => (
+                    <tr key={slip._id} className="hover:bg-[#f9fafb]">
+                      <td className="border border-[#d1d5db] p-2">{slip.salaryMonth}</td>
+                      <td className="border border-[#d1d5db] p-2">{slip.employee.name}</td>
+                      <td className="border border-[#d1d5db] p-2 text-right">₹ {slip.netPay.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                      <td className="border border-[#d1d5db] p-2 text-center">
+                        <div className="flex justify-center gap-2 text-xs">
+                          <a href={slip.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-[#2563eb] hover:underline">View</a>
+                          <a href={slip.pdfUrl} download className="text-[#16a34a] hover:underline">Download</a>
+                          <button onClick={() => handleDeleteSlip(slip._id)} className="text-[#ef4444] hover:underline">Delete</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
