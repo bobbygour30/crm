@@ -4,20 +4,20 @@ import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
 
 const InvoiceGenerator = () => {
-  // ------------------- STATE -------------------
   const [vendors, setVendors] = useState([]);
+  const [invoices, setInvoices] = useState([]); // ← Invoice list
   const [invoiceNo, setInvoiceNo] = useState("");
   const [previewUrl, setPreviewUrl] = useState("");
 
   const [vendorForm, setVendorForm] = useState({
     name: "", gst: "", pan: "", address: "", mobile: "", email: "", stateCode: ""
   });
-  const [editingVendor, setEditingVendor] = useState(null); // <-- THIS CONTROLS EDIT MODE
+  const [editingVendor, setEditingVendor] = useState(null);
 
   const [form, setForm] = useState({
     customerName: "",
     refNo: "OG-26-1149-4014-00000028",
-    baseAmount: 7626,
+    baseAmount: 0,
     billToCompany: "",
     serviceDescription: "Mobile Insurance - Services",
   });
@@ -35,29 +35,20 @@ const InvoiceGenerator = () => {
   useEffect(() => {
     fetchVendors();
     fetchNextInvoiceNo();
+    fetchInvoices();
   }, []);
 
   const fetchVendors = async () => {
     const token = localStorage.getItem("token");
     if (!token) return alert("Please login first");
-
     try {
       const res = await fetch(`${API_BASE}/api/invoice/vendors`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        console.error("Fetch vendors failed:", err);
-        alert(`Failed to load vendors: ${err.msg || res.status}`);
-        return;
-      }
-
-      const data = await res.json();
-      setVendors(data);
+      if (!res.ok) throw new Error();
+      setVendors(await res.json());
     } catch (e) {
-      console.error("Network error:", e);
-      alert("Network error. Check backend.");
+      console.error("fetchVendors error", e);
     }
   };
 
@@ -76,7 +67,38 @@ const InvoiceGenerator = () => {
     }
   };
 
-  // ------------------- EDIT VENDOR -------------------
+  const fetchInvoices = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/invoice/invoices`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      setInvoices(await res.json());
+    } catch (e) {
+      console.error("fetchInvoices error", e);
+    }
+  };
+
+  // ------------------- INVOICE DELETE -------------------
+  const handleDeleteInvoice = async (id) => {
+    if (!confirm("Delete this invoice permanently?")) return;
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/invoice/invoices/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchInvoices();
+      alert("Invoice deleted");
+    } catch (e) {
+      alert("Delete failed");
+    }
+  };
+
+  // ------------------- VENDOR CRUD -------------------
   const handleEditVendor = (vendor) => {
     setEditingVendor(vendor);
     setVendorForm({
@@ -88,7 +110,6 @@ const InvoiceGenerator = () => {
       email: vendor.email || "",
       stateCode: vendor.stateCode || "",
     });
-    window.scrollTo(0, 0); // Scroll to form
   };
 
   const cancelEdit = () => {
@@ -96,7 +117,6 @@ const InvoiceGenerator = () => {
     setVendorForm({ name: "", gst: "", pan: "", address: "", mobile: "", email: "", stateCode: "" });
   };
 
-  // ------------------- DELETE VENDOR -------------------
   const handleDeleteVendor = async (id) => {
     if (!confirm("Delete this vendor?")) return;
     const token = localStorage.getItem("token");
@@ -109,6 +129,31 @@ const InvoiceGenerator = () => {
       fetchVendors();
     } catch (e) {
       alert("Delete failed");
+    }
+  };
+
+  const handleAddOrUpdateVendor = async () => {
+    if (!vendorForm.name) return alert("Vendor name is required");
+    const token = localStorage.getItem("token");
+    const url = editingVendor
+      ? `${API_BASE}/api/invoice/vendors/${editingVendor._id}`
+      : `${API_BASE}/api/invoice/vendors`;
+    const method = editingVendor ? "PUT" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(vendorForm),
+      });
+      if (!res.ok) throw new Error();
+      cancelEdit();
+      fetchVendors();
+    } catch (e) {
+      alert("Save failed");
     }
   };
 
@@ -131,35 +176,6 @@ const InvoiceGenerator = () => {
     generatePreview();
   };
 
-  // ------------------- VENDOR CRUD -------------------
-  const handleAddOrUpdateVendor = async () => {
-    if (!vendorForm.name) return alert("Vendor name is required");
-    const token = localStorage.getItem("token");
-    const url = editingVendor
-      ? `${API_BASE}/api/invoice/vendors/${editingVendor._id}`
-      : `${API_BASE}/api/invoice/vendors`;
-    const method = editingVendor ? "PUT" : "POST";
-
-    try {
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(vendorForm),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.msg || "Failed");
-      }
-      cancelEdit();
-      fetchVendors();
-    } catch (e) {
-      alert(`Save failed: ${e.message}`);
-    }
-  };
-
   // ------------------- LIVE PREVIEW -------------------
   const generatePreview = async () => {
     if (!previewRef.current) return;
@@ -176,6 +192,7 @@ const InvoiceGenerator = () => {
       console.error("preview error", e);
     }
   };
+
   useEffect(() => {
     const t = setTimeout(generatePreview, 300);
     return () => clearTimeout(t);
@@ -184,6 +201,7 @@ const InvoiceGenerator = () => {
   // ------------------- GENERATE PDF -------------------
   const generatePDF = async () => {
     if (!form.billToCompany) return alert("Select Bill To Company");
+    if (form.baseAmount <= 0) return alert("Enter valid base amount");
 
     try {
       const canvas = await html2canvas(invoiceRef.current, {
@@ -196,6 +214,10 @@ const InvoiceGenerator = () => {
 
       const imgData = canvas.toDataURL("image/png");
 
+      const cgst = Math.round(form.baseAmount * 0.09);
+      const sgst = Math.round(form.baseAmount * 0.09);
+      const totalAmount = form.baseAmount + cgst + sgst;
+
       const invoiceData = {
         invoiceNo,
         date: new Date().toLocaleDateString("en-GB").split("/").join("-"),
@@ -203,9 +225,9 @@ const InvoiceGenerator = () => {
         customerName: form.customerName,
         refNo: form.refNo,
         baseAmount: form.baseAmount,
-        cgst: Math.round(form.baseAmount * 0.09),
-        sgst: Math.round(form.baseAmount * 0.09),
-        totalAmount: Math.round(form.baseAmount * 1.18),
+        cgst,
+        sgst,
+        totalAmount,
         billTo: { company: form.billToCompany, ...billTo },
         serviceDescription: form.serviceDescription,
       };
@@ -223,7 +245,7 @@ const InvoiceGenerator = () => {
       const contentType = res.headers.get("content-type");
       if (!contentType?.includes("application/json")) {
         const txt = await res.text();
-        throw new Error("Server error (check payload size)");
+        throw new Error("Server error");
       }
 
       const data = await res.json();
@@ -231,14 +253,21 @@ const InvoiceGenerator = () => {
 
       alert("PDF saved successfully!");
       fetchNextInvoiceNo();
+      fetchInvoices();
     } catch (err) {
       alert(`Failed: ${err.message}`);
     }
   };
 
+  // ------------------- DYNAMIC CALCULATIONS -------------------
+  const baseAmount = form.baseAmount;
+  const cgst = Math.round(baseAmount * 0.09);
+  const sgst = Math.round(baseAmount * 0.09);
+  const totalAmount = baseAmount + cgst + sgst;
+
   // ------------------- UTILS -------------------
   const numberToWords = (num) => {
-    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven1", "Eight", "Nine"];
+    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
     const b = ["", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
     const c = ["", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
     const d = ["", "Thousand", "Million"];
@@ -259,29 +288,19 @@ const InvoiceGenerator = () => {
     return "Rupees " + words + " Only";
   };
 
-  const cgst = Math.round(form.baseAmount * 0.09);
-  const sgst = Math.round(form.baseAmount * 0.09);
-  const totalAmount = form.baseAmount + cgst + sgst;
-
   // ------------------- JSX -------------------
   return (
-    <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md space-y-6">
+    <div className="p-6 max-w-7xl mx-auto bg-white rounded-lg shadow-md space-y-8">
       <h2 className="text-2xl font-bold text-center">Generate Invoice</h2>
 
-      {/* ---------- VENDOR FORM ---------- */}
+      {/* VENDOR FORM */}
       <div className="border p-4 rounded bg-gray-50">
-        <h3 className="font-bold mb-2">
-          {editingVendor ? `Edit Vendor: ${editingVendor.name}` : "Add New Vendor"}
-        </h3>
+        <h3 className="font-bold mb-2">{editingVendor ? `Edit Vendor: ${editingVendor.name}` : "Add New Vendor"}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {["name","gst","pan","address","mobile","email","stateCode"].map(f=>(
-            <input
-              key={f}
-              placeholder={f.toUpperCase()}
-              value={vendorForm[f]}
+            <input key={f} placeholder={f.toUpperCase()} value={vendorForm[f]}
               onChange={e=>setVendorForm({...vendorForm,[f]:e.target.value})}
-              className="border p-2 rounded text-sm"
-            />
+              className="border p-2 rounded text-sm"/>
           ))}
         </div>
         <div className="mt-3 flex gap-2">
@@ -296,11 +315,11 @@ const InvoiceGenerator = () => {
         </div>
       </div>
 
-      {/* ---------- VENDOR LIST ---------- */}
+      {/* VENDOR LIST */}
       <div className="border p-4 rounded bg-blue-50">
         <h3 className="font-bold mb-2">Vendors ({vendors.length})</h3>
         {vendors.length === 0 ? (
-          <p className="text-gray-500 text-sm">No vendors yet. Add one above.</p>
+          <p className="text-gray-500 text-sm">No vendors yet.</p>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {vendors.map((v) => (
@@ -308,18 +327,8 @@ const InvoiceGenerator = () => {
                 <div><strong>{v.name}</strong> ({v.code})</div>
                 <div>{v.mobile} | {v.email}</div>
                 <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => handleEditVendor(v)}
-                    className="text-blue-600 underline text-xs"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => handleDeleteVendor(v._id)}
-                    className="text-red-600 underline text-xs"
-                  >
-                    Delete
-                  </button>
+                  <button onClick={() => handleEditVendor(v)} className="text-blue-600 underline text-xs">Edit</button>
+                  <button onClick={() => handleDeleteVendor(v._id)} className="text-red-600 underline text-xs">Delete</button>
                 </div>
               </div>
             ))}
@@ -327,13 +336,13 @@ const InvoiceGenerator = () => {
         )}
       </div>
 
-      {/* ---------- INVOICE FORM ---------- */}
+      {/* INVOICE FORM */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <input value={invoiceNo} readOnly className="border p-2 bg-gray-100" placeholder="Invoice No" />
         <input value={new Date().toLocaleDateString("en-GB").split("/").join("-")} readOnly className="border p-2 bg-gray-100" placeholder="Date" />
         <input value={vendors.find(v=>v.name===form.billToCompany)?.code||""} readOnly className="border p-2 bg-gray-100" placeholder="Vendor Code" />
         <input value={form.customerName} onChange={e=>setForm({...form,customerName:e.target.value})} className="border p-2" placeholder="Customer Name" />
-        <input type="number" value={form.baseAmount} onChange={e=>setForm({...form,baseAmount:parseInt(e.target.value)||0})} className="border p-2" placeholder="Base Amount" />
+        <input type="number" value={form.baseAmount} onChange={e=>setForm({...form,baseAmount:parseInt(e.target.value)||0})} className="border p-2 font-medium" placeholder="Base Amount" />
         <input value={form.refNo} readOnly className="border p-2 bg-gray-100" placeholder="Ref No" />
         <select value={form.billToCompany} onChange={handleBillToCompanyChange} className="border p-2">
           <option value="">Select Vendor</option>
@@ -345,23 +354,71 @@ const InvoiceGenerator = () => {
         <input value={form.serviceDescription} onChange={e=>setForm({...form,serviceDescription:e.target.value})} className="border p-2 sm:col-span-2" placeholder="Service Description" />
       </div>
 
+      {/* AMOUNT SUMMARY */}
+      <div className="border p-4 rounded bg-green-50">
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div><strong>Base Amount:</strong> ₹ {baseAmount.toLocaleString("en-IN")}</div>
+          <div><strong>CGST (9%):</strong> ₹ {cgst.toLocaleString("en-IN")}</div>
+          <div><strong>SGST (9%):</strong> ₹ {sgst.toLocaleString("en-IN")}</div>
+          <div className="text-lg font-bold text-green-700"><strong>Total:</strong> ₹ {totalAmount.toLocaleString("en-IN")}</div>
+        </div>
+      </div>
+
       <button onClick={generatePDF} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded text-lg font-medium transition">
         Generate & Save PDF
       </button>
 
-      {/* ---------- LIVE PREVIEW ---------- */}
+      {/* LIVE PREVIEW */}
       {previewUrl && (
         <div className="mt-6 border p-4 rounded bg-gray-50">
-          <h3 className="font-bold text-lg mb-2">Live Preview</h3>
+          <h3 className="font、BOLD text-lg mb-2">Live Preview</h3>
           <img src={previewUrl} alt="preview" className="w-full border shadow-sm" style={{ maxWidth: "595px" }} />
         </div>
       )}
 
-      {/* ---------- HIDDEN A4 TEMPLATE (PDF) ---------- */}
+      {/* INVOICE LIST */}
+      <div className="mt-12 border-t pt-6">
+        <h3 className="text-xl font-bold mb-4">Generated Invoices ({invoices.length})</h3>
+        {invoices.length === 0 ? (
+          <p className="text-gray-500">No invoices yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border p-2 text-left">Invoice No</th>
+                  <th className="border p-2 text-left">Date</th>
+                  <th className="border p-2 text-left">Customer</th>
+                  <th className="border p-2 text-right">Total</th>
+                  <th className="border p-2 text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map((inv) => (
+                  <tr key={inv._id} className="hover:bg-gray-50">
+                    <td className="border p-2">{inv.invoiceNo}</td>
+                    <td className="border p-2">{inv.date}</td>
+                    <td className="border p-2">{inv.customerName}</td>
+                    <td className="border p-2 text-right">₹ {inv.totalAmount.toLocaleString("en-IN")}</td>
+                    <td className="border p-2 text-center">
+                      <div className="flex justify-center gap-2">
+                        <a href={inv.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline text-xs">View</a>
+                        <a href={inv.pdfUrl} download={`invoice-${inv.invoiceNo}.pdf`} className="text-green-600 hover:underline text-xs">Download</a>
+                        <button onClick={() => handleDeleteInvoice(inv._id)} className="text-red-600 hover:underline text-xs">Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* HIDDEN TEMPLATES */}
       <div ref={invoiceRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "595px", height: "842px", background: "#fff", padding: "20px", boxSizing: "border-box", fontSize: "11px", lineHeight: "1.3", fontFamily: "Arial, sans-serif" }}>
         <InvoiceTemplate invoiceNo={invoiceNo} form={form} billTo={billTo} vendors={vendors} cgst={cgst} sgst={sgst} totalAmount={totalAmount} numberToWords={numberToWords} />
       </div>
-
       <div ref={previewRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "595px", height: "842px", background: "#fff", padding: "20px", boxSizing: "border-box", fontSize: "11px", lineHeight: "1.3", fontFamily: "Arial, sans-serif" }}>
         <InvoiceTemplate invoiceNo={invoiceNo} form={form} billTo={billTo} vendors={vendors} cgst={cgst} sgst={sgst} totalAmount={totalAmount} numberToWords={numberToWords} />
       </div>
@@ -369,37 +426,26 @@ const InvoiceGenerator = () => {
   );
 };
 
-/* ==================== INVOICE TEMPLATE ==================== */
+/* INVOICE TEMPLATE */
 const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAmount, numberToWords }) => (
   <div style={{ width: "100%", height: "100%" }}>
-
-    {/* ----- HEADER ----- */}
+    {/* Header */}
     <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #000", paddingBottom: "6px" }}>
       <img src={assets.logo} alt="Logo" style={{ height: "55px" }} />
       <div style={{ textAlign: "right", fontSize: "10px" }}>
-        <strong style={{ fontSize: "14px", color: "#1e40af" }}>
-          Arshyan Insurance Marketing & Services Pvt. Ltd
-        </strong><br />
+        <strong style={{ fontSize: "14px", color: "#1e40af" }}>Arshyan Insurance Marketing & Services Pvt. Ltd</strong><br />
         Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089<br />
         Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com<br />
         website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715
       </div>
     </div>
 
-    {/* ----- TITLE ----- */}
-    <div style={{
-      backgroundColor: "#f3f4f6",
-      textAlign: "center",
-      fontWeight: "bold",
-      padding: "6px",
-      marginTop: "6px",
-      borderTop: "1px solid #000",
-      borderBottom: "1px solid #000",
-    }}>
+    {/* Title */}
+    <div style={{ backgroundColor: "#f3f4f6", textAlign: "center", fontWeight: "bold", padding: "6px", marginTop: "6px", borderTop: "1px solid #000", borderBottom: "1px solid #000" }}>
       TAX INVOICE
     </div>
 
-    {/* ----- COMPANY & INVOICE INFO ----- */}
+    {/* Company & Invoice Info */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
       <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
         <strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong><br />
@@ -413,7 +459,7 @@ const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAm
       </div>
     </div>
 
-    {/* ----- BILL TO ----- */}
+    {/* Bill To */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
       <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
         <strong>Bill To</strong><br />
@@ -431,7 +477,7 @@ const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAm
       </div>
     </div>
 
-    {/* ----- TABLE ----- */}
+    {/* Table */}
     <table style={{ width: "100%", marginTop: "6px", borderCollapse: "collapse", fontSize: "10px" }}>
       <thead>
         <tr style={{ backgroundColor: "#f3f4f6" }}>
@@ -448,9 +494,7 @@ const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAm
             <strong>Ref No:</strong> {form.refNo}
           </td>
           <td style={{ border: "1px solid #000", padding: "6px", textAlign: "center" }}>
-            998311<br />
-            CGST 9%<br />
-            SGST 9%
+            998311<br />CGST 9%<br />SGST 9%
           </td>
           <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
             ₹ {form.baseAmount.toLocaleString("en-IN")}<br />
@@ -460,9 +504,7 @@ const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAm
         </tr>
         <tr>
           <td style={{ border: "1px solid #000", padding: "6px" }}></td>
-          <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "bold", textAlign: "right" }}>
-            Total Amount
-          </td>
+          <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "bold", textAlign: "right" }}>Total Amount</td>
           <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "bold", textAlign: "right" }}>
             ₹ {totalAmount.toLocaleString("en-IN")}
           </td>
@@ -470,12 +512,10 @@ const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAm
       </tbody>
     </table>
 
-    {/* ----- AMOUNT IN WORDS ----- */}
     <div style={{ border: "1px solid #000", padding: "6px", marginTop: "6px", fontSize: "10px" }}>
       {numberToWords(totalAmount)}
     </div>
 
-    {/* ----- BANK & SIGNATURE ----- */}
     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
       <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
         <strong>COMPANY BANK ACCOUNT DETAILS :-</strong><br />
