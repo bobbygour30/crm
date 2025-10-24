@@ -1,656 +1,497 @@
-import React, { useState, useRef } from "react";
-import jsPDF from "jspdf";
+// src/components/InvoiceGenerator.jsx
+import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
-import assets from "../../assets/assets"; // Ensure your logo is correctly imported
+import assets from "../../assets/assets";
 
 const InvoiceGenerator = () => {
-  const [invoiceCount, setInvoiceCount] = useState(1);
-  const [invoiceNo, setInvoiceNo] = useState(`ARYN/2025-26/${String(1).padStart(4, "0")}`);
-  const [vendorCode, setVendorCode] = useState("");
-  const [customerName, setCustomerName] = useState("");
-  const [refNo, setRefNo] = useState("OG-26-1149-4014-00000028");
-  const [baseAmount, setBaseAmount] = useState(7626);
-  const [billToCompany, setBillToCompany] = useState("");
-  const [billToAddress, setBillToAddress] = useState("");
-  const [billToMobile, setBillToMobile] = useState("");
-  const [billToEmail, setBillToEmail] = useState("");
-  const [billToGSTIN, setBillToGSTIN] = useState("");
-  const [billToPAN, setBillToPAN] = useState("");
-  const [serviceDescription, setServiceDescription] = useState("Mobile Insurance - Services");
-
-  // Vendor management
+  // ------------------- STATE -------------------
   const [vendors, setVendors] = useState([]);
-  const [editingIndex, setEditingIndex] = useState(null);
+  const [invoiceNo, setInvoiceNo] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+
   const [vendorForm, setVendorForm] = useState({
-    name: "",
-    gst: "",
-    pan: "",
-    address: "",
-    mobile: "",
-    email: "",
-    stateCode: "",
-    code: ""
+    name: "", gst: "", pan: "", address: "", mobile: "", email: "", stateCode: ""
+  });
+  const [editingVendor, setEditingVendor] = useState(null); // <-- THIS CONTROLS EDIT MODE
+
+  const [form, setForm] = useState({
+    customerName: "",
+    refNo: "OG-26-1149-4014-00000028",
+    baseAmount: 7626,
+    billToCompany: "",
+    serviceDescription: "Mobile Insurance - Services",
+  });
+
+  const [billTo, setBillTo] = useState({
+    address: "", mobile: "", email: "", gstin: "", pan: ""
   });
 
   const invoiceRef = useRef();
+  const previewRef = useRef();
 
-  // Get current date in DD-MM-YYYY format
-  const getCurrentDate = () => {
-    return new Date().toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    }).split('/').join('-');
-  };
+  const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-  const handleVendorInputChange = (e) => {
-    const { name, value } = e.target;
-    setVendorForm({ ...vendorForm, [name]: value });
-    if (name === "name") {
-      setBillToCompany(value); // Sync vendor name with bill to company
-    }
-  };
+  // ------------------- FETCH DATA -------------------
+  useEffect(() => {
+    fetchVendors();
+    fetchNextInvoiceNo();
+  }, []);
 
-  const handleBillToCompanyChange = (e) => {
-    const value = e.target.value;
-    setBillToCompany(value);
-    const selectedVendor = vendors.find((v) => v.name === value);
-    if (selectedVendor) {
-      setVendorCode(selectedVendor.code);
-      setBillToAddress(selectedVendor.address || "");
-      setBillToMobile(selectedVendor.mobile || "");
-      setBillToEmail(selectedVendor.email || "");
-      setBillToGSTIN(selectedVendor.gst || "");
-      setBillToPAN(selectedVendor.pan || "");
-    } else {
-      setVendorCode("");
-      setBillToAddress("");
-      setBillToMobile("");
-      setBillToEmail("");
-      setBillToGSTIN("");
-      setBillToPAN("");
-    }
-  };
+  const fetchVendors = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return alert("Please login first");
 
-  const addOrUpdateVendor = () => {
-    if (!vendorForm.name) return alert("Vendor Name is required");
+    try {
+      const res = await fetch(`${API_BASE}/api/invoice/vendors`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-    if (editingIndex !== null) {
-      const updatedVendors = [...vendors];
-      updatedVendors[editingIndex] = { ...vendorForm, code: updatedVendors[editingIndex].code };
-      setVendors(updatedVendors);
-      setEditingIndex(null);
-    } else {
-      const newVendor = {
-        ...vendorForm,
-        code: `110089${String(vendors.length + 10).padStart(2, "0")}`
-      };
-      setVendors([...vendors, newVendor]);
-      setVendorCode(newVendor.code);
-      setBillToCompany(newVendor.name); // Sync new vendor name with bill to company
-    }
-
-    setVendorForm({
-      name: "",
-      gst: "",
-      pan: "",
-      address: "",
-      mobile: "",
-      email: "",
-      stateCode: "",
-      code: ""
-    });
-  };
-
-  const editVendor = (index) => {
-    setVendorForm(vendors[index]);
-    setVendorCode(vendors[index].code);
-    setEditingIndex(index);
-    setBillToCompany(vendors[index].name); // Sync when editing
-  };
-
-  // PDF and number-to-words logic
-  const numberToWords = (num) => {
-    const units = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine"];
-    const teens = ["", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
-    const tens = ["", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
-    const thousands = ["", "Thousand", "Million", "Billion"];
-
-    if (num === 0) return "Zero";
-    const convertLessThanThousand = (n) => {
-      if (n === 0) return "";
-      if (n < 10) return units[n];
-      if (n < 20) return teens[n - 10];
-      if (n < 100) return tens[Math.floor(n / 10)] + (n % 10 !== 0 ? " " + units[n % 10] : "");
-      return units[Math.floor(n / 100)] + " Hundred" + (n % 100 !== 0 ? " " + convertLessThanThousand(n % 100) : "");
-    };
-
-    let words = "";
-    let numInt = num;
-    let i = 0;
-    while (numInt > 0) {
-      if (numInt % 1000 !== 0) {
-        words = convertLessThanThousand(numInt % 1000) + (thousands[i] ? " " + thousands[i] : "") + (words ? " " + words : "");
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("Fetch vendors failed:", err);
+        alert(`Failed to load vendors: ${err.msg || res.status}`);
+        return;
       }
-      numInt = Math.floor(numInt / 1000);
+
+      const data = await res.json();
+      setVendors(data);
+    } catch (e) {
+      console.error("Network error:", e);
+      alert("Network error. Check backend.");
+    }
+  };
+
+  const fetchNextInvoiceNo = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/invoice/next-invoice`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      const { invoiceNo } = await res.json();
+      setInvoiceNo(invoiceNo);
+    } catch (e) {
+      console.error("fetchNextInvoiceNo error", e);
+    }
+  };
+
+  // ------------------- EDIT VENDOR -------------------
+  const handleEditVendor = (vendor) => {
+    setEditingVendor(vendor);
+    setVendorForm({
+      name: vendor.name,
+      gst: vendor.gst || "",
+      pan: vendor.pan || "",
+      address: vendor.address || "",
+      mobile: vendor.mobile || "",
+      email: vendor.email || "",
+      stateCode: vendor.stateCode || "",
+    });
+    window.scrollTo(0, 0); // Scroll to form
+  };
+
+  const cancelEdit = () => {
+    setEditingVendor(null);
+    setVendorForm({ name: "", gst: "", pan: "", address: "", mobile: "", email: "", stateCode: "" });
+  };
+
+  // ------------------- DELETE VENDOR -------------------
+  const handleDeleteVendor = async (id) => {
+    if (!confirm("Delete this vendor?")) return;
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/invoice/vendors/${id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) throw new Error();
+      fetchVendors();
+    } catch (e) {
+      alert("Delete failed");
+    }
+  };
+
+  // ------------------- BILL-TO LOGIC -------------------
+  const handleBillToCompanyChange = (e) => {
+    const company = e.target.value;
+    setForm({ ...form, billToCompany: company });
+    const v = vendors.find((v) => v.name === company);
+    setBillTo(
+      v
+        ? {
+            address: v.address || "",
+            mobile: v.mobile || "",
+            email: v.email || "",
+            gstin: v.gst || "",
+            pan: v.pan || "",
+          }
+        : { address: "", mobile: "", email: "", gstin: "", pan: "" }
+    );
+    generatePreview();
+  };
+
+  // ------------------- VENDOR CRUD -------------------
+  const handleAddOrUpdateVendor = async () => {
+    if (!vendorForm.name) return alert("Vendor name is required");
+    const token = localStorage.getItem("token");
+    const url = editingVendor
+      ? `${API_BASE}/api/invoice/vendors/${editingVendor._id}`
+      : `${API_BASE}/api/invoice/vendors`;
+    const method = editingVendor ? "PUT" : "POST";
+
+    try {
+      const res = await fetch(url, {
+        method,
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(vendorForm),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.msg || "Failed");
+      }
+      cancelEdit();
+      fetchVendors();
+    } catch (e) {
+      alert(`Save failed: ${e.message}`);
+    }
+  };
+
+  // ------------------- LIVE PREVIEW -------------------
+  const generatePreview = async () => {
+    if (!previewRef.current) return;
+    try {
+      const canvas = await html2canvas(previewRef.current, {
+        scale: 1.5,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: 595,
+        height: 842,
+      });
+      setPreviewUrl(canvas.toDataURL("image/png"));
+    } catch (e) {
+      console.error("preview error", e);
+    }
+  };
+  useEffect(() => {
+    const t = setTimeout(generatePreview, 300);
+    return () => clearTimeout(t);
+  }, [form, billTo, invoiceNo]);
+
+  // ------------------- GENERATE PDF -------------------
+  const generatePDF = async () => {
+    if (!form.billToCompany) return alert("Select Bill To Company");
+
+    try {
+      const canvas = await html2canvas(invoiceRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+        width: 595,
+        height: 842,
+      });
+
+      const imgData = canvas.toDataURL("image/png");
+
+      const invoiceData = {
+        invoiceNo,
+        date: new Date().toLocaleDateString("en-GB").split("/").join("-"),
+        vendorCode: vendors.find((v) => v.name === form.billToCompany)?.code || "",
+        customerName: form.customerName,
+        refNo: form.refNo,
+        baseAmount: form.baseAmount,
+        cgst: Math.round(form.baseAmount * 0.09),
+        sgst: Math.round(form.baseAmount * 0.09),
+        totalAmount: Math.round(form.baseAmount * 1.18),
+        billTo: { company: form.billToCompany, ...billTo },
+        serviceDescription: form.serviceDescription,
+      };
+
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/invoice/invoices`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ html: imgData, invoiceData }),
+      });
+
+      const contentType = res.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
+        const txt = await res.text();
+        throw new Error("Server error (check payload size)");
+      }
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.msg || `HTTP ${res.status}`);
+
+      alert("PDF saved successfully!");
+      fetchNextInvoiceNo();
+    } catch (err) {
+      alert(`Failed: ${err.message}`);
+    }
+  };
+
+  // ------------------- UTILS -------------------
+  const numberToWords = (num) => {
+    const a = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven1", "Eight", "Nine"];
+    const b = ["", "Eleven", "Twelve", "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+    const c = ["", "Ten", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+    const d = ["", "Thousand", "Million"];
+    const convert = (n) => {
+      if (n === 0) return "";
+      if (n < 10) return a[n];
+      if (n < 20) return b[n - 10];
+      if (n < 100) return c[Math.floor(n / 10)] + (n % 10 ? " " + a[n % 10] : "");
+      return a[Math.floor(n / 100)] + " Hundred" + (n % 100 ? " " + convert(n % 100) : "");
+    };
+    let words = "", i = 0;
+    while (num > 0) {
+      const chunk = num % 1000;
+      if (chunk) words = convert(chunk) + (d[i] ? " " + d[i] : "") + (words ? " " + words : "");
+      num = Math.floor(num / 1000);
       i++;
     }
-
     return "Rupees " + words + " Only";
   };
 
-  const cgst = Math.round(baseAmount * 0.09);
-  const sgst = Math.round(baseAmount * 0.09);
-  const totalAmount = Math.round(baseAmount + cgst + sgst);
+  const cgst = Math.round(form.baseAmount * 0.09);
+  const sgst = Math.round(form.baseAmount * 0.09);
+  const totalAmount = form.baseAmount + cgst + sgst;
 
-  const generatePDF = async () => {
-    if (!billToCompany) {
-      alert("Please enter a Bill To Company");
-      return;
-    }
-    if (!vendorCode && vendors.length > 0) {
-      alert("Please select a vendor with a valid vendor code");
-      return;
-    }
-
-    const element = invoiceRef.current;
-    if (!element) {
-      console.error("Invoice element not found");
-      return;
-    }
-
-    try {
-      const canvas = await html2canvas(element, { scale: 2, useCORS: true, backgroundColor: "#ffffff" });
-      const imgData = canvas.toDataURL("image/png");
-      const pdf = new jsPDF("p", "mm", "a4");
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const margin = 10;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      const yPosition = (pageHeight - imgHeight) / 2 > margin ? (pageHeight - imgHeight) / 2 : margin;
-      pdf.addImage(imgData, "PNG", margin, yPosition, imgWidth, imgHeight);
-      pdf.save(`invoice-${invoiceNo}.pdf`);
-
-      // Increment invoice number after generating PDF
-      setInvoiceCount((prev) => {
-        const newCount = prev + 1;
-        setInvoiceNo(`ARYN/2025-26/${String(newCount).padStart(4, "0")}`);
-        return newCount;
-      });
-    } catch (err) {
-      console.error("PDF generation failed:", err);
-      alert("Failed to generate PDF. Please try again.");
-    }
-  };
-
+  // ------------------- JSX -------------------
   return (
-    <div className="p-6 max-w-5xl mx-auto bg-white rounded-lg shadow-md">
-      <h2 className="text-2xl font-bold mb-4 text-center text-gray-900">
-        Generate Invoice
-      </h2>
-      <div className="border p-4 rounded-md mb-6 bg-gray-50">
-        <h3 className="font-bold mb-2 text-gray-900">Add Vendor</h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Vendor Name</label>
-            <input
-              type="text"
-              name="name"
-              value={vendorForm.name}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">GST Number</label>
-            <input
-              type="text"
-              name="gst"
-              value={vendorForm.gst}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">PAN Number</label>
-            <input
-              type="text"
-              name="pan"
-              value={vendorForm.pan}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Address</label>
-            <input
-              type="text"
-              name="address"
-              value={vendorForm.address}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Mobile Number</label>
-            <input
-              type="text"
-              name="mobile"
-              value={vendorForm.mobile}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">Email</label>
-            <input
-              type="email"
-              name="email"
-              value={vendorForm.email}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700">State Code</label>
-            <input
-              type="text"
-              name="stateCode"
-              value={vendorForm.stateCode}
-              onChange={handleVendorInputChange}
-              className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-            />
-          </div>
-        </div>
-        <button
-          onClick={addOrUpdateVendor}
-          className="mt-3 bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
-        >
-          {editingIndex !== null ? "Update Vendor" : "Add Vendor"}
-        </button>
+    <div className="p-6 max-w-4xl mx-auto bg-white rounded-lg shadow-md space-y-6">
+      <h2 className="text-2xl font-bold text-center">Generate Invoice</h2>
 
-        {/* Vendors List */}
-        {vendors.length > 0 && (
-          <div className="mt-4">
-            <h4 className="font-bold mb-2 text-gray-900">Vendors List</h4>
-            <div className="overflow-x-auto">
-              <table className="w-full border border-gray-300 text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border border-gray-300 p-2 text-left">Code</th>
-                    <th className="border border-gray-300 p-2 text-left">Name</th>
-                    <th className="border border-gray-300 p-2 text-left">GST</th>
-                    <th className="border border-gray-300 p-2 text-left">PAN</th>
-                    <th className="border border-gray-300 p-2 text-left">Mobile</th>
-                    <th className="border border-gray-300 p-2 text-left">Email</th>
-                    <th className="border border-gray-300 p-2 text-left">State Code</th>
-                    <th className="border border-gray-300 p-2 text-left">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendors.map((v, idx) => (
-                    <tr key={idx}>
-                      <td className="border border-gray-300 p-2">{v.code}</td>
-                      <td className="border border-gray-300 p-2">{v.name}</td>
-                      <td className="border border-gray-300 p-2">{v.gst}</td>
-                      <td className="border border-gray-300 p-2">{v.pan}</td>
-                      <td className="border border-gray-300 p-2">{v.mobile}</td>
-                      <td className="border border-gray-300 p-2">{v.email}</td>
-                      <td className="border border-gray-300 p-2">{v.stateCode}</td>
-                      <td className="border border-gray-300 p-2">
-                        <button
-                          onClick={() => editVendor(idx)}
-                          className="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      {/* ---------- VENDOR FORM ---------- */}
+      <div className="border p-4 rounded bg-gray-50">
+        <h3 className="font-bold mb-2">
+          {editingVendor ? `Edit Vendor: ${editingVendor.name}` : "Add New Vendor"}
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {["name","gst","pan","address","mobile","email","stateCode"].map(f=>(
+            <input
+              key={f}
+              placeholder={f.toUpperCase()}
+              value={vendorForm[f]}
+              onChange={e=>setVendorForm({...vendorForm,[f]:e.target.value})}
+              className="border p-2 rounded text-sm"
+            />
+          ))}
+        </div>
+        <div className="mt-3 flex gap-2">
+          <button onClick={handleAddOrUpdateVendor} className="bg-indigo-600 text-white px-4 py-2 rounded">
+            {editingVendor ? "Update" : "Add"} Vendor
+          </button>
+          {editingVendor && (
+            <button onClick={cancelEdit} className="bg-gray-500 text-white px-4 py-2 rounded">
+              Cancel
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ---------- VENDOR LIST ---------- */}
+      <div className="border p-4 rounded bg-blue-50">
+        <h3 className="font-bold mb-2">Vendors ({vendors.length})</h3>
+        {vendors.length === 0 ? (
+          <p className="text-gray-500 text-sm">No vendors yet. Add one above.</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {vendors.map((v) => (
+              <div key={v._id} className="border p-3 rounded bg-white text-sm">
+                <div><strong>{v.name}</strong> ({v.code})</div>
+                <div>{v.mobile} | {v.email}</div>
+                <div className="mt-2 flex gap-2">
+                  <button
+                    onClick={() => handleEditVendor(v)}
+                    className="text-blue-600 underline text-xs"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => handleDeleteVendor(v._id)}
+                    className="text-red-600 underline text-xs"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Input Form */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Invoice No
-          </label>
-          <input
-            type="text"
-            value={invoiceNo}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Invoice Date
-          </label>
-          <input
-            type="text"
-            value={getCurrentDate()}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Vendor Code
-          </label>
-          <input
-            type="text"
-            value={vendorCode}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Customer Name
-          </label>
-          <input
-            type="text"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Base Amount (INR)
-          </label>
-          <input
-            type="number"
-            value={baseAmount}
-            onChange={(e) => setBaseAmount(parseInt(e.target.value) || 0)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Reference No
-          </label>
-          <input
-            type="text"
-            value={refNo}
-            onChange={(e) => setRefNo(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To Company
-          </label>
-          <input
-            type="text"
-            value={billToCompany}
-            onChange={handleBillToCompanyChange}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To Address
-          </label>
-          <input
-            type="text"
-            value={billToAddress}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To Mobile
-          </label>
-          <input
-            type="text"
-            value={billToMobile}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To Email
-          </label>
-          <input
-            type="email"
-            value={billToEmail}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To GSTIN
-          </label>
-          <input
-            type="text"
-            value={billToGSTIN}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-gray-700">
-            Bill To PAN
-          </label>
-          <input
-            type="text"
-            value={billToPAN}
-            readOnly
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 bg-gray-100"
-          />
-        </div>
-        <div className="col-span-1 sm:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">
-            Service Description
-          </label>
-          <input
-            type="text"
-            value={serviceDescription}
-            onChange={(e) => setServiceDescription(e.target.value)}
-            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm text-gray-900 focus:ring-indigo-500 focus:border-indigo-500"
-          />
-        </div>
+      {/* ---------- INVOICE FORM ---------- */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <input value={invoiceNo} readOnly className="border p-2 bg-gray-100" placeholder="Invoice No" />
+        <input value={new Date().toLocaleDateString("en-GB").split("/").join("-")} readOnly className="border p-2 bg-gray-100" placeholder="Date" />
+        <input value={vendors.find(v=>v.name===form.billToCompany)?.code||""} readOnly className="border p-2 bg-gray-100" placeholder="Vendor Code" />
+        <input value={form.customerName} onChange={e=>setForm({...form,customerName:e.target.value})} className="border p-2" placeholder="Customer Name" />
+        <input type="number" value={form.baseAmount} onChange={e=>setForm({...form,baseAmount:parseInt(e.target.value)||0})} className="border p-2" placeholder="Base Amount" />
+        <input value={form.refNo} readOnly className="border p-2 bg-gray-100" placeholder="Ref No" />
+        <select value={form.billToCompany} onChange={handleBillToCompanyChange} className="border p-2">
+          <option value="">Select Vendor</option>
+          {vendors.map(v=><option key={v._id} value={v.name}>{v.name}</option>)}
+        </select>
+        {["address","mobile","email","gstin","pan"].map(k=>(
+          <input key={k} value={billTo[k]} readOnly className="border p-2 bg-gray-100" placeholder={k.charAt(0).toUpperCase()+k.slice(1)} />
+        ))}
+        <input value={form.serviceDescription} onChange={e=>setForm({...form,serviceDescription:e.target.value})} className="border p-2 sm:col-span-2" placeholder="Service Description" />
       </div>
 
-      <button
-        onClick={generatePDF}
-        className="w-full bg-indigo-600 text-white p-2 rounded-md hover:bg-indigo-700 transition-colors"
-      >
-        Generate PDF
+      <button onClick={generatePDF} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white p-3 rounded text-lg font-medium transition">
+        Generate & Save PDF
       </button>
 
-      {/* Invoice Template */}
-      <div
-        ref={invoiceRef}
-        className="text-sm mx-auto mt-6"
-        style={{
-          width: "800px",
-          minHeight: "1120px",
-          background: "#ffffff",
-          padding: "20px",
-          border: "2px solid #000000",
-          boxSizing: "border-box",
-        }}
-      >
-        {/* Header */}
-        <div className="flex justify-between items-center border-b border-gray-900 pb-2">
-          <img
-            src={assets.logo}
-            alt="Arshyan Insurance Logo"
-            className="h-16"
-          />
-          <div className="text-right text-gray-900">
-            <h1 className="font-bold text-blue-900 text-lg">
-              Arshyan Insurance Marketing & Services Pvt. Ltd
-            </h1>
-            <p>
-              Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089
-            </p>
-            <p>
-              Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com
-            </p>
-            <p>
-              website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715
-            </p>
-          </div>
+      {/* ---------- LIVE PREVIEW ---------- */}
+      {previewUrl && (
+        <div className="mt-6 border p-4 rounded bg-gray-50">
+          <h3 className="font-bold text-lg mb-2">Live Preview</h3>
+          <img src={previewUrl} alt="preview" className="w-full border shadow-sm" style={{ maxWidth: "595px" }} />
         </div>
+      )}
 
-        {/* Tax Invoice Label */}
-        <div className="bg-gray-100 text-center font-bold py-2 border-y border-gray-900 mt-2 text-gray-900">
-          TAX INVOICE
-        </div>
+      {/* ---------- HIDDEN A4 TEMPLATE (PDF) ---------- */}
+      <div ref={invoiceRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "595px", height: "842px", background: "#fff", padding: "20px", boxSizing: "border-box", fontSize: "11px", lineHeight: "1.3", fontFamily: "Arial, sans-serif" }}>
+        <InvoiceTemplate invoiceNo={invoiceNo} form={form} billTo={billTo} vendors={vendors} cgst={cgst} sgst={sgst} totalAmount={totalAmount} numberToWords={numberToWords} />
+      </div>
 
-        {/* Company & Invoice Info */}
-        <div className="grid grid-cols-2 border border-gray-900 mt-2">
-          <div className="p-2 text-gray-900 border-r border-gray-900">
-            <p>
-              <strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong>
-            </p>
-            <p>212, 1st Floor Block G-3, Sector-16 Rohini New Delhi-110089</p>
-            <p>07ABCCA0500H1ZD</p>
-            <p>ABCCA0500H</p>
-          </div>
-          <div className="p-2 text-gray-900">
-            <p>
-              <strong>INVOICE NO:</strong> {invoiceNo}
-            </p>
-            <p>
-              <strong>INVOICE DATE:</strong> {getCurrentDate()}
-            </p>
-          </div>
-        </div>
-
-        {/* Bill To & Vendor Info */}
-        <div className="grid grid-cols-2 border border-gray-900 mt-2">
-          <div className="p-2 text-gray-900 border-r border-gray-900">
-            <p>
-              <strong>Bill To</strong>
-            </p>
-            <p>{billToCompany}</p>
-            <p>{billToAddress}</p>
-            <p>
-              <strong>Mobile:</strong> {billToMobile}
-            </p>
-            <p>
-              <strong>Email:</strong> {billToEmail}
-            </p>
-            <p>
-              <strong>GSTIN:</strong> {billToGSTIN}
-            </p>
-            <p>
-              <strong>PAN:</strong> {billToPAN}
-            </p>
-          </div>
-          <div className="p-2 text-gray-900">
-            <p>
-              <strong>Vendor Code:</strong> {vendorCode}
-            </p>
-            <p>
-              <strong>State Name:</strong> Delhi
-            </p>
-            <p>
-              <strong>State Code:</strong> 07
-            </p>
-          </div>
-        </div>
-
-        {/* Particulars Table */}
-        <table className="w-full mt-2 border border-gray-900 text-sm">
-          <thead>
-            <tr className="bg-gray-100 text-gray-900">
-              <th className="border border-gray-900 p-2">Particulars</th>
-              <th className="border border-gray-900 p-2">HSN/SAC</th>
-              <th className="border border-gray-900 p-2">Amount (INR)</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td className="border border-gray-900 p-2 text-gray-900">
-                <div className="space-y-1">
-                  <div>{serviceDescription}</div>
-                  <div>
-                    <strong>Customer Name:</strong> {customerName}
-                  </div>
-                  <div>
-                    <strong>Ref No:</strong> {refNo}
-                  </div>
-                </div>
-              </td>
-              <td className="border border-gray-900 p-2 text-center text-gray-900">
-                <div className="space-y-1">
-                  <div>998311</div>
-                  <div>CGST 9%</div>
-                  <div>SGST 9%</div>
-                </div>
-              </td>
-              <td className="border border-gray-900 p-2 text-right text-gray-900">
-                <div className="space-y-1">
-                  <div>₹ {baseAmount.toLocaleString('en-IN')}</div>
-                  <div>₹ {cgst.toLocaleString('en-IN')}</div>
-                  <div>₹ {sgst.toLocaleString('en-IN')}</div>
-                </div>
-              </td>
-            </tr>
-            <tr>
-              <td className="border border-gray-900 p-2"></td>
-              <td className="border border-gray-900 p-2 font-bold text-right text-gray-900">
-                Total Amount
-              </td>
-              <td className="border border-gray-900 p-2 font-bold text-right text-gray-900">
-                ₹ {totalAmount.toLocaleString('en-IN')}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-
-        {/* Amount in Words */}
-        <div className="border border-gray-900 p-2 mt-2 text-gray-900">
-          {numberToWords(totalAmount)}
-        </div>
-
-        {/* Bank Details & Sign */}
-        <div className="grid grid-cols-2 border border-gray-900 mt-2">
-          <div className="p-2 text-gray-900 border-r border-gray-900">
-            <p>
-              <strong>COMPANY BANK ACCOUNT DETAILS :-</strong>
-            </p>
-            <p>
-              <strong>NAME:</strong> ARSHYAN INSURANCE MARKETING & SERVICES PVT LTD
-            </p>
-            <p>
-              <strong>BANK NAME:</strong> RBL BANK LTD
-            </p>
-            <p>
-              <strong>CURRENT A/C NO:</strong> 409002419528
-            </p>
-            <p>
-              <strong>IFSC CODE:</strong> RATN0000559
-            </p>
-            <p>
-              <strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085
-            </p>
-          </div>
-          <div className="p-2 text-right text-gray-900 flex flex-col justify-end">
-            <p>For Arshyan Insurance Marketing & Service Pvt Ltd</p>
-            <div className="h-12" />
-            <p>
-              <strong>Authorised Signatory</strong>
-            </p>
-          </div>
-        </div>
+      <div ref={previewRef} style={{ position: "absolute", left: "-9999px", top: 0, width: "595px", height: "842px", background: "#fff", padding: "20px", boxSizing: "border-box", fontSize: "11px", lineHeight: "1.3", fontFamily: "Arial, sans-serif" }}>
+        <InvoiceTemplate invoiceNo={invoiceNo} form={form} billTo={billTo} vendors={vendors} cgst={cgst} sgst={sgst} totalAmount={totalAmount} numberToWords={numberToWords} />
       </div>
     </div>
   );
 };
+
+/* ==================== INVOICE TEMPLATE ==================== */
+const InvoiceTemplate = ({ invoiceNo, form, billTo, vendors, cgst, sgst, totalAmount, numberToWords }) => (
+  <div style={{ width: "100%", height: "100%" }}>
+
+    {/* ----- HEADER ----- */}
+    <div style={{ display: "flex", justifyContent: "space-between", borderBottom: "1px solid #000", paddingBottom: "6px" }}>
+      <img src={assets.logo} alt="Logo" style={{ height: "55px" }} />
+      <div style={{ textAlign: "right", fontSize: "10px" }}>
+        <strong style={{ fontSize: "14px", color: "#1e40af" }}>
+          Arshyan Insurance Marketing & Services Pvt. Ltd
+        </strong><br />
+        Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089<br />
+        Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com<br />
+        website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715
+      </div>
+    </div>
+
+    {/* ----- TITLE ----- */}
+    <div style={{
+      backgroundColor: "#f3f4f6",
+      textAlign: "center",
+      fontWeight: "bold",
+      padding: "6px",
+      marginTop: "6px",
+      borderTop: "1px solid #000",
+      borderBottom: "1px solid #000",
+    }}>
+      TAX INVOICE
+    </div>
+
+    {/* ----- COMPANY & INVOICE INFO ----- */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
+      <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
+        <strong>Arshyan Insurance Marketing & Services Pvt Ltd</strong><br />
+        212, 1st Floor Block G-3, Sector-16 Rohini New Delhi-110089<br />
+        07ABCCA0500H1ZD<br />
+        ABCCA0500H
+      </div>
+      <div style={{ padding: "6px", fontSize: "10px" }}>
+        <strong>INVOICE NO:</strong> {invoiceNo}<br />
+        <strong>INVOICE DATE:</strong> {new Date().toLocaleDateString("en-GB").split("/").join("-")}
+      </div>
+    </div>
+
+    {/* ----- BILL TO ----- */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
+      <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
+        <strong>Bill To</strong><br />
+        {form.billToCompany}<br />
+        {billTo.address}<br />
+        <strong>Mobile:</strong> {billTo.mobile}<br />
+        <strong>Email:</strong> {billTo.email}<br />
+        <strong>GSTIN:</strong> {billTo.gstin}<br />
+        <strong>PAN:</strong> {billTo.pan}
+      </div>
+      <div style={{ padding: "6px", fontSize: "10px" }}>
+        <strong>Vendor Code:</strong> {vendors.find(v=>v.name===form.billToCompany)?.code || ""}<br />
+        <strong>State Name:</strong> Delhi<br />
+        <strong>State Code:</strong> 07
+      </div>
+    </div>
+
+    {/* ----- TABLE ----- */}
+    <table style={{ width: "100%", marginTop: "6px", borderCollapse: "collapse", fontSize: "10px" }}>
+      <thead>
+        <tr style={{ backgroundColor: "#f3f4f6" }}>
+          <th style={{ border: "1px solid #000", padding: "6px" }}>Particulars</th>
+          <th style={{ border: "1px solid #000", padding: "6px" }}>HSN/SAC</th>
+          <th style={{ border: "1px solid #000", padding: "6px" }}>Amount (INR)</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td style={{ border: "1px solid #000", padding: "6px" }}>
+            {form.serviceDescription}<br />
+            <strong>Customer Name:</strong> {form.customerName}<br />
+            <strong>Ref No:</strong> {form.refNo}
+          </td>
+          <td style={{ border: "1px solid #000", padding: "6px", textAlign: "center" }}>
+            998311<br />
+            CGST 9%<br />
+            SGST 9%
+          </td>
+          <td style={{ border: "1px solid #000", padding: "6px", textAlign: "right" }}>
+            ₹ {form.baseAmount.toLocaleString("en-IN")}<br />
+            ₹ {cgst.toLocaleString("en-IN")}<br />
+            ₹ {sgst.toLocaleString("en-IN")}
+          </td>
+        </tr>
+        <tr>
+          <td style={{ border: "1px solid #000", padding: "6px" }}></td>
+          <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "bold", textAlign: "right" }}>
+            Total Amount
+          </td>
+          <td style={{ border: "1px solid #000", padding: "6px", fontWeight: "bold", textAlign: "right" }}>
+            ₹ {totalAmount.toLocaleString("en-IN")}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+
+    {/* ----- AMOUNT IN WORDS ----- */}
+    <div style={{ border: "1px solid #000", padding: "6px", marginTop: "6px", fontSize: "10px" }}>
+      {numberToWords(totalAmount)}
+    </div>
+
+    {/* ----- BANK & SIGNATURE ----- */}
+    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", border: "1px solid #000", marginTop: "6px" }}>
+      <div style={{ padding: "6px", borderRight: "1px solid #000", fontSize: "10px" }}>
+        <strong>COMPANY BANK ACCOUNT DETAILS :-</strong><br />
+        <strong>NAME:</strong> ARSHYAN INSURANCE MARKETING & SERVICES PVT LTD<br />
+        <strong>BANK NAME:</strong> RBL BANK LTD<br />
+        <strong>CURRENT A/C NO:</strong> 409002419528<br />
+        <strong>IFSC CODE:</strong> RATN0000559<br />
+        <strong>ADDRESS:</strong> Sector-7 Rohini Delhi-110085
+      </div>
+      <div style={{ padding: "6px", display: "flex", flexDirection: "column", justifyContent: "flex-end", alignItems: "flex-end", gap: "4px" }}>
+        <p style={{ margin: 0, fontSize: "10px" }}>For Arshyan Insurance Marketing & Service Pvt Ltd</p>
+        <img src={assets.stamp} alt="Stamp" style={{ width: "110px", height: "110px", objectFit: "contain" }} />
+        <p style={{ margin: 0, fontSize: "10px" }}><strong>Authorised Signatory</strong></p>
+      </div>
+    </div>
+  </div>
+);
 
 export default InvoiceGenerator;
