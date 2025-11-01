@@ -24,7 +24,6 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
     { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
-    { name: "Vehicle Quote", icon: FaCarSide, path: "/vehicle-quote" },
     { name: "Quote", icon: FaBullhorn, path: "/quote" },
     { name: "Profile", icon: FaUser, path: "/profile" },
     { name: "Activity", icon: FaChartPie, path: "/activity" },
