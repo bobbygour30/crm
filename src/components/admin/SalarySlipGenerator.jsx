@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
+
 const defaultEarnings = {
   Basic: 10000,
   Incentive: 0,
@@ -9,19 +10,21 @@ const defaultEarnings = {
   "Leave Travel": 833.33,
   "Allowance Medical": 1250,
   Reimbursement: 6316.67,
-  "Special Pay": 0
+  "Special Pay": 0,
 };
+
 const defaultDeductions = {
   "PF (Employee Contribution)": 0,
-  "Tax Deducted at Source": 0
+  "Tax Deducted at Source": 0,
 };
+
 const SalarySlipGenerator = () => {
   const slipRef = useRef();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
-    empCode: "",
+    empCode: "Auto-generating...",
     name: "",
     department: "Sales & Marketing",
     designation: "Executive-Sales & Marketing",
@@ -34,7 +37,7 @@ const SalarySlipGenerator = () => {
     grade: "",
     dob: "",
     uan: "",
-    basicSalary: ""
+    basicSalary: "",
   });
   const [salarySlips, setSalarySlips] = useState([]);
   const getCurrentMonthYear = () => {
@@ -50,24 +53,6 @@ const SalarySlipGenerator = () => {
   const [earnings, setEarnings] = useState(defaultEarnings);
   const [deductions, setDeductions] = useState(defaultDeductions);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
-  // Generate next employee code
-  const generateNextEmpCode = (emps = employees) => {
-    if (emps.length === 0) return "ARSYN-44715-01";
-    const codes = emps
-      .map(e => {
-        const match = e.empCode?.match(/-(\d+)$/);
-        return match ? parseInt(match[1]) : 0;
-      })
-      .filter(n => n > 0);
-    const max = Math.max(...codes, 0);
-    return `ARSYN-44715-${String(max + 1).padStart(2, "0")}`;
-  };
-  // Auto-fill empCode only when adding new employee
-  useEffect(() => {
-    if (editingIndex === null && !employeeForm.empCode) {
-      setEmployeeForm(prev => ({ ...prev, empCode: generateNextEmpCode() }));
-    }
-  }, [employees, editingIndex]);
   // Total days in month
   const getTotalDaysInMonth = () => {
     const [monthName, year] = salaryMonth.split(" ");
@@ -113,13 +98,9 @@ const SalarySlipGenerator = () => {
       if (res.ok) {
         const data = await res.json();
         setEmployees(data);
-        return data;
-      } else {
-        return [];
       }
     } catch (e) {
       console.error("fetchEmployees error", e);
-      return [];
     }
   };
   const fetchSalarySlips = async () => {
@@ -146,6 +127,10 @@ const SalarySlipGenerator = () => {
       ? `${API_BASE}/api/salary/employees/${employees[editingIndex]._id}`
       : `${API_BASE}/api/salary/employees`;
     const method = editingIndex !== null ? "PUT" : "POST";
+    const payload = { ...employeeForm };
+    if (editingIndex === null) {
+      delete payload.empCode;
+    }
     try {
       const res = await fetch(url, {
         method,
@@ -153,13 +138,16 @@ const SalarySlipGenerator = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(employeeForm),
+        body: JSON.stringify(payload),
       });
-      if (!res.ok) throw new Error();
-      const newEmployees = await fetchEmployees();
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.msg || "Failed to save employee");
+      }
+      await fetchEmployees();
       setEditingIndex(null);
       setEmployeeForm({
-        empCode: generateNextEmpCode(newEmployees),
+        empCode: "Auto-generating...",
         name: "",
         department: "Sales & Marketing",
         designation: "Executive-Sales & Marketing",
@@ -172,10 +160,10 @@ const SalarySlipGenerator = () => {
         grade: "",
         dob: "",
         uan: "",
-        basicSalary: ""
+        basicSalary: "",
       });
     } catch (e) {
-      alert("Save failed");
+      alert(e.message || "Save failed");
     }
   };
   const editEmployee = (idx) => {
@@ -338,7 +326,7 @@ const SalarySlipGenerator = () => {
                     onClick={() => {
                       setEditingIndex(null);
                       setEmployeeForm({
-                        empCode: generateNextEmpCode(),
+                        empCode: "Auto-generating...",
                         name: "",
                         department: "Sales & Marketing",
                         designation: "Executive-Sales & Marketing",
@@ -427,7 +415,7 @@ const SalarySlipGenerator = () => {
                 </div>
               </div>
               <div>
-                <h4 className="font-medium mb-1 text[#1a202c]">Deductions</h4>
+                <h4 className="font-medium mb-1 text-[#1a202c]">Deductions</h4>
                 <div className="space-y-2">
                   {Object.keys(deductions).map((key) => (
                     <div key={key} className="flex justify-between items-center">
@@ -455,7 +443,7 @@ const SalarySlipGenerator = () => {
               </div>
               <div className="flex justify-between mt-2">
                 <div className="text-lg font-bold text-[#1a202c]">Net Salary</div>
-                <div className="text-lg font-bold text[#1a202c]">₹ {fmt(netPay)}</div>
+                <div className="text-lg font-bold text-[#1a202c]">₹ {fmt(netPay)}</div>
               </div>
             </div>
             <div className="mt-4">
@@ -487,7 +475,7 @@ const SalarySlipGenerator = () => {
             </div>
           </div>
           {/* Preview / Payslip */}
-          <div className="col-span-3">
+          <div className="col-span-1 md:col-span-3">
             <div ref={slipRef} className="mx-auto bg-white border-2 border-[#000000] p-4" style={{ width: "900px", boxSizing: "border-box" }}>
               <div className="flex justify-between items-start border-b border-[#000000] pb-2">
                 <div className="flex items-center gap-3">
@@ -514,7 +502,7 @@ const SalarySlipGenerator = () => {
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Name:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.name}</td>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.division}</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.division}</td>
                     </tr>
                     <tr>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td>
@@ -524,40 +512,40 @@ const SalarySlipGenerator = () => {
                     </tr>
                     <tr>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.designation}</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.designation}</td>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Grade:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.grade}</td>
                     </tr>
                     <tr>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">MOP:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.mop}</td>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">DOB:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.dob}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">MOP:</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.mop}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOB:</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.dob}</td>
                     </tr>
                     <tr>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">DOJ:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.doj}</td>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.uan}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOJ:</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.doj}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.uan}</td>
                     </tr>
                     <tr>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td>
-                      <td className="border border[#000000] p-2">{employeeForm.bankAcc}</td>
-                      <td className="border border[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td>
-                      <td className="border border[#000000] p-2 text-right">{payableDays} / {totalDaysInMonth}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td>
+                      <td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td>
+                      <td className="border border-[#000000] p-2 text-right">{payableDays} / {totalDaysInMonth}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div className="mt-3 border border[#000000]">
+              <div className="mt-3 border border-[#000000]">
                 <table className="w-full text-sm border-collapse">
                   <thead>
                     <tr className="bg-[#e5e7eb]">
-                      <th className="border border[#000000] p-2 text-left">Earning</th>
-                      <th className="border border[#000000] p-2 text-right">Monthly</th>
-                      <th className="border border[#000000] p-2 text-right">Payable Amount</th>
-                      <th className="border border[#000000] p-2 text-left">Deduction</th>
-                      <th className="border border[#000000] p-2 text-right">Amount</th>
+                      <th className="border border-[#000000] p-2 text-left">Earning</th>
+                      <th className="border border-[#000000] p-2 text-right">Monthly</th>
+                      <th className="border border-[#000000] p-2 text-right">Payable Amount</th>
+                      <th className="border border-[#000000] p-2 text-left">Deduction</th>
+                      <th className="border border-[#000000] p-2 text-right">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -567,17 +555,17 @@ const SalarySlipGenerator = () => {
                         : defaultEarnings[key] * (Number(employeeForm.basicSalary || 10000) / 10000);
                       return (
                         <tr key={key}>
-                          <td className="border border[#000000] p-2">{key}</td>
-                          <td className="border border[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
-                          <td className="border border[#000000] p-2 text-right">{fmt(earnings[key])}</td>
+                          <td className="border border-[#000000] p-2">{key}</td>
+                          <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
+                          <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])}</td>
                           {idx === 0 && (
                             <>
-                              <td className="border border[#000000] p-2" rowSpan={Object.keys(earnings).length}>
+                              <td className="border border-[#000000] p-2" rowSpan={Object.keys(earnings).length}>
                                 {Object.keys(deductions).map((k) => (
                                   <div key={k} className="text-sm font-semibold py-1">{k}</div>
                                 ))}
                               </td>
-                              <td className="border border[#000000] p-2 text-right" rowSpan={Object.keys(earnings).length}>
+                              <td className="border border-[#000000] p-2 text-right" rowSpan={Object.keys(earnings).length}>
                                 {Object.keys(deductions).map((k) => (
                                   <div key={k} className="py-1">₹ {fmt(deductions[k])}</div>
                                 ))}
@@ -588,48 +576,48 @@ const SalarySlipGenerator = () => {
                       );
                     })}
                     <tr>
-                      <td colSpan={2} className="border border[#000000] p-2 font-semibold text-right">GROSS PAY</td>
-                      <td className="border border[#000000] p-2 text-right font-semibold">₹ {fmt(grossPay)}</td>
+                      <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">GROSS PAY</td>
+                      <td className="border border-[#000000] p-2 text-right font-semibold">₹ {fmt(grossPay)}</td>
                     </tr>
                     <tr>
-                      <td colSpan={2} className="border border[#000000] p-2 font-semibold text-right">Net Salary: ₹ {fmt(netPay)}</td>
-                      <td className="border border[#000000] p-2 text-right font-semibold">({numberToWords(netPay)})</td>
+                      <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">Net Salary: ₹ {fmt(netPay)}</td>
+                      <td className="border border-[#000000] p-2 text-right font-semibold">({numberToWords(netPay)})</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
-              <div className="mt-3 text-sm font-semibold text[#1a202c]">
+              <div className="mt-3 text-sm font-semibold text-[#1a202c]">
                 This is a computer generated payslip and does not require any signature.
               </div>
             </div>
           </div>
         </div>
         <div className="mt-12 border-t pt-6">
-          <h3 className="text-xl font-bold mb-4 text[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
+          <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
           {salarySlips.length === 0 ? (
-            <p className="text-sm text[#6b7280]">No salary slips generated yet.</p>
+            <p className="text-sm text-[#6b7280]">No salary slips generated yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
                 <thead>
                   <tr className="bg-[#f3f4f6]">
-                    <th className="border border[#d1d5db] p-2 text-left">Month</th>
-                    <th className="border border[#d1d5db] p-2 text-left">Employee</th>
-                    <th className="border border[#d1d5db] p-2 text-right">Net Pay</th>
-                    <th className="border border[#d1d5db] p-2 text-center">Actions</th>
+                    <th className="border border-[#d1d5db] p-2 text-left">Month</th>
+                    <th className="border border-[#d1d5db] p-2 text-left">Employee</th>
+                    <th className="border border-[#d1d5db] p-2 text-right">Net Pay</th>
+                    <th className="border border-[#d1d5db] p-2 text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {salarySlips.map((slip) => (
-                    <tr key={slip._id} className="hover:bg[#f9fafb]">
-                      <td className="border border[#d1d5db] p-2">{slip.salaryMonth}</td>
-                      <td className="border border[#d1d5db] p-2">{slip.employee.name}</td>
-                      <td className="border border[#d1d5db] p-2 text-right">₹ {slip.netPay.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
-                      <td className="border border[#d1d5db] p-2 text-center">
+                    <tr key={slip._id} className="hover:bg-[#f9fafb]">
+                      <td className="border border-[#d1d5db] p-2">{slip.salaryMonth}</td>
+                      <td className="border border-[#d1d5db] p-2">{slip.employee.name}</td>
+                      <td className="border border-[#d1d5db] p-2 text-right">₹ {slip.netPay.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
+                      <td className="border border-[#d1d5db] p-2 text-center">
                         <div className="flex justify-center gap-2 text-xs">
-                          <a href={slip.pdfUrl} target="_blank" rel="noopener noreferrer" className="text[#2563eb] hover:underline">View</a>
-                          <a href={slip.pdfUrl} download className="text[#16a34a] hover:underline">Download</a>
-                          <button onClick={() => handleDeleteSlip(slip._id)} className="text[#ef4444] hover:underline">Delete</button>
+                          <a href={slip.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-[#2563eb] hover:underline">View</a>
+                          <a href={slip.pdfUrl} download className="text-[#16a34a] hover:underline">Download</a>
+                          <button onClick={() => handleDeleteSlip(slip._id)} className="text-[#ef4444] hover:underline">Delete</button>
                         </div>
                       </td>
                     </tr>
