@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
 import { FaEye } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
-import * as XLSX from "xlsx";
 
 function LeadTable({ filter, setFilter, setSelectedLead }) {
   const lobOptions = [
@@ -85,16 +84,17 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   ];
 
   const gstOptions = [0, 5, 12, 18];
-  const assignOptions = ["Sales Manager", "Self", "Admin", "User"];
 
   // === STATE ===
   const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState([]); // Real users from backend
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [newLead, setNewLead] = useState({
     name: "",
     email: "",
+    mobileNo: "",
     source: "",
+    reference: "",
     status: "Open",
     openStatus: "",
     policyNumber: "",
@@ -109,15 +109,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     gstPercent: 0,
     policyStartDate: "",
     policyExpiryDate: "",
-    mobileNo: "",
     insurer: "",
     remarks: "",
     assignedTo: [],
     agency: "",
     customAgency: "",
   });
-  const [selectedUsers, setSelectedUsers] = useState([]);
-  const [showDropdown, setShowDropdown] = useState(null);
+
+  const [selectedUsers, setSelectedUsers] = useState([]); // For form
+  const [showDropdown, setShowDropdown] = useState(null); // 'form' or lead._id
   const [showCustomAgency, setShowCustomAgency] = useState(false);
   const dropdownRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
@@ -125,7 +125,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   // === FETCH DATA ===
   useEffect(() => {
     fetchLeads();
-    fetchUsers();
+    fetchAllUsers();
   }, []);
 
   const fetchLeads = async () => {
@@ -144,11 +144,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     }
   };
 
-  const fetchUsers = async () => {
+  const fetchAllUsers = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE}/api/users`, {
+      const res = await fetch(`${API_BASE}/api/auth/users`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -218,29 +218,21 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     return payout + additional;
   };
 
+  const getUserName = (userId) => {
+    const user = users.find((u) => u._id === userId);
+    return user ? user.username || user.name || "Unknown" : "Unknown";
+  };
+
   // === ADD LEAD ===
   const handleAddLead = async (e) => {
     e.preventDefault();
 
-    const payoutValue = computePayoutValue(
-      newLead.netPremium,
-      newLead.payoutPercent
-    );
-    const grossPremium = computeGrossPremium(
-      newLead.netPremium,
-      newLead.gstPercent
-    );
-    const totalPayment = computeTotalPayment(
-      payoutValue,
-      newLead.additionalPayout
-    );
+    const payoutValue = computePayoutValue(newLead.netPremium, newLead.payoutPercent);
+    const grossPremium = computeGrossPremium(newLead.netPremium, newLead.gstPercent);
+    const totalPayment = computeTotalPayment(payoutValue, newLead.additionalPayout);
 
-    const finalLOB =
-      newLead.lobOption === "Other Insurance"
-        ? newLead.lobCustom || ""
-        : newLead.lobOption;
-    const finalAgency =
-      newLead.agency === "OTHERS" ? newLead.customAgency || "" : newLead.agency;
+    const finalLOB = newLead.lobOption === "Other Insurance" ? newLead.lobCustom || "" : newLead.lobOption;
+    const finalAgency = newLead.agency === "OTHERS" ? newLead.customAgency || "" : newLead.agency;
 
     const finalLead = {
       ...newLead,
@@ -252,6 +244,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       gst: newLead.gstPercent,
       totalPayment,
       assignedTo: selectedUsers,
+      reference: newLead.reference,
     };
 
     delete finalLead.lobOption;
@@ -285,7 +278,9 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     setNewLead({
       name: "",
       email: "",
+      mobileNo: "",
       source: "",
+      reference: "",
       status: "Open",
       openStatus: "",
       policyNumber: "",
@@ -300,7 +295,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       gstPercent: 0,
       policyStartDate: "",
       policyExpiryDate: "",
-      mobileNo: "",
       insurer: "",
       remarks: "",
       assignedTo: [],
@@ -330,10 +324,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
 
       if (res.ok) {
         const result = await res.json();
-        fetchLeads(); // Refresh
-        alert(`${result.count} leads uploaded!`);
+        fetchLeads();
+        alert(`${result.count} leads uploaded successfully!`);
       } else {
-        alert("Upload failed");
+        const error = await res.json();
+        alert("Upload failed: " + (error.error || "Unknown error"));
       }
     } catch (err) {
       alert("Error: " + err.message);
@@ -440,9 +435,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         >
           <form
             onSubmit={handleAddLead}
-            className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
           >
-            {/* All form fields (same as before) */}
             <div>
               <label className="text-sm font-medium text-gray-700">Name</label>
               <input
@@ -452,7 +446,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   setNewLead({ ...newLead, name: e.target.value })
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
-                required
               />
             </div>
             <div>
@@ -477,7 +470,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   setNewLead({ ...newLead, email: e.target.value })
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
-                required
               />
             </div>
             <div>
@@ -493,6 +485,20 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">
+                Reference
+              </label>
+              <input
+                type="text"
+                value={newLead.reference}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, reference: e.target.value })
+                }
+                placeholder="e.g. Facebook, Agent Name, Walk-in"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+            </div>
 
             <div>
               <label className="text-sm font-medium text-gray-700">
@@ -505,11 +511,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
+                <option value="Open">Open</option>
                 <option value="Policy Issued">Policy Issued</option>
                 <option value="Closed Without Issuance">
                   Closed Without Issuance
                 </option>
-                <option value="Open">Open</option>
               </select>
             </div>
 
@@ -569,7 +575,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               {newLead.lobOption === "Other Insurance" && (
                 <input
                   type="text"
-                  placeholder="Enter LOB"
+                  placeholder="Enter Custom LOB"
                   value={newLead.lobCustom}
                   onChange={(e) =>
                     setNewLead({ ...newLead, lobCustom: e.target.value })
@@ -601,13 +607,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               {showCustomAgency && (
                 <input
                   type="text"
-                  placeholder="Enter Agency"
+                  placeholder="Enter Custom Agency"
                   value={newLead.customAgency}
                   onChange={(e) =>
                     setNewLead({ ...newLead, customAgency: e.target.value })
                   }
                   className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
-                  required
                 />
               )}
             </div>
@@ -628,6 +633,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Endorsement
@@ -641,6 +647,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Net Premium
@@ -657,6 +664,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">GST %</label>
               <select
@@ -676,6 +684,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ))}
               </select>
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Gross Premium
@@ -689,6 +698,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout (%)
@@ -722,12 +732,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 />
               </div>
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout (calc)
               </label>
               <input
-                type=" Abdullah"
+                type="text"
                 readOnly
                 value={formatCurrency(
                   computePayoutValue(newLead.netPremium, newLead.payoutPercent)
@@ -735,6 +746,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Additional Payout
@@ -751,6 +763,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Total Payment
@@ -770,6 +783,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout Status
@@ -786,6 +800,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <option value="Received">Received</option>
               </select>
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Policy Start
@@ -799,6 +814,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Policy Expiry
@@ -812,6 +828,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Insurer
@@ -831,24 +848,56 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ))}
               </select>
             </div>
-            <div>
+
+            {/* ASSIGN TO - MULTI SELECT */}
+            <div className="relative" ref={dropdownRef}>
               <label className="text-sm font-medium text-gray-700">
                 Assign To
               </label>
-              <select
-                value={selectedUsers[0] || ""}
-                onChange={(e) => setSelectedUsers([e.target.value])}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+              <button
+                type="button"
+                onClick={() =>
+                  setShowDropdown(showDropdown === "form" ? null : "form")
+                }
+                className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
               >
-                <option value="">-- Select --</option>
-                {assignOptions.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
+                {selectedUsers.length > 0
+                  ? selectedUsers.map(getUserName).join(", ")
+                  : "-- Select Users --"}
+              </button>
+              {showDropdown === "form" && (
+                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                  {users.length === 0 ? (
+                    <div className="p-3 text-gray-500">Loading users...</div>
+                  ) : (
+                    users.map((user) => (
+                      <label
+                        key={user._id}
+                        className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedUsers.includes(user._id)}
+                          onChange={() =>
+                            setSelectedUsers((prev) =>
+                              prev.includes(user._id)
+                                ? prev.filter((id) => id !== user._id)
+                                : [...prev, user._id]
+                            )
+                          }
+                          className="mr-3"
+                        />
+                        <span className="text-sm">
+                          {user.username || user.name || user.email}
+                        </span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
             </div>
-            <div className="sm:col-span-2">
+
+            <div className="lg:col-span-3">
               <label className="text-sm font-medium text-gray-700">
                 Remarks
               </label>
@@ -858,49 +907,49 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   setNewLead({ ...newLead, remarks: e.target.value })
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
-                rows="2"
+                rows="3"
               ></textarea>
             </div>
-            <div className="sm:col-span-2">
+
+            <div className="lg:col-span-3">
               <button
                 type="submit"
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
+                className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
               >
-                Submit
+                Submit Lead
               </button>
             </div>
           </form>
         </motion.div>
       )}
 
-      {/* Table */}
+      {/* TABLE */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="hidden sm:block overflow-x-auto">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="w-full table-auto">
             <thead>
-              <tr className="bg-gray-100 text-left text-sm">
-                <th className="p-4 font-medium text-gray-700">Name</th>
-                <th className="p-4 font-medium text-gray-700">Email</th>
-                <th className="p-4 font-medium text-gray-700">Mobile No</th>
-                <th className="p-4 font-medium text-gray-700">Policy #</th>
-                <th className="p-4 font-medium text-gray-700">LOB</th>
-                <th className="p-4 font-medium text-gray-700">Agency</th>
-                <th className="p-4 font-medium text-gray-700">Sum Insured</th>
-                <th className="p-4 font-medium text-gray-700">Net Prem</th>
-                <th className="p-4 font-medium text-gray-700">GST %</th>
-                <th className="p-4 font-medium text-gray-700">Gross Prem</th>
-                <th className="p-4 font-medium text-gray-700">Payout %</th>
-                <th className="p-4 font-medium text-gray cech-700">
-                  Payout Val
-                </th>
-                <th className="p-4 font-medium text-gray-700">Add Payout</th>
-                <th className="p-4 font-medium text-gray-700">Total Pay</th>
-                <th className="p-4 font-medium text-gray-700">Pay Status</th>
-                <th className="p-4 font-medium text-gray-700">Insurer</th>
-                <th className="p-4 font-medium text-gray-700">Source</th>
-                <th className="p-4 font-medium text-gray-700">Status</th>
-                <th className="p-4 font-medium text-gray-700">Assigned To</th>
-                <th className="p-4 font-medium text-gray-700">Actions</th>
+              <tr className="bg-gray-100 text-left text-xs">
+                <th className="p-3">Name</th>
+                <th className="p-3">Email</th>
+                <th className="p-3">Mobile</th>
+                <th className="p-3">Policy #</th>
+                <th className="p-3">LOB</th>
+                <th className="p-3">Agency</th>
+                <th className="p-3">Sum Ins</th>
+                <th className="p-3">Net Prem</th>
+                <th className="p-3">GST %</th>
+                <th className="p-3">Gross Prem</th>
+                <th className="p-3">Payout %</th>
+                <th className="p-3">Payout Val</th>
+                <th className="p-3">Add Pay</th>
+                <th className="p-3">Total Pay</th>
+                <th className="p-3">Pay Status</th>
+                <th className="p-3">Insurer</th>
+                <th className="p-3">Source</th>
+                <th className="p-3">Reference</th>
+                <th className="p-3">Status</th>
+                <th className="p-3">Assigned To</th>
+                <th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -909,38 +958,29 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 .map((lead) => (
                   <motion.tr
                     key={lead._id}
-                    className="border-b hover:bg-gray-50 text-sm"
+                    className="border-b hover:bg-gray-50 text-xs"
                   >
-                    <td className="p-4">{lead.name}</td>
-                    <td className="p-4">{lead.email}</td>
-                    <td className="p-4">{lead.mobileNo}</td>
-                    <td className="p-4">{lead.policyNumber}</td>
-                    <td className="p-4">{lead.lob}</td>
-                    <td className="p-4">{lead.agency}</td>
-                    <td className="p-4">{formatNumber(lead.sumInsured)}</td>
-                    <td className="p-4">
-                      {formatCurrency(getLeadNetPremium(lead))}
-                    </td>
-                    <td className="p-4">{getLeadGSTPercent(lead)}%</td>
-                    <td className="p-4">
-                      {formatCurrency(leadGrossPremium(lead))}
-                    </td>
-                    <td className="p-4">{getLeadPayoutPercent(lead)}%</td>
-                    <td className="p-4">
-                      {formatCurrency(leadPayoutValue(lead))}
-                    </td>
-                    <td className="p-4">
-                      {formatCurrency(getLeadAdditionalPayout(lead))}
-                    </td>
-                    <td className="p-4">
-                      {formatCurrency(leadTotalPayment(lead))}
-                    </td>
-                    <td className="p-4">{lead.payoutStatus}</td>
-                    <td className="p-4">{lead.insurer}</td>
-                    <td className="p-4">{lead.source}</td>
-                    <td className="p-4">
+                    <td className="p-3">{lead.name}</td>
+                    <td className="p-3">{lead.email}</td>
+                    <td className="p-3">{lead.mobileNo}</td>
+                    <td className="p-3">{lead.policyNumber}</td>
+                    <td className="p-3">{lead.lob}</td>
+                    <td className="p-3">{lead.agency}</td>
+                    <td className="p-3">{formatNumber(lead.sumInsured)}</td>
+                    <td className="p-3">{formatCurrency(getLeadNetPremium(lead))}</td>
+                    <td className="p-3">{getLeadGSTPercent(lead)}%</td>
+                    <td className="p-3">{formatCurrency(leadGrossPremium(lead))}</td>
+                    <td className="p-3">{getLeadPayoutPercent(lead)}%</td>
+                    <td className="p-3">{formatCurrency(leadPayoutValue(lead))}</td>
+                    <td className="p-3">{formatCurrency(getLeadAdditionalPayout(lead))}</td>
+                    <td className="p-3">{formatCurrency(leadTotalPayment(lead))}</td>
+                    <td className="p-3">{lead.payoutStatus || "Pending"}</td>
+                    <td className="p-3">{lead.insurer}</td>
+                    <td className="p-3">{lead.source}</td>
+                    <td className="p-3">{lead.reference || "-"}</td>
+                    <td className="p-3">
                       <span
-                        className={`px-3 py-1 rounded-full text-xs ${
+                        className={`px-2 py-1 rounded-full text-xs ${
                           lead.status === "Open"
                             ? "bg-yellow-100 text-yellow-800"
                             : lead.status === "Policy Issued"
@@ -951,23 +991,18 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                         {lead.status}
                       </span>
                     </td>
-                    <td className="p-4">
+                    <td className="p-3">
                       {normalizeAssignedTo(lead.assignedTo)
-                        .map(
-                          (id) =>
-                            users.find((u) => u._id === id)?.name || "Unknown"
-                        )
+                        .map(getUserName)
                         .join(", ") || "Unassigned"}
                     </td>
-                    <td className="p-4 flex space-x-2 relative">
-                      <motion.button
-                        whileHover={{ scale: 1.1 }}
-                        whileTap={{ scale: 0.9 }}
+                    <td className="p-3 flex gap-2">
+                      <button
                         onClick={() => setSelectedLead(lead)}
-                        className="text-indigo-600 hover:text-indigo-800 p-1"
+                        className="text-indigo-600 hover:text-indigo-800"
                       >
                         <FaEye className="h-5 w-5" />
-                      </motion.button>
+                      </button>
                       <div className="relative" ref={dropdownRef}>
                         <button
                           onClick={() =>
@@ -975,36 +1010,24 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                               showDropdown === lead._id ? null : lead._id
                             )
                           }
-                          className="px-3 py-1 border border-gray-300 rounded-lg text-sm bg-gray-50 hover:bg-gray-100"
+                          className="px-3 py-1 text-xs border rounded bg-gray-50 hover:bg-gray-100"
                         >
-                          {normalizeAssignedTo(lead.assignedTo).length
-                            ? normalizeAssignedTo(lead.assignedTo)
-                                .map(
-                                  (id) =>
-                                    users.find((u) => u._id === id)?.name ||
-                                    "Unknown"
-                                )
-                                .join(", ")
-                            : "Assign"}
+                          Assign
                         </button>
                         {showDropdown === lead._id && (
-                          <div className="absolute z-50 mt-1 w-48 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          <div className="absolute z-50 mt-1 w-56 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {users.map((user) => (
                               <label
                                 key={user._id}
-                                className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
+                                className="flex items-center p-2 hover:bg-gray-100 cursor-pointer text-xs"
                               >
                                 <input
                                   type="checkbox"
-                                  checked={normalizeAssignedTo(
-                                    lead.assignedTo
-                                  ).includes(user._id)}
-                                  onChange={() =>
-                                    toggleUserSelection(lead._id, user._id)
-                                  }
+                                  checked={normalizeAssignedTo(lead.assignedTo).includes(user._id)}
+                                  onChange={() => toggleUserSelection(lead._id, user._id)}
                                   className="mr-2"
                                 />
-                                {user.name}
+                                {getUserName(user._id)}
                               </label>
                             ))}
                           </div>
@@ -1017,87 +1040,37 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           </table>
         </div>
 
-        {/* Mobile View */}
-        <div className="block sm:hidden p-4 space-y-4">
+        {/* Mobile Cards */}
+        <div className="block lg:hidden p-4 space-y-4">
           {leads
             .filter((lead) => filter === "All" || lead.status === filter)
             .map((lead) => (
-              <motion.div
+              <div
                 key={lead._id}
-                className="border border-gray-200 rounded-lg p-4 bg-gray-50 hover:bg-gray-100 shadow-sm"
+                className="border rounded-lg p-4 bg-gray-50 shadow-sm"
               >
                 <div className="space-y-2 text-sm">
-                  <div>
-                    <strong>Name:</strong> {lead.name}
-                  </div>
-                  <div>
-                    <strong>Email:</strong> {lead.email}
-                  </div>
-                  <div>
-                    <strong>Mobile:</strong> {lead.mobileNo}
-                  </div>
-                  <div>
-                    <strong>Policy #:</strong> {lead.policyNumber}
-                  </div>
-                  <div>
-                    <strong>LOB:</strong> {lead.lob}
-                  </div>
-                  <div>
-                    <strong>Agency:</strong> {lead.agency}
-                  </div>
-                  <div>
-                    <strong>Net Prem:</strong>{" "}
-                    {formatCurrency(getLeadNetPremium(lead))}
-                  </div>
-                  <div>
-                    <strong>Gross Prem:</strong>{" "}
-                    {formatCurrency(leadGrossPremium(lead))}
-                  </div>
-                  <div>
-                    <strong>Payout:</strong> {getLeadPayoutPercent(lead)}% →{" "}
-                    {formatCurrency(leadPayoutValue(lead))}
-                  </div>
-                  <div>
-                    <strong>Total Pay:</strong>{" "}
-                    {formatCurrency(leadTotalPayment(lead))}
-                  </div>
-                  <div>
-                    <strong>Status:</strong>{" "}
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        lead.status === "Open"
-                          ? "bg-yellow-100"
-                          : lead.status === "Policy Issued"
-                          ? "bg-green-100"
-                          : "bg-red-100"
-                      }`}
-                    >
-                      {lead.status}
-                    </span>
-                  </div>
-                  <div>
-                    <strong>Assigned:</strong>{" "}
-                    {normalizeAssignedTo(lead.assignedTo)
-                      .map(
-                        (id) =>
-                          users.find((u) => u._id === id)?.name || "Unknown"
-                      )
-                      .join(", ") || "Unassigned"}
-                  </div>
-                  <div className="flex gap-2 pt-2">
-                    <button
-                      onClick={() => setSelectedLead(lead)}
-                      className="text-indigo-600"
-                    >
+                  <div><strong>Name:</strong> {lead.name}</div>
+                  <div><strong>Mobile:</strong> {lead.mobileNo}</div>
+                  <div><strong>Email:</strong> {lead.email}</div>
+                  <div><strong>Policy #:</strong> {lead.policyNumber}</div>
+                  <div><strong>LOB:</strong> {lead.lob}</div>
+                  <div><strong>Agency:</strong> {lead.agency}</div>
+                  <div><strong>Net Prem:</strong> {formatCurrency(getLeadNetPremium(lead))}</div>
+                  <div><strong>Gross:</strong> {formatCurrency(leadGrossPremium(lead))}</div>
+                  <div><strong>Payout:</strong> {getLeadPayoutPercent(lead)}% → {formatCurrency(leadPayoutValue(lead))}</div>
+                  <div><strong>Total Pay:</strong> {formatCurrency(leadTotalPayment(lead))}</div>
+                  <div><strong>Source:</strong> {lead.source}</div>
+                  <div><strong>Reference:</strong> {lead.reference || "-"}</div>
+                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100" : lead.status === "Policy Issued" ? "bg-green-100" : "bg-red-100"}`}>{lead.status}</span></div>
+                  <div><strong>Assigned:</strong> {normalizeAssignedTo(lead.assignedTo).map(getUserName).join(", ") || "Unassigned"}</div>
+                  <div className="pt-2 flex gap-3">
+                    <button onClick={() => setSelectedLead(lead)} className="text-indigo-600">
                       <FaEye className="h-5 w-5" />
                     </button>
                     <button
-                      onClick={() =>
-                        setShowDropdown(
-                          showDropdown === lead._id ? null : lead._id
-                        )
-                      }
-                      className="px-3 py-1 border rounded text-xs bg-gray-100"
+                      onClick={() => setShowDropdown(showDropdown === lead._id ? null : lead._id)}
+                      className="text-xs px-3 py-1 border rounded bg-white"
                     >
                       Assign
                     </button>
@@ -1105,26 +1078,19 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   {showDropdown === lead._id && (
                     <div className="mt-2 border rounded bg-white p-2">
                       {users.map((user) => (
-                        <label
-                          key={user._id}
-                          className="flex items-center gap-2 text-xs"
-                        >
+                        <label key={user._id} className="flex items-center gap-2 text-xs">
                           <input
                             type="checkbox"
-                            checked={normalizeAssignedTo(
-                              lead.assignedTo
-                            ).includes(user._id)}
-                            onChange={() =>
-                              toggleUserSelection(lead._id, user._id)
-                            }
+                            checked={normalizeAssignedTo(lead.assignedTo).includes(user._id)}
+                            onChange={() => toggleUserSelection(lead._id, user._id)}
                           />
-                          {user.name}
+                          {getUserName(user._id)}
                         </label>
                       ))}
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </div>
             ))}
         </div>
       </div>
