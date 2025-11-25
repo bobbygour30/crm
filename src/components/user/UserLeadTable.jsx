@@ -1,378 +1,289 @@
-import { useState } from 'react';
+// components/user/UserLeadTable.jsx
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaEye } from 'react-icons/fa';
-import LeadModal from '../admin/LeadModal';
+import { FaEye, FaPlus, FaTimes } from 'react-icons/fa';
 
-function UserLeadTable({ initialLeads, filter, setFilter, setSelectedLead, selectedLead }) {
-  const insurerOptions = [
-    'Bajaj Allianz Gengeral Insurance Co Ltd',
-    'Tata Aig General Insurance Co Ltd',
-    'HDFC Ergo General Insurance Co Ltd',
-    'ICICI Lombard General Insurance Co Ltd',
-    'Digit General Insurance Co Ltd',
-    'Reliance General Insurance Co Ltd',
-    'SBI General Insurance Co Ltd',
-    'Future General General Insurance Co Ltd',
-    'Magma HDI General Insurance Co Ltd',
-    'Royal Sundram Genetal Insurance Co Ltd',
-    'kotak Mahinrda General Insurance Co Ltd',
-    'Liberty General Insurance Co Ltd',
-    'Shriram General Insurance Co Ltd',
-    'United India General Insurance Co Ltd',
-    'Oriental General Insurance Co Ltd',
-    'National General Insurance Co Ltd',
-    'New India General Insurance Co Ltd',
-    'Chola MS General Insurance Co Ltd',
-    'Universal Sompo General Insurance Co Ltd',
-    'Iffco tokio General Insurance Co Ltd',
-    'ICICI Prudential Life Insurance',
-    'TATA AIA Life Insurance',
-    'HDFC Life Insurance',
-    'Reliance Nippon Life Insurance',
-    'Axis Max Life Insurance',
-    'Niva Bupa Health Insurance',
-    'Care Health Insurance',
-    'Star Health Insurance',
-    'Aditya Birla Health Insurance',
-    'Bajaj Allianz Life Insurance',
-  ];
+const lobOptions = [
+  "Private Car-OD", "Private Car-SOD", "Private Car-Comprehensive", "Private Car-TP",
+  "Taxi-Comprehensive", "Taxi-TP", "Commerical Vehicle-Comprehensive", "Commerical Vehicle-TP",
+  "Two-Wheeler-TP", "My home", "Mediclaim Health Insurance", "Travel Insurance", "Other Insurance"
+];
 
-  const lobOptions = [
-    'Private Car-OD',
-    'Private Car-SOD',
-    'Private Car-Comprehensive',
-    'Private Car-TP',
-    'Taxi-Comprehensive',
-    'Taxi-TP',
-    'Commerical Vehicle-Comprehensive',
-    'Commerical Vehicle-TP',
-    'E-Rikshaw-TP',
-    'E-Rikshaw-Comprehensive',
-    'Two-Wheeler-TP',
-    'My home',
-    'Mediclaim Health Insurance',
-    'Bharat Sookshma Udyam Suraksha',
-    'Bharat Laghu Udyam Suraksha',
-    'Bharat Grih Raksha',
-    'Burglary',
-    'MARINE-OPEN',
-    'MARINE-SPECIFIC',
-    'MARINE-STOP',
-    'PERSONAL ACCIDENT',
-    'Employee Compensation',
-    'Group Health Insurance',
-    'Terms Insurance',
-    'Ulip Plan',
-    'Treditional Plan',
-    'Travel Insurance',
-    'New Vehicle Insurance',
-    'New Two Wheeler Insurance',
-    'Other Insurance'
-  ];
+const insurerOptions = [
+  "Bajaj Allianz General Insurance Co Ltd", "Tata Aig General Insurance Co Ltd",
+  "HDFC Ergo General Insurance Co Ltd", "ICICI Lombard General Insurance Co Ltd",
+  "Digit General Insurance Co Ltd", "Reliance General Insurance Co Ltd",
+  "ICICI Prudential Life Insurance", "HDFC Life Insurance", "Niva Bupa Health Insurance"
+];
 
-  const [leads, setLeads] = useState(initialLeads || []);
+const agencyOptions = ["EKRAMUL HAQUE",
+    "ARSHYAN INSURANCE",
+    "RUHI",
+    "NARGISH TARANNUM",
+    "NEHA KHATOON",
+    "MOINA KHATOON",
+    "SHARMEEN KHATOON",
+    "NEYAZ AHMED",
+    "PIYUSH KUMAR",
+    "DEEPAK KUMAR",
+    "OTHERS",];
+
+function UserLeadTable() {
+  const [leads, setLeads] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [filter, setFilter] = useState('All');
+  const [selectedLead, setSelectedLead] = useState(null);
+
+  const API_BASE = import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000';
+
   const [newLead, setNewLead] = useState({
-    name: '',
-    mobile: '',
-    email: '',
-    policyNumber: '',
-    netPremium: '',
-    grossPremium: '',
-    source: '',
-    status: 'Pending',
-    policyIssueDate: '',
-    policyExpiryDate: '',
-    companyName: '',
-    product: '',
+    name: "", email: "", mobileNo: "", source: "", reference: "",
+    status: "Open", policyNumber: "", lob: "", customLob: "", agency: "", customAgency: "",
+    sumInsured: 0, endorsement: "", netPremium: 0, gst: 18,
+    payout: 0, additionalPayout: 0, payoutStatus: "Pending",
+    policyStartDate: "", policyExpiryDate: "", insurer: "", remarks: ""
   });
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setNewLead({ ...newLead, [name]: value });
+  useEffect(() => {
+    fetchLeads();
+  }, []);
+
+  const fetchLeads = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/user-leads`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLeads(data);
+      }
+    } catch (err) {
+      console.error("Error fetching leads:", err);
+    }
   };
 
-  const handleAddLead = (e) => {
-    e.preventDefault();
-    if (!newLead.name || !newLead.mobile || !newLead.email) return;
+  const calculate = () => {
+    const net = parseFloat(newLead.netPremium) || 0;
+    const gstRate = parseFloat(newLead.gst) || 18;
+    const payoutPct = parseFloat(newLead.payout) || 0;
+    const addPay = parseFloat(newLead.additionalPayout) || 0;
 
-    const lead = {
+    const gstAmt = net * (gstRate / 100);
+    const gross = net + gstAmt;
+    const payoutVal = net * (payoutPct / 100);
+    const total = payoutVal + addPay;
+
+    return { gross: gross.toFixed(2), payoutVal: payoutVal.toFixed(2), total: total.toFixed(2) };
+  };
+
+  const { gross, payoutVal, total } = calculate();
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const token = localStorage.getItem('token');
+
+    const finalLob = newLead.lob === "Other Insurance" ? newLead.customLob : newLead.lob;
+    const finalAgency = newLead.agency === "OTHERS" ? newLead.customAgency : newLead.agency;
+
+    const payload = {
       ...newLead,
-      id: Date.now(),
-      netPremium: parseFloat(newLead.netPremium) || 0,
-      grossPremium: parseFloat(newLead.grossPremium) || 0,
+      lob: finalLob || newLead.lob,
+      agency: finalAgency || newLead.agency,
     };
-    setLeads([lead, ...leads]);
-    setNewLead({
-      name: '',
-      mobile: '',
-      email: '',
-      policyNumber: '',
-      netPremium: '',
-      grossPremium: '',
-      source: '',
-      status: 'Pending',
-      policyIssueDate: '',
-      policyExpiryDate: '',
-      companyName: '',
-      product: '',
-    });
+
+    try {
+      const res = await fetch(`${API_BASE}/api/user-leads`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        const saved = await res.json();
+        setLeads([saved, ...leads]);
+        setShowForm(false);
+        setNewLead({
+          name: "", email: "", mobileNo: "", source: "", reference: "",
+          status: "Open", policyNumber: "", lob: "", customLob: "", agency: "", customAgency: "",
+          sumInsured: 0, endorsement: "", netPremium: 0, gst: 18,
+          payout: 0, additionalPayout: 0, payoutStatus: "Pending",
+          policyStartDate: "", policyExpiryDate: "", insurer: "", remarks: ""
+        });
+      }
+    } catch (err) {
+      alert("Failed to save lead");
+    }
+  };
+
+  const formatCurrency = (val) => {
+    return val ? Number(val).toLocaleString('en-IN', { maximumFractionDigits: 2 }) : '0.00';
   };
 
   return (
-    <div className="space-y-6 mt-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <h1 className="text-3xl sm:text-4xl font-extrabold text-gray-900 tracking-tight">Leads</h1>
+    <div className="min-h-screen bg-gray-50 p-4 md:p-8 mt-20">
+      <div className="max-w-7xl mx-auto">
 
-      {/* Create Lead Form */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white p-6 rounded-2xl shadow-lg border border-gray-200"
-      >
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Create Lead</h2>
-        <form onSubmit={handleAddLead} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Customer Name *</label>
-            <input
-              type="text"
-              name="name"
-              placeholder="Enter customer name"
-              value={newLead.name}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Mobile Number *</label>
-            <input
-              type="text"
-              name="mobile"
-              placeholder="Enter mobile number"
-              value={newLead.mobile}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Email ID *</label>
-            <input
-              type="email"
-              name="email"
-              placeholder="Enter email ID"
-              value={newLead.email}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Policy Number</label>
-            <input
-              type="text"
-              name="policyNumber"
-              placeholder="Enter policy number"
-              value={newLead.policyNumber}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700" title="Date the policy was issued">Policy Issue Date</label>
-            <input
-              type="date"
-              name="policyIssueDate"
-              placeholder="Select issue date"
-              value={newLead.policyIssueDate}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700" title="Date the policy expires">Policy Expiry Date</label>
-            <input
-              type="date"
-              name="policyExpiryDate"
-              placeholder="Select expiry date"
-              value={newLead.policyExpiryDate}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Product</label>
+        {/* Header */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+          <h1 className="text-3xl font-bold text-gray-800">My Leads</h1>
+          <div className="flex gap-3 mt-4 md:mt-0">
             <select
-              name="product"
-              value={newLead.product}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value)}
+              className="px-4 py-2 border rounded-lg bg-white"
             >
-              <option value="">-- Select Product --</option>
-              {lobOptions.map((lob) => (
-                <option key={lob} value={lob}>{lob}</option>
-              ))}
+              <option value="All">All Leads</option>
+              <option value="Open">Open</option>
+              <option value="Policy Issued">Policy Issued</option>
+              <option value="Closed Without Issuance">Closed</option>
             </select>
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Company Name</label>
-            <select
-              name="companyName"
-              value={newLead.companyName}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
+            <button
+              onClick={() => setShowForm(!showForm)}
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
             >
-              <option value="">-- Select Company --</option>
-              {insurerOptions.map((insurer) => (
-                <option key={insurer} value={insurer}>{insurer}</option>
-              ))}
-            </select>
+              {showForm ? <FaTimes /> : <FaPlus />}
+              {showForm ? "Cancel" : "Add Lead"}
+            </button>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Net Premium</label>
-            <input
-              type="number"
-              name="netPremium"
-              placeholder="Enter net premium"
-              value={newLead.netPremium}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Gross Premium</label>
-            <input
-              type="number"
-              name="grossPremium"
-              placeholder="Enter gross premium"
-              value={newLead.grossPremium}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Source</label>
-            <input
-              type="text"
-              name="source"
-              placeholder="Enter source"
-              value={newLead.source}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-gray-700">Status</label>
-            <select
-              name="status"
-              value={newLead.status}
-              onChange={handleInputChange}
-              className="w-full p-3 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 transition"
-            >
-              <option value="Pending">Pending</option>
-              <option value="Issued">Issued</option>
-              <option value="Lost">Lost</option>
-            </select>
-          </div>
-          <div className="sm:col-span-2 lg:col-span-3">
-            <motion.button
-              type="submit"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              className="w-full p-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition focus:ring-2 focus:ring-indigo-500"
-            >
-              Add Lead
-            </motion.button>
-          </div>
-        </form>
-      </motion.div>
+        </div>
 
-      {/* Leads Table */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="bg-white rounded-2xl shadow-lg border border-gray-200 overflow-x-auto"
-      >
-        <table className="w-full table-auto text-sm min-w-[1100px]">
-          <thead>
-            <tr className="bg-gray-100 text-left">
-              <th className="p-4 font-medium text-gray-700">Customer Name</th>
-              <th className="p-4 font-medium text-gray-700">Mobile</th>
-              <th className="p-4 font-medium text-gray-700">Email</th>
-              <th className="p-4 font-medium text-gray-700">Policy Number</th>
-              <th className="p-4 font-medium text-gray-700" title="Date the policy was issued">Policy Issue Date</th>
-              <th className="p-4 font-medium text-gray-700" title="Date the policy expires">Policy Expiry Date</th>
-              <th className="p-4 font-medium text-gray-700">Product</th>
-              <th className="p-4 font-medium text-gray-700">Company Name</th>
-              <th className="p-4 font-medium text-gray-700">Net Premium</th>
-              <th className="p-4 font-medium text-gray-700">Gross Premium</th>
-              <th className="p-4 font-medium text-gray-700">Source</th>
-              <th className="p-4 font-medium text-gray-700">Status</th>
-              <th className="p-4 font-medium text-gray-700">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {leads
-              .filter((lead) => filter === 'All' || lead.status === filter)
-              .map((lead) => (
-                <motion.tr
-                  key={lead.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                  className="border-b hover:bg-gray-50"
-                >
-                  <td className="p-4">{lead.name}</td>
-                  <td className="p-4">{lead.mobile}</td>
-                  <td className="p-4">{lead.email}</td>
-                  <td className="p-4">{lead.policyNumber || ''}</td>
-                  <td className="p-4">{lead.policyIssueDate || ''}</td>
-                  <td className="p-4">{lead.policyExpiryDate || ''}</td>
-                  <td className="p-4">{lead.product || ''}</td>
-                  <td className="p-4">{lead.companyName || ''}</td>
-                  <td className="p-4">{lead.netPremium}</td>
-                  <td className="p-4">{lead.grossPremium}</td>
-                  <td className="p-4">{lead.source || ''}</td>
-                  <td className="p-4">
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${
-                        lead.status === 'Pending'
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : lead.status === 'Issued'
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}
-                    >
-                      {lead.status}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <motion.button
-                      whileHover={{ scale: 1.1 }}
-                      whileTap={{ scale: 0.9 }}
-                      onClick={() => setSelectedLead(lead)}
-                      className="text-indigo-600 hover:text-indigo-800 p-1"
-                    >
-                      <FaEye className="h-5 w-5" />
-                    </motion.button>
-                  </td>
-                </motion.tr>
-              ))}
-          </tbody>
-        </table>
-      </motion.div>
+        {/* Add Lead Form */}
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white p-6 rounded-xl shadow-lg mb-8 border"
+          >
+            <h2 className="text-xl font-semibold mb-6">Create New Lead</h2>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+              {/* Row 1 */}
+              <input placeholder="Customer Name *" required value={newLead.name} onChange={e => setNewLead({...newLead, name: e.target.value})} className="p-3 border rounded-lg" />
+              <input placeholder="Mobile No *" required value={newLead.mobileNo} onChange={e => setNewLead({...newLead, mobileNo: e.target.value})} className="p-3 border rounded-lg" />
+              <input placeholder="Email" value={newLead.email} onChange={e => setNewLead({...newLead, email: e.target.value})} className="p-3 border rounded-lg" />
 
-      {/* Lead Modal */}
-      {selectedLead && (
-        <LeadModal
-          lead={selectedLead}
-          setSelectedLead={setSelectedLead}
-          activities={[]}
-          users={[]}
-          onAssignLead={() => {}}
-        />
-      )}
+              {/* Row 2 */}
+              <input placeholder="Source" value={newLead.source} onChange={e => setNewLead({...newLead, source: e.target.value})} className="p-3 border rounded-lg" />
+              <input placeholder="Reference" value={newLead.reference} onChange={e => setNewLead({...newLead, reference: e.target.value})} className="p-3 border rounded-lg" />
+              <input placeholder="Policy Number" value={newLead.policyNumber} onChange={e => setNewLead({...newLead, policyNumber: e.target.value})} className="p-3 border rounded-lg" />
+
+              {/* LOB & Agency */}
+              <div>
+                <select value={newLead.lob} onChange={e => setNewLead({...newLead, lob: e.target.value, customLob: e.target.value === "Other Insurance" ? newLead.customLob : ""})} className="w-full p-3 border rounded-lg">
+                  <option value="">-- Select LOB --</option>
+                  {lobOptions.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+                {newLead.lob === "Other Insurance" && (
+                  <input placeholder="Custom LOB" value={newLead.customLob} onChange={e => setNewLead({...newLead, customLob: e.target.value})} className="mt-2 w-full p-3 border rounded-lg" />
+                )}
+              </div>
+
+              <div>
+                <select value={newLead.agency} onChange={e => setNewLead({...newLead, agency: e.target.value})} className="w-full p-3 border rounded-lg">
+                  <option value="">-- Select Agency --</option>
+                  {agencyOptions.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+                {newLead.agency === "OTHERS" && (
+                  <input placeholder="Custom Agency" value={newLead.customAgency} onChange={e => setNewLead({...newLead, customAgency: e.target.value})} className="mt-2 w-full p-3 border rounded-lg" />
+                )}
+              </div>
+
+              <select value={newLead.insurer} onChange={e => setNewLead({...newLead, insurer: e.target.value})} className="p-3 border rounded-lg">
+                <option value="">-- Insurer --</option>
+                {insurerOptions.map(i => <option key={i} value={i}>{i}</option>)}
+              </select>
+
+              {/* Premium Fields */}
+              <input type="number" placeholder="Net Premium" value={newLead.netPremium} onChange={e => setNewLead({...newLead, netPremium: e.target.value})} className="p-3 border rounded-lg" />
+              <select value={newLead.gst} onChange={e => setNewLead({...newLead, gst: e.target.value})} className="p-3 border rounded-lg">
+                <option value={0}>GST 0%</option>
+                <option value={5}>GST 5%</option>
+                <option value={12}>GST 12%</option>
+                <option value={18}>GST 18%</option>
+              </select>
+              <input readOnly value={formatCurrency(gross)} placeholder="Gross Premium" className="p-3 border rounded-lg bg-gray-100" />
+
+              <div className="flex items-center gap-3">
+                <input type="range" min="0" max="100" value={newLead.payout} onChange={e => setNewLead({...newLead, payout: e.target.value})} className="flex-1" />
+                <input type="number" min="0" max="100" value={newLead.payout} onChange={e => setNewLead({...newLead, payout: e.target.value})} className="w-20 p-2 border rounded" />
+                <span>%</span>
+              </div>
+
+              <input readOnly value={formatCurrency(payoutVal)} placeholder="Payout Value" className="p-3 border rounded-lg bg-gray-100" />
+              <input type="number" placeholder="Additional Payout" value={newLead.additionalPayout} onChange={e => setNewLead({...newLead, additionalPayout: e.target.value})} className="p-3 border rounded-lg" />
+
+              <input readOnly value={formatCurrency(total)} placeholder="Total Payment" className="p-3 border rounded-lg bg-green-50 font-semibold text-green-700" />
+
+              <select value={newLead.status} onChange={e => setNewLead({...newLead, status: e.target.value})} className="p-3 border rounded-lg">
+                <option value="Open">Open</option>
+                <option value="Policy Issued">Policy Issued</option>
+                <option value="Closed Without Issuance">Closed</option>
+              </select>
+
+              <button type="submit" className="md:col-span-3 lg:col-span-1 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">
+                Save Lead
+              </button>
+            </form>
+          </motion.div>
+        )}
+
+        {/* Leads Table */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="p-4 text-left">Name</th>
+                  <th className="p-4 text-left">Mobile</th>
+                  <th className="p-4 text-left">LOB</th>
+                  <th className="p-4 text-left">Net</th>
+                  <th className="p-4 text-left">GST</th>
+                  <th className="p-4 text-left">Gross</th>
+                  <th className="p-4 text-left">Payout %</th>
+                  <th className="p-4 text-left">Total Pay</th>
+                  <th className="p-4 text-left">Status</th>
+                  <th className="p-4 text-left">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads
+                  .filter(l => filter === 'All' || l.status === filter)
+                  .map(lead => (
+                    <tr key={lead._id} className="border-b hover:bg-gray-50">
+                      <td className="p-4 font-medium">{lead.name}</td>
+                      <td className="p-4">{lead.mobileNo}</td>
+                      <td className="p-4">{lead.lob}</td>
+                      <td className="p-4">{formatCurrency(lead.netPremium)}</td>
+                      <td className="p-4">{lead.gst}%</td>
+                      <td className="p-4">{formatCurrency(lead.grossPremium)}</td>
+                      <td className="p-4">{lead.payout}%</td>
+                      <td className="p-4 font-semibold text-green-600">{formatCurrency(lead.totalPayment)}</td>
+                      <td className="p-4">
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                          lead.status === 'Open' ? 'bg-yellow-100 text-yellow-800' :
+                          lead.status === 'Policy Issued' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
+                          <FaEye size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
