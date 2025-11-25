@@ -8,7 +8,7 @@ import {
   FaChartPie,
   FaClock,
   FaBullhorn,
-  FaCarSide,
+  FaMoneyCheckAlt,
   FaSignOutAlt,
   FaChartBar,
 } from "react-icons/fa";
@@ -24,7 +24,7 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
     { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
-    { name: "Salary Slip", icon: FaClipboardList, path: "/salary-slip" },
+    { name: "Salary Slip", icon: FaMoneyCheckAlt, path: "/salary-slip" },
     { name: "Quote", icon: FaBullhorn, path: "/quote" },
     { name: "Profile", icon: FaUser, path: "/profile" },
     { name: "Activity", icon: FaChartPie, path: "/activity" },
