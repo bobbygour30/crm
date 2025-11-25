@@ -16,6 +16,7 @@ import {
   users,
   campaigns,
 } from "../../data/mockData";
+import EmployeeSalarySlipViewer from "./EmployeeSalarySlipViewer";
 
 function UserApp({ handleLogout }) {
   const [activeTab, setActiveTab] = useState("home");
@@ -129,6 +130,7 @@ function UserApp({ handleLogout }) {
             <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
 
             <Route path="/vehicle-quote" element={<VehicleQuote user={loggedInUser} />} />
+            <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={loggedInUser} />} />
             <Route path="/quote" element={<Quote user={loggedInUser} />} />
           </Routes>
         </div>
