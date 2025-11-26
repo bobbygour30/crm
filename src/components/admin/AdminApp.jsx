@@ -1,3 +1,4 @@
+// src/components/AdminApp.jsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,6 +18,7 @@ import { tasks, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
+import WelcomeLetterGenerator from './WelcomeLetterGenerator'; // ← ADDED ONLY THIS
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -37,6 +39,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
       'policy-upload': '/admin/policy-upload',
+      'welcome-letter': '/admin/welcome-letter', // ← ADDED
     };
     const pathToTab = (pathname) => {
       const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
@@ -70,6 +73,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
       'policy-upload': '/admin/policy-upload',
+      'welcome-letter': '/admin/welcome-letter', // ← ADDED
     }),
     []
   );
@@ -186,6 +190,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': 'Vehicle Admin',
       'salary-slip': 'Salary Slip Generator',
       'policy-upload': 'Policy Upload',
+      'welcome-letter': 'Welcome Letter Generator', // ← ADDED
     };
     return (
       <div className="flex items-center space-x-3">
@@ -209,6 +214,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': 'Manage all vehicle administration tasks',
       'salary-slip': 'Generate detailed employee salary slips',
       'policy-upload': 'Upload and manage policy documents',
+      'welcome-letter': 'Generate professional welcome letters for mobile insurance customers', // ← ADDED
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   }, [activeTab]);
@@ -322,6 +328,7 @@ function AdminApp({ handleLogout }) {
                 {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
                 {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
                 {activeTab === 'policy-upload' && <PolicyUpload />}
+                {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />} {/* ← ADDED */}
               </motion.div>
             </AnimatePresence>
           )}

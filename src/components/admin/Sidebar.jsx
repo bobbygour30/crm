@@ -1,7 +1,8 @@
+// src/components/Sidebar.jsx
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload 
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText 
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -13,6 +14,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
+    { name: 'Welcome Letter', icon: FaEnvelopeOpenText, key: 'welcome-letter' }, // ← ADDED
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     { name: 'Policy Upload', icon: FaFileUpload, key: 'policy-upload' },
     ...(isAdmin ? [
@@ -34,6 +36,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'vehicle-admin': '/admin/vehicle-admin',
     'salary-slip': '/admin/salary-slip',
     'policy-upload': '/admin/policy-upload',
+    'welcome-letter': '/admin/welcome-letter', // ← ADDED
   };
 
   const handleTabClick = useCallback((tabKey) => {
