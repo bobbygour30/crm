@@ -14,7 +14,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
-    { name: 'Welcome Letter', icon: FaEnvelopeOpenText, key: 'welcome-letter' }, // ← ADDED
+    { name: 'Arshyan Portable Equipments Insurance', icon: FaEnvelopeOpenText, key: 'welcome-letter' }, // ← ADDED
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     { name: 'Policy Upload', icon: FaFileUpload, key: 'policy-upload' },
     ...(isAdmin ? [

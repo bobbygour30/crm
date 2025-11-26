@@ -3,22 +3,7 @@ import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
 
-/**
- * WelcomeLetterGenerator.jsx
- *
- * - Full single-file component for generating 4-page Welcome Letter PDFs
- * - Manual date inputs (purchaseDate, startDate, expiryDate, issueDate)
- * - Validation: expiryDate must be after startDate
- * - Optional auto-calc expiry (1 year after startDate) with toggle
- * - Date formatting (DD-MM-YYYY) for PDF display
- * - Live preview (first page), generate & save via server endpoint
- * - Saved letters list with view, download and delete (confirmation + auto refresh)
- * - Double-lined border on each page and typography tuned to match uploaded PDF
- *
- * IMPORTANT:
- * - Ensure `assets.logo` and `assets.stamp` exist in your assets object.
- * - Ensure VITE_BACKEND_URL is set in your environment or set API_BASE manually.
- */
+
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "";
 
@@ -650,7 +635,7 @@ const WelcomeLetterGenerator = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-6" style={{ fontFamily: "Arial, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-900 mb-8">Welcome Letter Generator</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-900 mb-8">Arshyan Portable Equipments Insurance Generator</h1>
 
         {/* FORM */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
@@ -715,7 +700,7 @@ const WelcomeLetterGenerator = () => {
 
         {/* Saved Letters */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-10">
-          <h2 className="text-2xl font-bold text-center mb-6 text-blue-800">Saved Welcome Letters</h2>
+          <h2 className="text-2xl font-bold text-center mb-6 text-blue-800">Saved Arshyan Portable Equipments Insurance Letters</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
             <input value={filterName} onChange={handleFilterName} placeholder="Filter by Customer Name" className="px-4 py-3 border-2 rounded-xl" />
