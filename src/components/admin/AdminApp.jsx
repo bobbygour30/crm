@@ -190,7 +190,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': 'Vehicle Admin',
       'salary-slip': 'Salary Slip Generator',
       'policy-upload': 'Policy Upload',
-      'welcome-letter': 'Arshyan Portable Equipments Insurance Generator', // ← ADDED
+      'welcome-letter': 'Arshyan Portable Equipments Insurance', // ← ADDED
     };
     return (
       <div className="flex items-center space-x-3">

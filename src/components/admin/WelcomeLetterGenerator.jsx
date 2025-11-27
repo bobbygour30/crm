@@ -3,15 +3,13 @@ import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
 
-
-
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "";
 
 const useToast = () => {
   const [toast, setToast] = useState(null);
   useEffect(() => {
     if (!toast) return;
-    const t = setTimeout(() => setToast(null), 3000);
+    const t = setTimeout(() => setToast(null), 3800);
     return () => clearTimeout(t);
   }, [toast]);
   return { toast, show: (msg) => setToast(msg) };
@@ -39,10 +37,47 @@ const todayISO = () => {
 };
 
 /* -----------------------
-   Page visual components
+   Const arrays (GST & Insurers)
+   ----------------------- */
+const gstOptions = [0, 5, 12, 18];
+
+const insurerOptions = [
+  "Bajaj Allianz General Insurance Co Ltd",
+  "Tata Aig General Insurance Co Ltd",
+  "HDFC Ergo General Insurance Co Ltd",
+  "ICICI Lombard General Insurance Co Ltd",
+  "Digit General Insurance Co Ltd",
+  "Reliance General Insurance Co Ltd",
+  "SBI General Insurance Co Ltd",
+  "Future General General Insurance Co Ltd",
+  "Magma HDI General Insurance Co Ltd",
+  "Royal Sundram General Insurance Co Ltd",
+  "Kotak Mahindra General Insurance Co Ltd",
+  "Liberty General Insurance Co Ltd",
+  "Shriram General Insurance Co Ltd",
+  "United India General Insurance Co Ltd",
+  "Oriental General Insurance Co Ltd",
+  "National General Insurance Co Ltd",
+  "New India General Insurance Co Ltd",
+  "Chola MS General Insurance Co Ltd",
+  "Universal Sompo General Insurance Co Ltd",
+  "Iffco Tokio General Insurance Co Ltd",
+  "ICICI Prudential Life Insurance",
+  "TATA AIA Life Insurance",
+  "HDFC Life Insurance",
+  "Reliance Nippon Life Insurance",
+  "Axis Max Life Insurance",
+  "Niva Bupa Health Insurance",
+  "Care Health Insurance",
+  "Star Health Insurance",
+  "Aditya Birla Health Insurance",
+  "Bajaj Allianz Life Insurance",
+];
+
+/* -----------------------
+   Page visual components (unchanged)
    ----------------------- */
 
-// Page container style for html2canvas capture (A4-like)
 const pageContainerStyle = {
   background: "#ffffff",
   width: "794px",
@@ -52,7 +87,7 @@ const pageContainerStyle = {
   boxSizing: "border-box",
   overflow: "hidden",
   padding: "38px 40px",
-  border: "6px double #000", // double-lined border
+  border: "6px double #000",
 };
 
 const pageFontBase = {
@@ -89,7 +124,6 @@ const PageFooter = () => (
 const PageTemplate = ({ children }) => {
   return (
     <div style={pageContainerStyle}>
-      {/* Watermark logo faint — kept for brand identity while matching PDF */}
       <img
         src={assets.logo}
         alt="Watermark"
@@ -109,7 +143,7 @@ const PageTemplate = ({ children }) => {
 };
 
 /* -----------------------
-   Page content components
+   Page content components (unchanged aside from reading new fields)
    ----------------------- */
 
 const WelcomeLetterPage1 = ({ form }) => {
@@ -122,7 +156,6 @@ const WelcomeLetterPage1 = ({ form }) => {
   return (
     <PageTemplate>
       <PageHeader />
-      {/* Issue Date top right */}
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6, marginBottom: 6 }}>
         <div style={{ fontSize: 11 }}>
           <strong>Date: </strong>
@@ -240,7 +273,7 @@ const WelcomeLetterPage2 = ({ form }) => {
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insurerName}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST @18%)</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST)</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.serviceCharges}</td>
           </tr>
         </tbody>
@@ -357,12 +390,15 @@ const WelcomeLetterGenerator = () => {
       brandModel: "",
       imei: "",
     },
-    // Membership / Plan details
+    // Membership / Plan details (now includes net/gst/total)
     membership: {
       productDetail: "",
       insuranceRefNo: "",
       insurerName: "",
       serviceCharges: "",
+      netAmount: "",
+      gstPercentage: 18,
+      totalAmount: "",
     },
 
     // DATE FIELDS (manual)
@@ -372,8 +408,8 @@ const WelcomeLetterGenerator = () => {
     issueDate: todayISO(), // default to today but editable
   });
 
-  const [autoCalcExpiry, setAutoCalcExpiry] = useState(true); // if enabled, expiry auto = start + 1 year
-  const [dateFormatDisplay, setDateFormatDisplay] = useState("DD-MM-YYYY"); // placeholder if needed
+  const [autoCalcExpiry, setAutoCalcExpiry] = useState(true);
+  const [dateFormatDisplay, setDateFormatDisplay] = useState("DD-MM-YYYY");
 
   const [previewUrl, setPreviewUrl] = useState("");
   const [loading, setLoading] = useState(false);
@@ -386,7 +422,6 @@ const WelcomeLetterGenerator = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const lettersPerPage = 10;
 
-  // Refs for four page containers (for html2canvas)
   const page1Ref = useRef();
   const page2Ref = useRef();
   const page3Ref = useRef();
@@ -394,9 +429,7 @@ const WelcomeLetterGenerator = () => {
 
   const { toast, show } = useToast();
 
-  // Helper: update nested fields easily
   const updateForm = (path, value) => {
-    // path examples: "refNo", "asset.mobileNo", "membership.insurerName"
     const keys = path.split(".");
     if (keys.length === 1) {
       setForm((p) => ({ ...p, [keys[0]]: value }));
@@ -406,12 +439,10 @@ const WelcomeLetterGenerator = () => {
     } else if (keys.length === 3) {
       const [a, b, c] = keys;
       setForm((p) => ({ ...p, [a]: { ...p[a], [b]: { ...p[a][b], [c]: value } } }));
-    } else {
-      // deeper not needed here
     }
   };
 
-  // When startDate changes and autoCalcExpiry is true -> set expiryDate to startDate + 1 year
+  // when startDate changes, auto-calc expiry
   useEffect(() => {
     if (!form.startDate) return;
     if (!autoCalcExpiry) return;
@@ -421,7 +452,6 @@ const WelcomeLetterGenerator = () => {
         const dt = new Date(Number(y), Number(m) - 1, Number(d));
         const nextYear = new Date(dt);
         nextYear.setFullYear(dt.getFullYear() + 1);
-        // expiry date set to one day before or same? We'll set to same day next year (user can edit)
         const yyyy = nextYear.getFullYear();
         const mm = String(nextYear.getMonth() + 1).padStart(2, "0");
         const dd = String(nextYear.getDate()).padStart(2, "0");
@@ -433,7 +463,6 @@ const WelcomeLetterGenerator = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.startDate, autoCalcExpiry]);
 
-  // Preview generation for first page
   const generatePreview = async () => {
     if (!page1Ref.current) return;
     try {
@@ -453,7 +482,6 @@ const WelcomeLetterGenerator = () => {
   };
 
   useEffect(() => {
-    // generate preview slightly debounced when form changes
     const t = setTimeout(() => generatePreview(), 380);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -474,34 +502,76 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
+  // Fetch next ref from backend (server authoritative)
+  const fetchNextRef = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/letter/next-ref`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.nextRef) {
+        setForm((p) => ({ ...p, refNo: data.nextRef }));
+      }
+    } catch (err) {
+      console.error("Error fetching next ref:", err);
+    }
+  };
+
   useEffect(() => {
+    fetchNextRef();
     fetchLetters();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Form validation before generating PDF
+  // when net or gst changes -> recalc total
+  useEffect(() => {
+    const net = parseFloat(form.membership.netAmount || 0);
+    const gst = parseFloat(form.membership.gstPercentage || 0);
+    if (isNaN(net)) return;
+    const total = net + (net * gst) / 100;
+    const displayTotal = `₹ ${Number(total).toFixed(2)}`;
+    setForm((p) => ({
+      ...p,
+      membership: {
+        ...p.membership,
+        totalAmount: total.toFixed(2),
+        serviceCharges: displayTotal,
+      },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.membership.netAmount, form.membership.gstPercentage]);
+
   const validateFormBeforeGenerate = () => {
-    if (!form.refNo || !form.customerName || !form.customerPhone || !form.customerAddress) {
-      alert("Please fill all required fields (Ref No, Customer Name, Phone, Address).");
+  if (!form.customerName || !form.customerPhone || !form.customerAddress) {
+    alert("Please fill all required fields (Customer Name, Phone, Address).");
+    return false;
+  }
+
+  if (form.membership.netAmount === "" || form.membership.netAmount === null) {
+    const ok = window.confirm("Net amount is empty. Do you want to proceed?");
+    if (!ok) return false;
+  }
+
+  // Ensure dates are valid ISO format if present
+  if (form.startDate && form.expiryDate) {
+    const sd = new Date(form.startDate);
+    const ed = new Date(form.expiryDate);
+
+    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
+      alert("Please provide valid start and expiry dates.");
       return false;
     }
-    // Ensure dates are valid ISO format if present
-    if (form.startDate && form.expiryDate) {
-      const sd = new Date(form.startDate);
-      const ed = new Date(form.expiryDate);
-      if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
-        alert("Please provide valid start and expiry dates.");
-        return false;
-      }
-      if (ed.getTime() <= sd.getTime()) {
-        const ok = window.confirm("Expiry date is not after start date. Do you want to proceed?");
-        return ok;
-      }
-    }
-    return true;
-  };
 
-  // Generate PDF by taking 4 page snapshots and sending to backend
+    if (ed.getTime() <= sd.getTime()) {
+      const ok = window.confirm("Expiry date is not after start date. Do you want to proceed?");
+      if (!ok) return false;
+    }
+  }
+
+  return true;
+};
+
   const generatePDF = async () => {
     if (!validateFormBeforeGenerate()) return;
 
@@ -542,7 +612,6 @@ const WelcomeLetterGenerator = () => {
           pngImages,
           letterData: {
             ...form,
-            // include nested fields explicitly
             asset: form.asset,
             membership: form.membership,
           },
@@ -554,8 +623,14 @@ const WelcomeLetterGenerator = () => {
 
       setPdfUrl(data.pdfUrl);
       setSuccess("Welcome Letter Generated & Saved Successfully!");
-      show("Saved successfully");
+
+      // Show toast with generated refNo (backend authoritative)
+      const generatedRef = data.refNo || form.refNo;
+      show(`🎉 Letter ${generatedRef} generated successfully!`);
+
+      // refresh list and next ref
       await fetchLetters();
+      await fetchNextRef();
     } catch (err) {
       console.error("Error generating PDF:", err);
       alert("Error: " + err.message);
@@ -564,7 +639,6 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // Delete letter
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this welcome letter? This action cannot be undone.")) return;
     try {
@@ -586,7 +660,6 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // Filtering & pagination
   const handleFilterName = (e) => {
     setFilterName(e.target.value);
     setCurrentPage(1);
@@ -608,20 +681,16 @@ const WelcomeLetterGenerator = () => {
   const indexOfFirst = indexOfLast - lettersPerPage;
   const currentLetters = filteredLetters.slice(indexOfFirst, indexOfLast);
 
-  // Input change handler generalized
   const onInputChange = (e) => {
     const { name, value } = e.target;
-    // if name contains dot, use updateForm
     if (name.includes(".")) updateForm(name, value);
     else setForm((p) => ({ ...p, [name]: value }));
   };
 
-  // date input change
   const onDateChange = (field, value) => {
     setForm((p) => ({ ...p, [field]: value }));
   };
 
-  // Small helper for formatting createdAt in table
   const friendlyDate = (iso) => {
     if (!iso) return "";
     try {
@@ -635,21 +704,80 @@ const WelcomeLetterGenerator = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-6" style={{ fontFamily: "Arial, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-900 mb-8">Arshyan Portable Equipments Insurance Generator</h1>
+        <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-900 mb-8">Arshyan Portable Equipments Insurance</h1>
 
         {/* FORM */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <input name="refNo" value={form.refNo} onChange={onInputChange} placeholder="Arshyan Ref No" className="px-4 py-3 border-2 rounded-xl" />
+            {/* refNo: auto-generated (disabled) */}
+            <input name="refNo" value={form.refNo} readOnly disabled className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
             <input name="customerName" value={form.customerName} onChange={onInputChange} placeholder="Customer Name" className="px-4 py-3 border-2 rounded-xl" />
             <input name="customerPhone" value={form.customerPhone} onChange={onInputChange} placeholder="Phone" className="px-4 py-3 border-2 rounded-xl" />
             <textarea name="customerAddress" value={form.customerAddress} onChange={onInputChange} rows={3} placeholder="Address" className="px-4 py-3 border-2 rounded-xl" />
+
             <input name="asset.mobileNo" value={form.asset.mobileNo} onChange={onInputChange} placeholder="Mobile No" className="px-4 py-3 border-2 rounded-xl" />
             <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
             <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
+
+            {/* Product detail */}
+            <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
+
+            {/* Insurance ref and insurer select */}
             <input name="membership.insuranceRefNo" value={form.membership.insuranceRefNo} onChange={onInputChange} placeholder="Insurance Ref No" className="px-4 py-3 border-2 rounded-xl" />
-            <input name="membership.insurerName" value={form.membership.insurerName} onChange={onInputChange} placeholder="Insurer Name" className="px-4 py-3 border-2 rounded-xl" />
-            <input name="membership.serviceCharges" value={form.membership.serviceCharges} onChange={onInputChange} placeholder="Service Charges" className="px-4 py-3 border-2 rounded-xl" />
+
+            <select
+              name="membership.insurerName"
+              value={form.membership.insurerName}
+              onChange={onInputChange}
+              className="px-4 py-3 border-2 rounded-xl"
+            >
+              <option value="">Select Insurer</option>
+              {insurerOptions.map((ins, idx) => (
+                <option key={idx} value={ins}>
+                  {ins}
+                </option>
+              ))}
+            </select>
+
+            {/* Net / GST / Total inputs */}
+            <input
+              name="membership.netAmount"
+              value={form.membership.netAmount}
+              onChange={onInputChange}
+              placeholder="Net Amount (e.g. 1000)"
+              type="number"
+              className="px-4 py-3 border-2 rounded-xl"
+            />
+
+            <select
+              name="membership.gstPercentage"
+              value={form.membership.gstPercentage}
+              onChange={onInputChange}
+              className="px-4 py-3 border-2 rounded-xl"
+            >
+              {gstOptions.map((g) => (
+                <option key={g} value={g}>
+                  {g}%
+                </option>
+              ))}
+            </select>
+
+            <input
+              name="membership.totalAmount"
+              value={form.membership.totalAmount ? `₹ ${Number(form.membership.totalAmount).toFixed(2)}` : ""}
+              readOnly
+              placeholder="Total (calculated)"
+              className="px-4 py-3 border-2 rounded-xl bg-gray-100"
+            />
+
+            {/* keep original serviceCharges field in sync (displayed on pdf) */}
+            <input
+              name="membership.serviceCharges"
+              value={form.membership.serviceCharges}
+              onChange={onInputChange}
+              placeholder="Service Charges (displayed)"
+              className="px-4 py-3 border-2 rounded-xl"
+            />
           </div>
 
           {/* Date inputs */}
@@ -675,8 +803,6 @@ const WelcomeLetterGenerator = () => {
             </div>
           </div>
 
-          
-
           <button
             onClick={generatePDF}
             disabled={loading}
@@ -695,8 +821,6 @@ const WelcomeLetterGenerator = () => {
             </a>
           </div>
         )}
-
-        
 
         {/* Saved Letters */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-10">
@@ -771,13 +895,32 @@ const WelcomeLetterGenerator = () => {
         </div>
       </div>
 
-      {/* Toast */}
+      {/* Toast (designed) */}
       {toast && (
-        <div style={{
-          position: "fixed", right: 20, bottom: 20, zIndex: 9999,
-          background: "#111", color: "#fff", padding: "10px 14px", borderRadius: 8, boxShadow: "0 6px 20px rgba(0,0,0,0.15)"
-        }}>
-          {toast}
+        <div
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: 20,
+            zIndex: 9999,
+            background: "linear-gradient(90deg,#0f3b82,#4f46e5)",
+            color: "#fff",
+            padding: "12px 16px",
+            borderRadius: 12,
+            boxShadow: "0 10px 30px rgba(15,59,130,0.25)",
+            display: "flex",
+            alignItems: "center",
+            gap: 12,
+            minWidth: 260,
+          }}
+        >
+          <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
+            ✓
+          </div>
+          <div style={{ flex: 1, fontSize: 14, lineHeight: 1.25 }}>
+            {toast}
+            <div style={{ marginTop: 6, fontSize: 12, opacity: 0.9 }}>Saved to cloud & database</div>
+          </div>
         </div>
       )}
     </div>
