@@ -378,6 +378,9 @@ const WelcomeLetterPage4 = ({ form }) => {
    ----------------------- */
 
 const WelcomeLetterGenerator = () => {
+  // NEW STATE FOR TOGGLE
+  const [showFormFields, setShowFormFields] = useState(true);
+
   const [form, setForm] = useState({
     // Basic details
     refNo: "",
@@ -543,34 +546,34 @@ const WelcomeLetterGenerator = () => {
   }, [form.membership.netAmount, form.membership.gstPercentage]);
 
   const validateFormBeforeGenerate = () => {
-  if (!form.customerName || !form.customerPhone || !form.customerAddress) {
-    alert("Please fill all required fields (Customer Name, Phone, Address).");
-    return false;
-  }
-
-  if (form.membership.netAmount === "" || form.membership.netAmount === null) {
-    const ok = window.confirm("Net amount is empty. Do you want to proceed?");
-    if (!ok) return false;
-  }
-
-  // Ensure dates are valid ISO format if present
-  if (form.startDate && form.expiryDate) {
-    const sd = new Date(form.startDate);
-    const ed = new Date(form.expiryDate);
-
-    if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
-      alert("Please provide valid start and expiry dates.");
+    if (!form.customerName || !form.customerPhone || !form.customerAddress) {
+      alert("Please fill all required fields (Customer Name, Phone, Address).");
       return false;
     }
 
-    if (ed.getTime() <= sd.getTime()) {
-      const ok = window.confirm("Expiry date is not after start date. Do you want to proceed?");
+    if (form.membership.netAmount === "" || form.membership.netAmount === null) {
+      const ok = window.confirm("Net amount is empty. Do you want to proceed?");
       if (!ok) return false;
     }
-  }
 
-  return true;
-};
+    // Ensure dates are valid ISO format if present
+    if (form.startDate && form.expiryDate) {
+      const sd = new Date(form.startDate);
+      const ed = new Date(form.expiryDate);
+
+      if (isNaN(sd.getTime()) || isNaN(ed.getTime())) {
+        alert("Please provide valid start and expiry dates.");
+        return false;
+      }
+
+      if (ed.getTime() <= sd.getTime()) {
+        const ok = window.confirm("Expiry date is not after start date. Do you want to proceed?");
+        if (!ok) return false;
+      }
+    }
+
+    return true;
+  };
 
   const generatePDF = async () => {
     if (!validateFormBeforeGenerate()) return;
@@ -626,7 +629,7 @@ const WelcomeLetterGenerator = () => {
 
       // Show toast with generated refNo (backend authoritative)
       const generatedRef = data.refNo || form.refNo;
-      show(`🎉 Letter ${generatedRef} generated successfully!`);
+      show(`Letter ${generatedRef} generated successfully!`);
 
       // refresh list and next ref
       await fetchLetters();
@@ -701,6 +704,7 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-6" style={{ fontFamily: "Arial, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
@@ -708,108 +712,124 @@ const WelcomeLetterGenerator = () => {
 
         {/* FORM */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* refNo: auto-generated (disabled) */}
-            <input name="refNo" value={form.refNo} readOnly disabled className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
-            <input name="customerName" value={form.customerName} onChange={onInputChange} placeholder="Customer Name" className="px-4 py-3 border-2 rounded-xl" />
-            <input name="customerPhone" value={form.customerPhone} onChange={onInputChange} placeholder="Phone" className="px-4 py-3 border-2 rounded-xl" />
-            <textarea name="customerAddress" value={form.customerAddress} onChange={onInputChange} rows={3} placeholder="Address" className="px-4 py-3 border-2 rounded-xl" />
-
-            <input name="asset.mobileNo" value={form.asset.mobileNo} onChange={onInputChange} placeholder="Mobile No" className="px-4 py-3 border-2 rounded-xl" />
-            <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
-            <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
-
-            {/* Product detail */}
-            <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
-
-            {/* Insurance ref and insurer select */}
-            <input name="membership.insuranceRefNo" value={form.membership.insuranceRefNo} onChange={onInputChange} placeholder="Insurance Ref No" className="px-4 py-3 border-2 rounded-xl" />
-
-            <select
-              name="membership.insurerName"
-              value={form.membership.insurerName}
-              onChange={onInputChange}
-              className="px-4 py-3 border-2 rounded-xl"
+          {/* TOGGLE BUTTON */}
+          <div className="flex justify-end mb-4">
+            <button
+              onClick={() => setShowFormFields((prev) => !prev)}
+              className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl transition"
             >
-              <option value="">Select Insurer</option>
-              {insurerOptions.map((ins, idx) => (
-                <option key={idx} value={ins}>
-                  {ins}
-                </option>
-              ))}
-            </select>
-
-            {/* Net / GST / Total inputs */}
-            <input
-              name="membership.netAmount"
-              value={form.membership.netAmount}
-              onChange={onInputChange}
-              placeholder="Net Amount (e.g. 1000)"
-              type="number"
-              className="px-4 py-3 border-2 rounded-xl"
-            />
-
-            <select
-              name="membership.gstPercentage"
-              value={form.membership.gstPercentage}
-              onChange={onInputChange}
-              className="px-4 py-3 border-2 rounded-xl"
-            >
-              {gstOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}%
-                </option>
-              ))}
-            </select>
-
-            <input
-              name="membership.totalAmount"
-              value={form.membership.totalAmount ? `₹ ${Number(form.membership.totalAmount).toFixed(2)}` : ""}
-              readOnly
-              placeholder="Total (calculated)"
-              className="px-4 py-3 border-2 rounded-xl bg-gray-100"
-            />
-
-            {/* keep original serviceCharges field in sync (displayed on pdf) */}
-            <input
-              name="membership.serviceCharges"
-              value={form.membership.serviceCharges}
-              onChange={onInputChange}
-              placeholder="Service Charges (displayed)"
-              className="px-4 py-3 border-2 rounded-xl"
-            />
+              {showFormFields ? "Hide" : "Generate"}
+            </button>
           </div>
 
-          {/* Date inputs */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
-            <div>
-              <label className="block text-sm font-semibold mb-1">Issue Date</label>
-              <input type="date" name="issueDate" value={form.issueDate} onChange={(e) => onDateChange("issueDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
-            </div>
+          {/* CONDITIONAL RENDERING OF ALL INPUT FIELDS */}
+          {showFormFields && (
+            <>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* refNo: auto-generated (disabled) */}
+                <input name="refNo" value={form.refNo} readOnly disabled className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
+                <input name="customerName" value={form.customerName} onChange={onInputChange} placeholder="Customer Name" className="px-4 py-3 border-2 rounded-xl" />
+                <input name="customerPhone" value={form.customerPhone} onChange={onInputChange} placeholder="Phone" className="px-4 py-3 border-2 rounded-xl" />
+                <textarea name="customerAddress" value={form.customerAddress} onChange={onInputChange} rows={3} placeholder="Address" className="px-4 py-3 border-2 rounded-xl" />
 
-            <div>
-              <label className="block text-sm font-semibold mb-1">Date of Purchase</label>
-              <input type="date" name="purchaseDate" value={form.purchaseDate} onChange={(e) => onDateChange("purchaseDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
-            </div>
+                <input name="asset.mobileNo" value={form.asset.mobileNo} onChange={onInputChange} placeholder="Mobile No" className="px-4 py-3 border-2 rounded-xl" />
+                <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
+                <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
 
-            <div>
-              <label className="block text-sm font-semibold mb-1">Coverage Start Date</label>
-              <input type="date" name="startDate" value={form.startDate} onChange={(e) => onDateChange("startDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
-            </div>
+                {/* Product detail */}
+                <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
 
-            <div>
-              <label className="block text-sm font-semibold mb-1">Coverage Expiry Date</label>
-              <input type="date" name="expiryDate" value={form.expiryDate} onChange={(e) => onDateChange("expiryDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
-            </div>
-          </div>
+                {/* Insurance ref and insurer select */}
+                <input name="membership.insuranceRefNo" value={form.membership.insuranceRefNo} onChange={onInputChange} placeholder="Insurance Ref No" className="px-4 py-3 border-2 rounded-xl" />
 
-          <button
+                <select
+                  name="membership.insurerName"
+                  value={form.membership.insurerName}
+                  onChange={onInputChange}
+                  className="px-4 py-3 border-2 rounded-xl"
+                >
+                  <option value="">Select Insurer</option>
+                  {insurerOptions.map((ins, idx) => (
+                    <option key={idx} value={ins}>
+                      {ins}
+                    </option>
+                  ))}
+                </select>
+
+                {/* Net / GST / Total inputs */}
+                <input
+                  name="membership.netAmount"
+                  value={form.membership.netAmount}
+                  onChange={onInputChange}
+                  placeholder="Net Amount (e.g. 1000)"
+                  type="number"
+                  className="px-4 py-3 border-2 rounded-xl"
+                />
+
+                <select
+                  name="membership.gstPercentage"
+                  value={form.membership.gstPercentage}
+                  onChange={onInputChange}
+                  className="px-4 py-3 border-2 rounded-xl"
+                >
+                  {gstOptions.map((g) => (
+                    <option key={g} value={g}>
+                      {g}%
+                    </option>
+                  ))}
+                </select>
+
+                <input
+                  name="membership.totalAmount"
+                  value={form.membership.totalAmount ? `₹ ${Number(form.membership.totalAmount).toFixed(2)}` : ""}
+                  readOnly
+                  placeholder="Total (calculated)"
+                  className="px-4 py-3 border-2 rounded-xl bg-gray-100"
+                />
+
+                {/* keep original serviceCharges field in sync (displayed on pdf) */}
+                <input
+                  name="membership.serviceCharges"
+                  value={form.membership.serviceCharges}
+                  onChange={onInputChange}
+                  placeholder="Service Charges (displayed)"
+                  className="px-4 py-3 border-2 rounded-xl"
+                />
+              </div>
+
+              {/* Date inputs */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Issue Date</label>
+                  <input type="date" name="issueDate" value={form.issueDate} onChange={(e) => onDateChange("issueDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Date of Purchase</label>
+                  <input type="date" name="purchaseDate" value={form.purchaseDate} onChange={(e) => onDateChange("purchaseDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Coverage Start Date</label>
+                  <input type="date" name="startDate" value={form.startDate} onChange={(e) => onDateChange("startDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1">Coverage Expiry Date</label>
+                  <input type="date" name="expiryDate" value={form.expiryDate} onChange={(e) => onDateChange("expiryDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
+                </div>
+              </div>
+              <button
             onClick={generatePDF}
             disabled={loading}
             className={`mt-6 w-full py-4 text-xl font-bold text-white rounded-2xl transition-all ${loading ? "bg-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-105"}`}
           >
             {loading ? "Generating PDF..." : "Generate & Save Welcome Letter"}
           </button>
+            </>
+          )}
+
+          
         </div>
 
         {/* Success & download */}
@@ -915,7 +935,7 @@ const WelcomeLetterGenerator = () => {
           }}
         >
           <div style={{ width: 44, height: 44, borderRadius: 10, background: "rgba(255,255,255,0.12)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>
-            ✓
+            Check
           </div>
           <div style={{ flex: 1, fontSize: 14, lineHeight: 1.25 }}>
             {toast}
@@ -925,6 +945,8 @@ const WelcomeLetterGenerator = () => {
       )}
     </div>
   );
+
 };
+
 
 export default WelcomeLetterGenerator;
