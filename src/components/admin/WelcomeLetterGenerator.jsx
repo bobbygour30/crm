@@ -74,6 +74,19 @@ const insurerOptions = [
   "Bajaj Allianz Life Insurance",
 ];
 
+const premiumData = {
+  "0-19999": { 1: 2000, 2: 3850, 3: 5875 },
+  "20000-29999": { 1: 2350, 2: 4250, 3: 6099 },
+  "30000-34999": { 1: 2500, 2: 4750, 3: 6599 },
+  "35000-49999": { 1: 2800, 2: 5099, 3: 7299 },
+  "50000-74999": { 1: 4250, 2: 6999, 3: 8999 },
+  "75000-99999": { 1: 4998, 2: 8599, 3: 10999 },
+  "100000-124999": { 1: 5546, 2: 10546, 3: 15650 },
+  "125000-149999": { 1: 6195, 2: 11999, 3: 16999 },
+  "150000-199999": { 1: 8999, 2: 16449, 3: 25999 },
+  "200000-250000": { 1: 10999, 2: 19999, 3: 30999 },
+};
+
 /* -----------------------
    Page visual components (unchanged)
    ----------------------- */
@@ -143,7 +156,7 @@ const PageTemplate = ({ children }) => {
 };
 
 /* -----------------------
-   Page content components (unchanged aside from reading new fields)
+   Page content components (updated for new fields)
    ----------------------- */
 
 const WelcomeLetterPage1 = ({ form }) => {
@@ -210,6 +223,8 @@ const WelcomeLetterPage1 = ({ form }) => {
 };
 
 const WelcomeLetterPage2 = ({ form }) => {
+  const periodText = form.selectedPeriod === 1 ? "1 Year" : form.selectedPeriod === 2 ? "2 Years" : "3 Years";
+
   return (
     <PageTemplate>
       <PageHeader />
@@ -229,6 +244,10 @@ const WelcomeLetterPage2 = ({ form }) => {
             <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>IMEI #</td>
             <td style={{ border: "1px solid #000", padding: 8 }}>{form.asset.imei}</td>
           </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Value of Equipment</td>
+            <td style={{ border: "1px solid #000", padding: 8 }}>₹ {form.valueOfEquipment}</td>
+          </tr>
         </tbody>
       </table>
 
@@ -239,6 +258,10 @@ const WelcomeLetterPage2 = ({ form }) => {
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Name of Customer</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerName}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Email of Customer</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerEmail}</td>
           </tr>
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Address of Customer</td>
@@ -261,6 +284,10 @@ const WelcomeLetterPage2 = ({ form }) => {
             <td style={{ border: "1px solid #000", padding: 6 }}>{formatDisplayDate(form.expiryDate)}</td>
           </tr>
           <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Service Tenure</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{periodText}</td>
+          </tr>
+          <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Product Detail</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.productDetail}</td>
           </tr>
@@ -271,6 +298,10 @@ const WelcomeLetterPage2 = ({ form }) => {
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurer Name</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insurerName}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurance Premium Including GST</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {form.insurancePremium}</td>
           </tr>
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST)</td>
@@ -385,6 +416,7 @@ const WelcomeLetterGenerator = () => {
     // Basic details
     refNo: "",
     customerName: "",
+    customerEmail: "",
     customerAddress: "",
     customerPhone: "",
     // Asset details
@@ -393,6 +425,10 @@ const WelcomeLetterGenerator = () => {
       brandModel: "",
       imei: "",
     },
+    // NEW FIELDS
+    valueOfEquipment: "",
+    selectedPeriod: "",
+    insurancePremium: "",
     // Membership / Plan details (now includes net/gst/total)
     membership: {
       productDetail: "",
@@ -445,16 +481,55 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
+  const calculatePremium = (valueOfEquipment, selectedPeriod) => {
+    const numValue = parseInt(valueOfEquipment) || 0;
+    let selectedRange = null;
+
+    for (const range in premiumData) {
+      const [min, max] = range.split("-").map(Number);
+      if (numValue >= min && (max === undefined || numValue <= max)) {
+        selectedRange = range;
+        break;
+      }
+    }
+
+    if (selectedRange && selectedPeriod) {
+      const premium = premiumData[selectedRange][selectedPeriod];
+      setForm((prev) => ({
+        ...prev,
+        insurancePremium: premium,
+        membership: {
+          ...prev.membership,
+          serviceCharges: `₹ ${premium}`,
+          netAmount: premium.toString(),
+          totalAmount: premium.toString(),
+        },
+      }));
+    } else {
+      setForm((prev) => ({
+        ...prev,
+        insurancePremium: "",
+        membership: {
+          ...prev.membership,
+          serviceCharges: "",
+          netAmount: "",
+          totalAmount: "",
+        },
+      }));
+    }
+  };
+
   // when startDate changes, auto-calc expiry
   useEffect(() => {
     if (!form.startDate) return;
     if (!autoCalcExpiry) return;
+    if (!form.selectedPeriod) return;
     try {
       const [y, m, d] = form.startDate.split("-");
       if (y && m && d) {
         const dt = new Date(Number(y), Number(m) - 1, Number(d));
         const nextYear = new Date(dt);
-        nextYear.setFullYear(dt.getFullYear() + 1);
+        nextYear.setFullYear(dt.getFullYear() + parseInt(form.selectedPeriod));
         const yyyy = nextYear.getFullYear();
         const mm = String(nextYear.getMonth() + 1).padStart(2, "0");
         const dd = String(nextYear.getDate()).padStart(2, "0");
@@ -464,7 +539,25 @@ const WelcomeLetterGenerator = () => {
       // ignore
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.startDate, autoCalcExpiry]);
+  }, [form.startDate, autoCalcExpiry, form.selectedPeriod]);
+
+  // when net or gst changes -> recalc total
+  useEffect(() => {
+    const net = parseFloat(form.membership.netAmount || 0);
+    const gst = parseFloat(form.membership.gstPercentage || 0);
+    if (isNaN(net)) return;
+    const total = net + (net * gst) / 100;
+    const displayTotal = `₹ ${Number(total).toFixed(2)}`;
+    setForm((p) => ({
+      ...p,
+      membership: {
+        ...p.membership,
+        totalAmount: total.toFixed(2),
+        serviceCharges: displayTotal,
+      },
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.membership.netAmount, form.membership.gstPercentage]);
 
   const generatePreview = async () => {
     if (!page1Ref.current) return;
@@ -527,27 +620,14 @@ const WelcomeLetterGenerator = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // when net or gst changes -> recalc total
-  useEffect(() => {
-    const net = parseFloat(form.membership.netAmount || 0);
-    const gst = parseFloat(form.membership.gstPercentage || 0);
-    if (isNaN(net)) return;
-    const total = net + (net * gst) / 100;
-    const displayTotal = `₹ ${Number(total).toFixed(2)}`;
-    setForm((p) => ({
-      ...p,
-      membership: {
-        ...p.membership,
-        totalAmount: total.toFixed(2),
-        serviceCharges: displayTotal,
-      },
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.membership.netAmount, form.membership.gstPercentage]);
-
   const validateFormBeforeGenerate = () => {
-    if (!form.customerName || !form.customerPhone || !form.customerAddress) {
-      alert("Please fill all required fields (Customer Name, Phone, Address).");
+    if (!form.customerName || !form.customerEmail || !form.customerPhone || !form.customerAddress) {
+      alert("Please fill all required fields (Customer Name, Email, Phone, Address).");
+      return false;
+    }
+
+    if (form.valueOfEquipment === "" || form.selectedPeriod === "") {
+      alert("Please fill Value of Equipment and select Service Tenure.");
       return false;
     }
 
@@ -686,8 +766,16 @@ const WelcomeLetterGenerator = () => {
 
   const onInputChange = (e) => {
     const { name, value } = e.target;
-    if (name.includes(".")) updateForm(name, value);
-    else setForm((p) => ({ ...p, [name]: value }));
+    if (name.includes(".")) {
+      updateForm(name, value);
+    } else {
+      const updatedForm = { ...form, [name]: value };
+      setForm(updatedForm);
+
+      if (name === "valueOfEquipment" || name === "selectedPeriod") {
+        calculatePremium(updatedForm.valueOfEquipment, updatedForm.selectedPeriod);
+      }
+    }
   };
 
   const onDateChange = (field, value) => {
@@ -729,12 +817,23 @@ const WelcomeLetterGenerator = () => {
                 {/* refNo: auto-generated (disabled) */}
                 <input name="refNo" value={form.refNo} readOnly disabled className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
                 <input name="customerName" value={form.customerName} onChange={onInputChange} placeholder="Customer Name" className="px-4 py-3 border-2 rounded-xl" />
+                <input name="customerEmail" value={form.customerEmail} onChange={onInputChange} placeholder="Customer Email" type="email" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="customerPhone" value={form.customerPhone} onChange={onInputChange} placeholder="Phone" className="px-4 py-3 border-2 rounded-xl" />
                 <textarea name="customerAddress" value={form.customerAddress} onChange={onInputChange} rows={3} placeholder="Address" className="px-4 py-3 border-2 rounded-xl" />
 
                 <input name="asset.mobileNo" value={form.asset.mobileNo} onChange={onInputChange} placeholder="Mobile No" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
+
+                {/* NEW FIELDS */}
+                <input name="valueOfEquipment" value={form.valueOfEquipment} onChange={onInputChange} placeholder="Value of Equipment (e.g. 15000)" type="number" className="px-4 py-3 border-2 rounded-xl" />
+                <select name="selectedPeriod" value={form.selectedPeriod} onChange={onInputChange} className="px-4 py-3 border-2 rounded-xl">
+                  <option value="">Select Service Tenure</option>
+                  <option value="1">1 Year</option>
+                  <option value="2">2 Years</option>
+                  <option value="3">3 Years</option>
+                </select>
+                <input name="insurancePremium" value={form.insurancePremium ? `₹ ${form.insurancePremium}` : "Please select value and period"} readOnly className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
 
                 {/* Product detail */}
                 <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
