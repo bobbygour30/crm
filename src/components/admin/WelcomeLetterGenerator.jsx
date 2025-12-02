@@ -74,17 +74,32 @@ const insurerOptions = [
   "Bajaj Allianz Life Insurance",
 ];
 
-const premiumData = {
-  "0-19999": { 1: 2000, 2: 3850, 3: 5875 },
-  "20000-29999": { 1: 2350, 2: 4250, 3: 6099 },
-  "30000-34999": { 1: 2500, 2: 4750, 3: 6599 },
-  "35000-49999": { 1: 2800, 2: 5099, 3: 7299 },
-  "50000-74999": { 1: 4250, 2: 6999, 3: 8999 },
-  "75000-99999": { 1: 4998, 2: 8599, 3: 10999 },
-  "100000-124999": { 1: 5546, 2: 10546, 3: 15650 },
-  "125000-149999": { 1: 6195, 2: 11999, 3: 16999 },
-  "150000-199999": { 1: 8999, 2: 16449, 3: 25999 },
-  "200000-250000": { 1: 10999, 2: 19999, 3: 30999 },
+// UPDATED PREMIUM DATA - EXACTLY FROM YOUR IMAGE (With GST values for display)
+const premiumWithGST = {
+  "0-20000": { 1: 2000, 2: 4620, 3: 7638 },
+  "20001-30000": { 1: 2821, 2: 5313, 3: 7929 },
+  "30001-35000": { 1: 3126, 2: 5937, 3: 8578 },
+  "35001-50000": { 1: 3500, 2: 6373, 3: 9489 },
+  "50001-75000": { 1: 5313, 2: 8749, 3: 11698 },
+  "75001-100000": { 1: 6248, 2: 10748, 3: 14298 },
+  "100001-125000": { 1: 7210, 2: 13709, 3: 20345 },
+  "125001-150000": { 1: 8054, 2: 15599, 3: 23099 },
+  "150001-200000": { 1: 11698, 2: 21348, 3: 33799 },
+  "200001-250000": { 1: 14298, 2: 25998, 3: 40298 },
+};
+
+// Net Premium Data (before GST) - Directly from image for accurate split
+const netPremiumData = {
+  "0-20000": { 1: 1695, 2: 3915, 3: 6473 },
+  "20001-30000": { 1: 2391, 2: 4503, 3: 6719.5 },
+  "30001-35000": { 1: 2649, 2: 5031, 3: 7270 },
+  "35001-50000": { 1: 2966, 2: 5401, 3: 8042 },
+  "50001-75000": { 1: 4503, 2: 7414, 3: 9913.5 },
+  "75001-100000": { 1: 5295, 2: 9109, 3: 12117 },
+  "100001-125000": { 1: 6110, 2: 11618, 3: 17241.5 },
+  "125001-150000": { 1: 6825, 2: 13219, 3: 19576 },
+  "150001-200000": { 1: 9913.8, 2: 18092, 3: 28643 },
+  "200001-250000": { 1: 12117, 2: 22032, 3: 34151 },
 };
 
 /* -----------------------
@@ -176,9 +191,9 @@ const WelcomeLetterPage1 = ({ form }) => {
         </div>
       </div>
 
-      <div style={{ display: "flex", justifyContent: "space-between", marginTop: 8, marginBottom: 18 }}>
-        <div style={{ fontWeight: 700, fontSize: 11 }}>ARSHYAN REF NO</div>
-        <div style={{ fontWeight: 700, fontSize: 13, color: "#0f3b82" }}>{form.refNo}</div>
+      <div style={{ display: "flex", marginTop: 8, marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, fontSize: 11 }}>ARSHYAN REF NO :</div>
+        <div style={{ fontWeight: 700, fontSize: 11, color: "#0f3b82" }}>{form.refNo}</div>
       </div>
 
       <div style={{ marginBottom: 18, fontSize: 12 }}>
@@ -300,11 +315,11 @@ const WelcomeLetterPage2 = ({ form }) => {
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insurerName}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurance Premium Including GST</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Net Services Charges Including GST {form.membership.gstPercentage}%</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>₹ {form.insurancePremium}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST)</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST){form.membership.gstPercentage}%</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.serviceCharges}</td>
           </tr>
         </tbody>
@@ -481,28 +496,44 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
+  // UPDATED CALCULATE PREMIUM - MATCHES IMAGE EXACTLY (With GST as total, net from table)
   const calculatePremium = (valueOfEquipment, selectedPeriod) => {
     const numValue = parseInt(valueOfEquipment) || 0;
+    const period = parseInt(selectedPeriod) || 0;
     let selectedRange = null;
 
-    for (const range in premiumData) {
-      const [min, max] = range.split("-").map(Number);
-      if (numValue >= min && (max === undefined || numValue <= max)) {
-        selectedRange = range;
+    // Exact ranges from image
+    const ranges = [
+      { key: "0-20000", min: 0, max: 20000 },
+      { key: "20001-30000", min: 20001, max: 30000 },
+      { key: "30001-35000", min: 30001, max: 35000 },
+      { key: "35001-50000", min: 35001, max: 50000 },
+      { key: "50001-75000", min: 50001, max: 75000 },
+      { key: "75001-100000", min: 75001, max: 100000 },
+      { key: "100001-125000", min: 100001, max: 125000 },
+      { key: "125001-150000", min: 125001, max: 150000 },
+      { key: "150001-200000", min: 150001, max: 200000 },
+      { key: "200001-250000", min: 200001, max: 250000 },
+    ];
+
+    for (const range of ranges) {
+      if (numValue >= range.min && numValue <= range.max) {
+        selectedRange = range.key;
         break;
       }
     }
 
-    if (selectedRange && selectedPeriod) {
-      const premium = premiumData[selectedRange][selectedPeriod];
+    if (selectedRange && period >= 1 && period <= 3) {
+      const totalWithGST = premiumWithGST[selectedRange][period];
+      const net = netPremiumData[selectedRange][period];
       setForm((prev) => ({
         ...prev,
-        insurancePremium: premium,
+        insurancePremium: totalWithGST,
         membership: {
           ...prev.membership,
-          serviceCharges: `₹ ${premium}`,
-          netAmount: premium.toString(),
-          totalAmount: premium.toString(),
+          netAmount: net.toFixed(2),
+          totalAmount: totalWithGST.toFixed(2),
+          serviceCharges: `₹ ${totalWithGST}`,
         },
       }));
     } else {
@@ -511,9 +542,9 @@ const WelcomeLetterGenerator = () => {
         insurancePremium: "",
         membership: {
           ...prev.membership,
-          serviceCharges: "",
           netAmount: "",
           totalAmount: "",
+          serviceCharges: "",
         },
       }));
     }
