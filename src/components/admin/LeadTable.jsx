@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FaEye, FaEdit, FaSave, FaTimes, FaTrash } from "react-icons/fa";
+import { FaEye, FaEdit, FaSave, FaTimes, FaTrash, FaFilePdf } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
 
 function LeadTable({ filter, setFilter, setSelectedLead }) {
@@ -114,6 +114,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     assignedTo: [],
     agency: "",
     customAgency: "",
+    policyPdf: null, // File object for new upload
   });
 
   const [selectedUsers, setSelectedUsers] = useState([]); // For form
@@ -149,6 +150,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     assignedTo: [],
     agency: "",
     customAgency: "",
+    policyPdf: null, // Current PDF object
+    newPolicyPdf: null, // New file object for update
   });
   const [editSelectedUsers, setEditSelectedUsers] = useState([]);
   const [showEditCustomAgency, setShowEditCustomAgency] = useState(false);
@@ -299,6 +302,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       lobCustom: lead.lob === "Other Insurance" ? lead.lob : "",
       agency: lead.agency === "OTHERS" ? "OTHERS" : lead.agency,
       customAgency: lead.agency === "OTHERS" ? lead.agency : "",
+      policyPdf: lead.policyPdf || null, // Ensure null if missing
+      newPolicyPdf: null, // Reset new file
     });
     setEditSelectedUsers(assignedTo);
     setShowEditCustomAgency(lead.agency === "OTHERS");
@@ -333,6 +338,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       assignedTo: [],
       agency: "",
       customAgency: "",
+      policyPdf: null,
+      newPolicyPdf: null,
     });
     setEditSelectedUsers([]);
     setShowEditCustomAgency(false);
@@ -350,33 +357,45 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     const grossPremium = computeGrossPremium(editData.netPremium, editData.gstPercent);
     const totalPayment = computeTotalPayment(payoutValue, editData.additionalPayout);
 
-    const payload = {
-      ...editData,
-      lob: finalLOB,
-      agency: finalAgency,
-      payout: editData.payoutPercent,
-      payoutValue,
-      grossPremium,
-      gst: editData.gstPercent,
-      totalPayment,
-      assignedTo: editSelectedUsers,
-    };
+    const formData = new FormData();
+    formData.append('name', editData.name);
+    formData.append('email', editData.email);
+    formData.append('mobileNo', editData.mobileNo);
+    formData.append('source', editData.source);
+    formData.append('reference', editData.reference);
+    formData.append('status', editData.status);
+    formData.append('openStatus', editData.openStatus);
+    formData.append('policyNumber', editData.policyNumber);
+    formData.append('lob', finalLOB);
+    formData.append('sumInsured', editData.sumInsured);
+    formData.append('endorsement', editData.endorsement);
+    formData.append('payout', editData.payoutPercent);
+    formData.append('payoutValue', payoutValue);
+    formData.append('netPremium', editData.netPremium);
+    formData.append('gst', editData.gstPercent);
+    formData.append('grossPremium', grossPremium);
+    formData.append('additionalPayout', editData.additionalPayout);
+    formData.append('totalPayment', totalPayment);
+    formData.append('payoutStatus', editData.payoutStatus);
+    formData.append('policyStartDate', editData.policyStartDate);
+    formData.append('policyExpiryDate', editData.policyExpiryDate);
+    formData.append('insurer', editData.insurer);
+    formData.append('remarks', editData.remarks);
+    formData.append('agency', finalAgency);
+    editSelectedUsers.forEach(userId => formData.append('assignedTo', userId));
 
-    // Clean up temp fields
-    delete payload.lobOption;
-    delete payload.lobCustom;
-    delete payload.customAgency;
-    delete payload.payoutPercent;
-    delete payload.gstPercent;
+    if (editData.newPolicyPdf) {
+      console.log('Uploading new PDF in edit:', editData.newPolicyPdf.name); // Debug log
+      formData.append('policyPdf', editData.newPolicyPdf);
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/leads/${editLead}`, {
         method: "PUT",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(payload),
+        body: formData,
       });
 
       if (res.ok) {
@@ -384,11 +403,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         setLeads((prev) => prev.map((l) => (l._id === editLead ? updatedLead : l)));
         closeEditModal();
       } else {
-        alert("Failed to update lead");
+        const errorData = await res.json();
+        alert(`Failed to update lead: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
       console.error("Update error:", err);
-      alert("Error updating lead");
+      alert("Error updating lead: " + err.message);
     }
   };
 
@@ -470,32 +490,46 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     const finalLOB = newLead.lobOption === "Other Insurance" ? newLead.lobCustom || "" : newLead.lobOption;
     const finalAgency = newLead.agency === "OTHERS" ? newLead.customAgency || "" : newLead.agency;
 
-    const finalLead = {
-      ...newLead,
-      lob: finalLOB,
-      agency: finalAgency,
-      payout: newLead.payoutPercent,
-      payoutValue,
-      grossPremium,
-      gst: newLead.gstPercent,
-      totalPayment,
-      assignedTo: selectedUsers,
-      reference: newLead.reference,
-    };
+    const formData = new FormData();
+    formData.append('name', newLead.name);
+    formData.append('email', newLead.email);
+    formData.append('mobileNo', newLead.mobileNo);
+    formData.append('source', newLead.source);
+    formData.append('reference', newLead.reference);
+    formData.append('status', newLead.status);
+    formData.append('openStatus', newLead.openStatus);
+    formData.append('policyNumber', newLead.policyNumber);
+    formData.append('lob', finalLOB);
+    formData.append('sumInsured', newLead.sumInsured);
+    formData.append('endorsement', newLead.endorsement);
+    formData.append('payout', newLead.payoutPercent);
+    formData.append('payoutValue', payoutValue);
+    formData.append('netPremium', newLead.netPremium);
+    formData.append('gst', newLead.gstPercent);
+    formData.append('grossPremium', grossPremium);
+    formData.append('additionalPayout', newLead.additionalPayout);
+    formData.append('totalPayment', totalPayment);
+    formData.append('payoutStatus', newLead.payoutStatus);
+    formData.append('policyStartDate', newLead.policyStartDate);
+    formData.append('policyExpiryDate', newLead.policyExpiryDate);
+    formData.append('insurer', newLead.insurer);
+    formData.append('remarks', newLead.remarks);
+    formData.append('agency', finalAgency);
+    selectedUsers.forEach(userId => formData.append('assignedTo', userId));
 
-    delete finalLead.lobOption;
-    delete finalLead.lobCustom;
-    delete finalLead.customAgency;
+    if (newLead.policyPdf) {
+      console.log('Uploading PDF:', newLead.policyPdf.name); // Debug log
+      formData.append('policyPdf', newLead.policyPdf);
+    }
 
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(finalLead),
+        body: formData,
       });
 
       if (res.ok) {
@@ -503,9 +537,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         setLeads((prev) => [savedLead, ...prev]);
         resetForm();
       } else {
-        alert("Failed to save lead");
+        const errorData = await res.json();
+        alert(`Failed to save lead: ${errorData.error || 'Unknown error'}`);
       }
     } catch (err) {
+      console.error("Create error:", err);
       alert("Error: " + err.message);
     }
   };
@@ -536,6 +572,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       assignedTo: [],
       agency: "",
       customAgency: "",
+      policyPdf: null,
     });
     setSelectedUsers([]);
     setShowLeadForm(false);
@@ -1048,6 +1085,22 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               </select>
             </div>
 
+            {/* Policy Upload */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Policy Upload</label>
+              <input
+                type="file"
+                accept=".pdf"
+                onChange={(e) =>
+                  setNewLead({ ...newLead, policyPdf: e.target.files[0] })
+                }
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {newLead.policyPdf && (
+                <p className="text-sm text-gray-500 mt-1">{newLead.policyPdf.name}</p>
+              )}
+            </div>
+
             {/* ASSIGN TO - MULTI SELECT FOR FORM */}
             <div className="relative" ref={formDropdownRef}>
               <label className="text-sm font-medium text-gray-700">
@@ -1414,6 +1467,36 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   ))}
                 </select>
               </div>
+
+              {/* Policy Upload in Edit */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Upload</label>
+                {editData.policyPdf?.url && (
+                  <div className="mb-2">
+                    <a
+                      href={editData.policyPdf.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-500 text-sm flex items-center gap-1"
+                    >
+                      <FaFilePdf className="h-4 w-4" />
+                      Current PDF
+                    </a>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) =>
+                    setEditData({ ...editData, newPolicyPdf: e.target.files[0] })
+                  }
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+                {editData.newPolicyPdf && (
+                  <p className="text-sm text-gray-500 mt-1">{editData.newPolicyPdf.name}</p>
+                )}
+              </div>
+
               <div className="relative" ref={editFormDropdownRef}>
                 <label className="text-sm font-medium text-gray-700">Assign To</label>
                 <button
@@ -1500,6 +1583,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <th className="p-3">Total Pay</th>
                 <th className="p-3">Pay Status</th>
                 <th className="p-3">Insurer</th>
+                <th className="p-3">Policy PDF</th>
                 <th className="p-3">Source</th>
                 <th className="p-3">Reference</th>
                 <th className="p-3">Status</th>
@@ -1535,6 +1619,21 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     <td className="p-3">{formatCurrency(leadTotalPayment(lead))}</td>
                     <td className="p-3">{lead.payoutStatus || "Pending"}</td>
                     <td className="p-3">{lead.insurer}</td>
+                    <td className="p-3">
+                      {lead.policyPdf?.url ? (
+                        <a
+                          href={lead.policyPdf.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline flex items-center gap-1 text-xs"
+                        >
+                          <FaFilePdf className="h-4 w-4" />
+                          View PDF
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
                     <td className="p-3">{lead.source}</td>
                     <td className="p-3">{lead.reference || "-"}</td>
                     <td className="p-3">
@@ -1630,6 +1729,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   <div><strong>Gross:</strong> {formatCurrency(leadGrossPremium(lead))}</div>
                   <div><strong>Payout:</strong> {getLeadPayoutPercent(lead)}% → {formatCurrency(leadPayoutValue(lead))}</div>
                   <div><strong>Total Pay:</strong> {formatCurrency(leadTotalPayment(lead))}</div>
+                  <div><strong>Policy PDF:</strong> {lead.policyPdf?.url ? (
+                    <a href={lead.policyPdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 flex items-center gap-1">
+                      <FaFilePdf className="h-4 w-4" /> View
+                    </a>
+                  ) : "-" }</div>
                   <div><strong>Source:</strong> {lead.source}</div>
                   <div><strong>Reference:</strong> {lead.reference || "-"}</div>
                   <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100 text-yellow-800" : lead.status === "Policy Issued" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{lead.status}</span></div>
