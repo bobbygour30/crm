@@ -181,7 +181,7 @@ function AdminApp({ handleLogout }) {
   const getPageTitle = useCallback(() => {
     const titles = {
       dashboard: 'Dashboard',
-      leads: 'Lead Management',
+      leads: 'Insurance Policy Punch',
       tasks: 'Task Management',
       analytics: 'Analytics & Reports',
       users: 'User Management',

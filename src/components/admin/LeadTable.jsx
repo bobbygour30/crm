@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FaEye } from "react-icons/fa";
+import { FaEye, FaEdit, FaSave, FaTimes, FaTrash } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
 
 function LeadTable({ filter, setFilter, setSelectedLead }) {
@@ -117,9 +117,46 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   });
 
   const [selectedUsers, setSelectedUsers] = useState([]); // For form
-  const [showDropdown, setShowDropdown] = useState(null); // 'form' or lead._id
+  const [showFormDropdown, setShowFormDropdown] = useState(false);
+  const [showLeadDropdowns, setShowLeadDropdowns] = useState({}); // Object for each lead
   const [showCustomAgency, setShowCustomAgency] = useState(false);
-  const dropdownRef = useRef(null);
+
+  // Edit Modal State
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLead, setEditLead] = useState(null);
+  const [editData, setEditData] = useState({
+    name: "",
+    email: "",
+    mobileNo: "",
+    source: "",
+    reference: "",
+    status: "Open",
+    openStatus: "",
+    policyNumber: "",
+    lobOption: "",
+    lobCustom: "",
+    sumInsured: 0,
+    endorsement: "",
+    payoutPercent: 0,
+    payoutStatus: "",
+    additionalPayout: 0,
+    netPremium: 0,
+    gstPercent: 0,
+    policyStartDate: "",
+    policyExpiryDate: "",
+    insurer: "",
+    remarks: "",
+    assignedTo: [],
+    agency: "",
+    customAgency: "",
+  });
+  const [editSelectedUsers, setEditSelectedUsers] = useState([]);
+  const [showEditCustomAgency, setShowEditCustomAgency] = useState(false);
+  const [showEditFormDropdown, setShowEditFormDropdown] = useState(false);
+
+  const formDropdownRef = useRef(null);
+  const editFormDropdownRef = useRef(null);
+  const leadDropdownRefs = useRef({}); // Map of refs for each lead
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
   // === FETCH DATA ===
@@ -160,12 +197,23 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     }
   };
 
-  // === CLICK OUTSIDE DROPDOWN ===
+  // === CLICK OUTSIDE FOR DROPDOWNS ===
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
-        setShowDropdown(null);
+      // Form dropdown
+      if (formDropdownRef.current && !formDropdownRef.current.contains(event.target)) {
+        setShowFormDropdown(false);
       }
+      // Edit form dropdown
+      if (editFormDropdownRef.current && !editFormDropdownRef.current.contains(event.target)) {
+        setShowEditFormDropdown(false);
+      }
+      // Lead dropdowns
+      Object.entries(leadDropdownRefs.current).forEach(([leadId, ref]) => {
+        if (ref && !ref.contains(event.target)) {
+          setShowLeadDropdowns(prev => ({ ...prev, [leadId]: false }));
+        }
+      });
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -173,9 +221,9 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
 
   // === HELPERS ===
   const normalizeAssignedTo = (assignedTo) => {
-    if (Array.isArray(assignedTo)) return assignedTo;
+    if (Array.isArray(assignedTo)) return assignedTo.map(id => typeof id === 'object' ? id._id : id);
     if (!assignedTo) return [];
-    return [assignedTo];
+    return [typeof assignedTo === 'object' ? assignedTo._id : assignedTo];
   };
 
   const clampPercent = (val) => {
@@ -221,6 +269,194 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   const getUserName = (userId) => {
     const user = users.find((u) => u._id === userId);
     return user ? user.username || user.name || "Unknown" : "Unknown";
+  };
+
+  const getLeadPayoutPercent = (lead) => lead.payout || 0;
+  const getLeadNetPremium = (lead) => lead.netPremium || 0;
+  const getLeadGSTPercent = (lead) => lead.gst || 0;
+  const getLeadAdditionalPayout = (lead) => lead.additionalPayout || 0;
+
+  const leadPayoutValue = (lead) =>
+    computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
+  const leadGrossPremium = (lead) =>
+    lead.grossPremium ||
+    computeGrossPremium(getLeadNetPremium(lead), getLeadGSTPercent(lead));
+  const leadTotalPayment = (lead) =>
+    lead.totalPayment ||
+    computeTotalPayment(leadPayoutValue(lead), getLeadAdditionalPayout(lead));
+
+  const formatNumber = (value) => (value ? value.toLocaleString() : "0");
+
+  // === EDIT MODAL HELPERS ===
+  const openEditModal = (lead) => {
+    const assignedTo = normalizeAssignedTo(lead.assignedTo);
+    setEditLead(lead._id);
+    setEditData({
+      ...lead,
+      payoutPercent: lead.payout || 0,
+      gstPercent: lead.gst || 0,
+      lobOption: lead.lob === "Other Insurance" ? "Other Insurance" : lead.lob,
+      lobCustom: lead.lob === "Other Insurance" ? lead.lob : "",
+      agency: lead.agency === "OTHERS" ? "OTHERS" : lead.agency,
+      customAgency: lead.agency === "OTHERS" ? lead.agency : "",
+    });
+    setEditSelectedUsers(assignedTo);
+    setShowEditCustomAgency(lead.agency === "OTHERS");
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditLead(null);
+    setEditData({
+      name: "",
+      email: "",
+      mobileNo: "",
+      source: "",
+      reference: "",
+      status: "Open",
+      openStatus: "",
+      policyNumber: "",
+      lobOption: "",
+      lobCustom: "",
+      sumInsured: 0,
+      endorsement: "",
+      payoutPercent: 0,
+      payoutStatus: "",
+      additionalPayout: 0,
+      netPremium: 0,
+      gstPercent: 0,
+      policyStartDate: "",
+      policyExpiryDate: "",
+      insurer: "",
+      remarks: "",
+      assignedTo: [],
+      agency: "",
+      customAgency: "",
+    });
+    setEditSelectedUsers([]);
+    setShowEditCustomAgency(false);
+    setShowEditFormDropdown(false);
+  };
+
+  const saveEdit = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+
+    const finalLOB = editData.lobOption === "Other Insurance" ? editData.lobCustom || "" : editData.lobOption || editData.lob;
+    const finalAgency = editData.agency === "OTHERS" ? editData.customAgency || "" : editData.agency || editData.agency;
+
+    const payoutValue = computePayoutValue(editData.netPremium, editData.payoutPercent);
+    const grossPremium = computeGrossPremium(editData.netPremium, editData.gstPercent);
+    const totalPayment = computeTotalPayment(payoutValue, editData.additionalPayout);
+
+    const payload = {
+      ...editData,
+      lob: finalLOB,
+      agency: finalAgency,
+      payout: editData.payoutPercent,
+      payoutValue,
+      grossPremium,
+      gst: editData.gstPercent,
+      totalPayment,
+      assignedTo: editSelectedUsers,
+    };
+
+    // Clean up temp fields
+    delete payload.lobOption;
+    delete payload.lobCustom;
+    delete payload.customAgency;
+    delete payload.payoutPercent;
+    delete payload.gstPercent;
+
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${editLead}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads((prev) => prev.map((l) => (l._id === editLead ? updatedLead : l)));
+        closeEditModal();
+      } else {
+        alert("Failed to update lead");
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+      alert("Error updating lead");
+    }
+  };
+
+  // === ASSIGN LEAD ===
+  const assignLead = async (leadId, assignedTo) => {
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${leadId}/assign`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ assignedTo }),
+      });
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads((prev) => prev.map((l) => (l._id === leadId ? updatedLead : l)));
+      }
+    } catch (err) {
+      console.error("Assign error:", err);
+    }
+  };
+
+  const toggleUserSelection = (leadId, userId, isForm = false, isEditForm = false) => {
+    if (isForm) {
+      setSelectedUsers((prev) =>
+        prev.includes(userId)
+          ? prev.filter((id) => id !== userId)
+          : [...prev, userId]
+      );
+    } else if (isEditForm) {
+      setEditSelectedUsers((prev) =>
+        prev.includes(userId)
+          ? prev.filter((id) => id !== userId)
+          : [...prev, userId]
+      );
+    } else {
+      const lead = leads.find((l) => l._id === leadId);
+      const current = normalizeAssignedTo(lead.assignedTo);
+      const updated = current.includes(userId)
+        ? current.filter((id) => id !== userId)
+        : [...current, userId];
+      assignLead(leadId, updated);
+    }
+  };
+
+  // === DELETE LEAD ===
+  const deleteLead = async (leadId) => {
+    if (!confirm("Are you sure you want to delete this lead?")) return;
+
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (res.ok) {
+        setLeads((prev) => prev.filter((l) => l._id !== leadId));
+      } else {
+        alert("Failed to delete lead");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Error deleting lead");
+    }
   };
 
   // === ADD LEAD ===
@@ -304,6 +540,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     setSelectedUsers([]);
     setShowLeadForm(false);
     setShowCustomAgency(false);
+    setShowFormDropdown(false);
   };
 
   // === EXCEL UPLOAD ===
@@ -335,48 +572,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     }
   };
 
-  // === ASSIGN LEAD ===
-  const assignLead = async (leadId, assignedTo) => {
-    const token = localStorage.getItem("token");
-    try {
-      await fetch(`${API_BASE}/api/leads/${leadId}/assign`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ assignedTo }),
-      });
-      fetchLeads();
-    } catch (err) {
-      console.error("Assign error:", err);
-    }
-  };
-
-  const toggleUserSelection = (leadId, userId) => {
-    const lead = leads.find((l) => l._id === leadId);
-    const current = normalizeAssignedTo(lead.assignedTo);
-    const updated = current.includes(userId)
-      ? current.filter((id) => id !== userId)
-      : [...current, userId];
-    assignLead(leadId, updated);
-  };
-
-  const getLeadPayoutPercent = (lead) => lead.payout || 0;
-  const getLeadNetPremium = (lead) => lead.netPremium || 0;
-  const getLeadGSTPercent = (lead) => lead.gst || 0;
-  const getLeadAdditionalPayout = (lead) => lead.additionalPayout || 0;
-
-  const leadPayoutValue = (lead) =>
-    computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
-  const leadGrossPremium = (lead) =>
-    lead.grossPremium ||
-    computeGrossPremium(getLeadNetPremium(lead), getLeadGSTPercent(lead));
-  const leadTotalPayment = (lead) =>
-    lead.totalPayment ||
-    computeTotalPayment(leadPayoutValue(lead), getLeadAdditionalPayout(lead));
-
-  const formatNumber = (value) => (value ? value.toLocaleString() : "0");
+  // Filtered leads
+  const filteredLeads = leads.filter((lead) => filter === "All" || lead.status === filter);
 
   return (
     <motion.div
@@ -431,7 +628,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           initial={{ opacity: 0, height: 0 }}
           animate={{ opacity: 1, height: "auto" }}
           transition={{ duration: 0.3 }}
-          className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6"
+          className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6 overflow-hidden"
         >
           <form
             onSubmit={handleAddLead}
@@ -446,6 +643,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   setNewLead({ ...newLead, name: e.target.value })
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
+                required
               />
             </div>
             <div>
@@ -459,6 +657,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   setNewLead({ ...newLead, mobileNo: e.target.value })
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg"
+                required
               />
             </div>
             <div>
@@ -849,15 +1048,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               </select>
             </div>
 
-            {/* ASSIGN TO - MULTI SELECT */}
-            <div className="relative" ref={dropdownRef}>
+            {/* ASSIGN TO - MULTI SELECT FOR FORM */}
+            <div className="relative" ref={formDropdownRef}>
               <label className="text-sm font-medium text-gray-700">
                 Assign To
               </label>
               <button
                 type="button"
                 onClick={() =>
-                  setShowDropdown(showDropdown === "form" ? null : "form")
+                  setShowFormDropdown(!showFormDropdown)
                 }
                 className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
               >
@@ -865,7 +1064,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   ? selectedUsers.map(getUserName).join(", ")
                   : "-- Select Users --"}
               </button>
-              {showDropdown === "form" && (
+              {showFormDropdown && (
                 <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                   {users.length === 0 ? (
                     <div className="p-3 text-gray-500">Loading users...</div>
@@ -879,11 +1078,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                           type="checkbox"
                           checked={selectedUsers.includes(user._id)}
                           onChange={() =>
-                            setSelectedUsers((prev) =>
-                              prev.includes(user._id)
-                                ? prev.filter((id) => id !== user._id)
-                                : [...prev, user._id]
-                            )
+                            toggleUserSelection(null, user._id, true)
                           }
                           className="mr-3"
                         />
@@ -916,17 +1111,377 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 type="submit"
                 className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
               >
-                Submit Lead
+                Submit
               </button>
             </div>
           </form>
         </motion.div>
       )}
 
+      {/* Edit Modal */}
+      {showEditModal && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-4xl max-h-[90vh] overflow-y-auto w-full"
+          >
+            <h2 className="text-xl font-bold mb-4">Edit Lead</h2>
+            <form className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Name</label>
+                <input
+                  type="text"
+                  value={editData.name}
+                  onChange={(e) => setEditData({ ...editData, name: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Mobile No</label>
+                <input
+                  type="text"
+                  value={editData.mobileNo}
+                  onChange={(e) => setEditData({ ...editData, mobileNo: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  required
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Email</label>
+                <input
+                  type="email"
+                  value={editData.email}
+                  onChange={(e) => setEditData({ ...editData, email: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Source</label>
+                <input
+                  type="text"
+                  value={editData.source}
+                  onChange={(e) => setEditData({ ...editData, source: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Reference</label>
+                <input
+                  type="text"
+                  value={editData.reference}
+                  onChange={(e) => setEditData({ ...editData, reference: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Status</label>
+                <select
+                  value={editData.status}
+                  onChange={(e) => setEditData({ ...editData, status: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="Open">Open</option>
+                  <option value="Policy Issued">Policy Issued</option>
+                  <option value="Closed Without Issuance">Closed Without Issuance</option>
+                </select>
+              </div>
+              {editData.status === "Open" && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Next Step</label>
+                  <select
+                    value={editData.openStatus}
+                    onChange={(e) => setEditData({ ...editData, openStatus: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select</option>
+                    <option value="Closed">Closed</option>
+                    <option value="Policy Issued">Policy Issued</option>
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Number</label>
+                <input
+                  type="text"
+                  value={editData.policyNumber}
+                  onChange={(e) => setEditData({ ...editData, policyNumber: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">LOB</label>
+                <select
+                  value={editData.lobOption}
+                  onChange={(e) => {
+                    setEditData({
+                      ...editData,
+                      lobOption: e.target.value,
+                      lobCustom: "",
+                    });
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Select LOB --</option>
+                  {lobOptions.map((lob) => (
+                    <option key={lob} value={lob}>
+                      {lob}
+                    </option>
+                  ))}
+                </select>
+                {editData.lobOption === "Other Insurance" && (
+                  <input
+                    type="text"
+                    placeholder="Enter Custom LOB"
+                    value={editData.lobCustom}
+                    onChange={(e) => setEditData({ ...editData, lobCustom: e.target.value })}
+                    className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
+                  />
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Agency</label>
+                <select
+                  value={editData.agency}
+                  onChange={(e) => {
+                    setEditData({ ...editData, agency: e.target.value });
+                    setShowEditCustomAgency(e.target.value === "OTHERS");
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Select Agency --</option>
+                  {agencyOptions.map((a) => (
+                    <option key={a} value={a}>
+                      {a}
+                    </option>
+                  ))}
+                </select>
+                {showEditCustomAgency && (
+                  <input
+                    type="text"
+                    placeholder="Enter Custom Agency"
+                    value={editData.customAgency}
+                    onChange={(e) => setEditData({ ...editData, customAgency: e.target.value })}
+                    className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
+                  />
+                )}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Sum Insured</label>
+                <input
+                  type="number"
+                  value={editData.sumInsured}
+                  onChange={(e) => setEditData({ ...editData, sumInsured: parseFloat(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Endorsement</label>
+                <input
+                  type="text"
+                  value={editData.endorsement}
+                  onChange={(e) => setEditData({ ...editData, endorsement: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Net Premium</label>
+                <input
+                  type="number"
+                  value={editData.netPremium}
+                  onChange={(e) => setEditData({ ...editData, netPremium: parseFloat(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">GST %</label>
+                <select
+                  value={editData.gstPercent}
+                  onChange={(e) => setEditData({ ...editData, gstPercent: parseFloat(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  {gstOptions.map((g) => (
+                    <option key={g} value={g}>
+                      {g}%
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Gross Premium</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formatCurrency(computeGrossPremium(editData.netPremium, editData.gstPercent))}
+                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Payout (%)</label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={editData.payoutPercent}
+                    onChange={(e) => setEditData({ ...editData, payoutPercent: clampPercent(e.target.value) })}
+                    className="w-full"
+                  />
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={editData.payoutPercent}
+                    onChange={(e) => setEditData({ ...editData, payoutPercent: clampPercent(e.target.value) })}
+                    className="w-20 p-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Payout (calc)</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formatCurrency(computePayoutValue(editData.netPremium, editData.payoutPercent))}
+                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Additional Payout</label>
+                <input
+                  type="number"
+                  value={editData.additionalPayout}
+                  onChange={(e) => setEditData({ ...editData, additionalPayout: parseFloat(e.target.value) || 0 })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Total Payment</label>
+                <input
+                  type="text"
+                  readOnly
+                  value={formatCurrency(computeTotalPayment(computePayoutValue(editData.netPremium, editData.payoutPercent), editData.additionalPayout))}
+                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Payout Status</label>
+                <select
+                  value={editData.payoutStatus}
+                  onChange={(e) => setEditData({ ...editData, payoutStatus: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Select --</option>
+                  <option value="Pending">Pending</option>
+                  <option value="Received">Received</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Start</label>
+                <input
+                  type="date"
+                  value={editData.policyStartDate}
+                  onChange={(e) => setEditData({ ...editData, policyStartDate: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Expiry</label>
+                <input
+                  type="date"
+                  value={editData.policyExpiryDate}
+                  onChange={(e) => setEditData({ ...editData, policyExpiryDate: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Insurer</label>
+                <select
+                  value={editData.insurer}
+                  onChange={(e) => setEditData({ ...editData, insurer: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">-- Select --</option>
+                  {insurerOptions.map((ins) => (
+                    <option key={ins} value={ins}>
+                      {ins}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="relative" ref={editFormDropdownRef}>
+                <label className="text-sm font-medium text-gray-700">Assign To</label>
+                <button
+                  type="button"
+                  onClick={() => setShowEditFormDropdown(!showEditFormDropdown)}
+                  className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
+                >
+                  {editSelectedUsers.length > 0
+                    ? editSelectedUsers.map(getUserName).join(", ")
+                    : "-- Select Users --"}
+                </button>
+                {showEditFormDropdown && (
+                  <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    {users.length === 0 ? (
+                      <div className="p-3 text-gray-500">Loading users...</div>
+                    ) : (
+                      users.map((user) => (
+                        <label
+                          key={user._id}
+                          className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={editSelectedUsers.includes(user._id)}
+                            onChange={() => toggleUserSelection(null, user._id, false, true)}
+                            className="mr-3"
+                          />
+                          <span className="text-sm">{user.username || user.name || user.email}</span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="lg:col-span-3">
+                <label className="text-sm font-medium text-gray-700">Remarks</label>
+                <textarea
+                  value={editData.remarks}
+                  onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  rows="3"
+                ></textarea>
+              </div>
+              <div className="lg:col-span-3 flex gap-4 justify-end">
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={saveEdit}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Update Lead
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* TABLE */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="hidden lg:block overflow-x-auto">
-          <table className="w-full table-auto">
+          <table className="w-full table-auto min-w-full">
             <thead>
               <tr className="bg-gray-100 text-left text-xs">
                 <th className="p-3">Name</th>
@@ -953,12 +1508,16 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               </tr>
             </thead>
             <tbody>
-              {leads
-                .filter((lead) => filter === "All" || lead.status === filter)
-                .map((lead) => (
+              {filteredLeads.map((lead) => {
+                const assignedTo = normalizeAssignedTo(lead.assignedTo);
+                const currentShowDropdown = showLeadDropdowns[lead._id] || false;
+
+                return (
                   <motion.tr
                     key={lead._id}
                     className="border-b hover:bg-gray-50 text-xs"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
                   >
                     <td className="p-3">{lead.name}</td>
                     <td className="p-3">{lead.email}</td>
@@ -992,29 +1551,31 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                       </span>
                     </td>
                     <td className="p-3">
-                      {normalizeAssignedTo(lead.assignedTo)
+                      {assignedTo
                         .map(getUserName)
                         .join(", ") || "Unassigned"}
                     </td>
-                    <td className="p-3 flex gap-2">
+                    <td className="p-3 flex gap-2 items-center">
                       <button
                         onClick={() => setSelectedLead(lead)}
                         className="text-indigo-600 hover:text-indigo-800"
                       >
                         <FaEye className="h-5 w-5" />
                       </button>
-                      <div className="relative" ref={dropdownRef}>
+                      <button
+                        onClick={() => openEditModal(lead)}
+                        className="text-blue-600 hover:text-blue-800"
+                      >
+                        <FaEdit className="h-5 w-5" />
+                      </button>
+                      <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
                         <button
-                          onClick={() =>
-                            setShowDropdown(
-                              showDropdown === lead._id ? null : lead._id
-                            )
-                          }
+                          onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))}
                           className="px-3 py-1 text-xs border rounded bg-gray-50 hover:bg-gray-100"
                         >
                           Assign
                         </button>
-                        {showDropdown === lead._id && (
+                        {currentShowDropdown && (
                           <div className="absolute z-50 mt-1 w-56 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {users.map((user) => (
                               <label
@@ -1023,7 +1584,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                               >
                                 <input
                                   type="checkbox"
-                                  checked={normalizeAssignedTo(lead.assignedTo).includes(user._id)}
+                                  checked={assignedTo.includes(user._id)}
                                   onChange={() => toggleUserSelection(lead._id, user._id)}
                                   className="mr-2"
                                 />
@@ -1033,18 +1594,27 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                           </div>
                         )}
                       </div>
+                      <button
+                        onClick={() => deleteLead(lead._id)}
+                        className="text-red-600 hover:text-red-800"
+                      >
+                        <FaTrash className="h-5 w-5" />
+                      </button>
                     </td>
                   </motion.tr>
-                ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
 
         {/* Mobile Cards */}
         <div className="block lg:hidden p-4 space-y-4">
-          {leads
-            .filter((lead) => filter === "All" || lead.status === filter)
-            .map((lead) => (
+          {filteredLeads.map((lead) => {
+            const assignedTo = normalizeAssignedTo(lead.assignedTo);
+            const currentShowDropdown = showLeadDropdowns[lead._id] || false;
+
+            return (
               <div
                 key={lead._id}
                 className="border rounded-lg p-4 bg-gray-50 shadow-sm"
@@ -1062,36 +1632,45 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   <div><strong>Total Pay:</strong> {formatCurrency(leadTotalPayment(lead))}</div>
                   <div><strong>Source:</strong> {lead.source}</div>
                   <div><strong>Reference:</strong> {lead.reference || "-"}</div>
-                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100" : lead.status === "Policy Issued" ? "bg-green-100" : "bg-red-100"}`}>{lead.status}</span></div>
-                  <div><strong>Assigned:</strong> {normalizeAssignedTo(lead.assignedTo).map(getUserName).join(", ") || "Unassigned"}</div>
+                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100 text-yellow-800" : lead.status === "Policy Issued" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{lead.status}</span></div>
+                  <div><strong>Assigned:</strong> {assignedTo.map(getUserName).join(", ") || "Unassigned"}</div>
                   <div className="pt-2 flex gap-3">
                     <button onClick={() => setSelectedLead(lead)} className="text-indigo-600">
                       <FaEye className="h-5 w-5" />
                     </button>
-                    <button
-                      onClick={() => setShowDropdown(showDropdown === lead._id ? null : lead._id)}
-                      className="text-xs px-3 py-1 border rounded bg-white"
-                    >
-                      Assign
+                    <button onClick={() => openEditModal(lead)} className="text-blue-600">
+                      <FaEdit className="h-5 w-5" />
+                    </button>
+                    <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
+                      <button
+                        onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))}
+                        className="text-xs px-3 py-1 border rounded bg-white"
+                      >
+                        Assign
+                      </button>
+                      {currentShowDropdown && (
+                        <div className="absolute z-50 mt-2 w-full bg-white border rounded p-2 max-h-40 overflow-y-auto">
+                          {users.map((user) => (
+                            <label key={user._id} className="flex items-center gap-2 text-xs block py-1">
+                              <input
+                                type="checkbox"
+                                checked={assignedTo.includes(user._id)}
+                                onChange={() => toggleUserSelection(lead._id, user._id)}
+                              />
+                              {getUserName(user._id)}
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button onClick={() => deleteLead(lead._id)} className="text-red-600">
+                      <FaTrash className="h-5 w-5" />
                     </button>
                   </div>
-                  {showDropdown === lead._id && (
-                    <div className="mt-2 border rounded bg-white p-2">
-                      {users.map((user) => (
-                        <label key={user._id} className="flex items-center gap-2 text-xs">
-                          <input
-                            type="checkbox"
-                            checked={normalizeAssignedTo(lead.assignedTo).includes(user._id)}
-                            onChange={() => toggleUserSelection(lead._id, user._id)}
-                          />
-                          {getUserName(user._id)}
-                        </label>
-                      ))}
-                    </div>
-                  )}
                 </div>
               </div>
-            ))}
+            );
+          })}
         </div>
       </div>
     </motion.div>

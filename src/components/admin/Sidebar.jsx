@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom';
 function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebarOpen, handleLogout, username }) {
   const tabs = [
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
-    { name: 'Leads', icon: FaUsers, key: 'leads' },
+    { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
