@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { FaEye, FaEdit, FaSave, FaTimes, FaTrash, FaFilePdf } from "react-icons/fa";
+import { FaEye, FaEdit, FaSave, FaTimes, FaTrash, FaFilePdf, FaDownload, FaCalendarAlt, FaSearch } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
+import * as XLSX from 'xlsx';
 
 function LeadTable({ filter, setFilter, setSelectedLead }) {
   const lobOptions = [
@@ -35,7 +36,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "New Two Wheeler Insurance",
     "Other Insurance",
   ];
-
   const insurerOptions = [
     "Bajaj Allianz General Insurance Co Ltd",
     "Tata Aig General Insurance Co Ltd",
@@ -68,7 +68,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "Aditya Birla Health Insurance",
     "Bajaj Allianz Life Insurance",
   ];
-
   const agencyOptions = [
     "EKRAMUL HAQUE",
     "ARSHYAN INSURANCE",
@@ -82,9 +81,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "DEEPAK KUMAR",
     "OTHERS",
   ];
-
   const gstOptions = [0, 5, 12, 18];
-
   // === STATE ===
   const [leads, setLeads] = useState([]);
   const [users, setUsers] = useState([]); // Real users from backend
@@ -115,13 +112,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     agency: "",
     customAgency: "",
     policyPdf: null, // File object for new upload
+    imageUrl: "", // Added for image if needed, but using policyPdf.url as image url
   });
-
   const [selectedUsers, setSelectedUsers] = useState([]); // For form
   const [showFormDropdown, setShowFormDropdown] = useState(false);
   const [showLeadDropdowns, setShowLeadDropdowns] = useState({}); // Object for each lead
   const [showCustomAgency, setShowCustomAgency] = useState(false);
-
   // Edit Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editLead, setEditLead] = useState(null);
@@ -152,22 +148,24 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     customAgency: "",
     policyPdf: null, // Current PDF object
     newPolicyPdf: null, // New file object for update
+    imageUrl: "", // Added for image
   });
   const [editSelectedUsers, setEditSelectedUsers] = useState([]);
   const [showEditCustomAgency, setShowEditCustomAgency] = useState(false);
   const [showEditFormDropdown, setShowEditFormDropdown] = useState(false);
-
+  // New Filter States
+  const [searchName, setSearchName] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
   const formDropdownRef = useRef(null);
   const editFormDropdownRef = useRef(null);
   const leadDropdownRefs = useRef({}); // Map of refs for each lead
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
-
   // === FETCH DATA ===
   useEffect(() => {
     fetchLeads();
     fetchAllUsers();
   }, []);
-
   const fetchLeads = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -183,7 +181,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Fetch leads error:", err);
     }
   };
-
   const fetchAllUsers = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -199,7 +196,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Fetch users error:", err);
     }
   };
-
   // === CLICK OUTSIDE FOR DROPDOWNS ===
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -221,14 +217,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
   // === HELPERS ===
   const normalizeAssignedTo = (assignedTo) => {
     if (Array.isArray(assignedTo)) return assignedTo.map(id => typeof id === 'object' ? id._id : id);
     if (!assignedTo) return [];
     return [typeof assignedTo === 'object' ? assignedTo._id : assignedTo];
   };
-
   const clampPercent = (val) => {
     let n = parseFloat(val);
     if (isNaN(n)) return 0;
@@ -236,7 +230,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     if (n > 100) n = 100;
     return Math.round(n);
   };
-
   const formatCurrency = (value) => {
     const v = parseFloat(value) || 0;
     return v.toLocaleString("en-IN", {
@@ -244,41 +237,34 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       maximumFractionDigits: 2,
     });
   };
-
   const computePayoutValue = (netPremium, payoutPercent) => {
     const net = parseFloat(netPremium) || 0;
     const pct = parseFloat(payoutPercent) || 0;
     return (net * pct) / 100;
   };
-
   const computeGSTAmount = (amount, gstPercent) => {
     const a = parseFloat(amount) || 0;
     const g = parseFloat(gstPercent) || 0;
     return (a * g) / 100;
   };
-
   const computeGrossPremium = (netPremium, gstPercent) => {
     const net = parseFloat(netPremium) || 0;
     const gstAmt = computeGSTAmount(net, gstPercent);
     return net + gstAmt;
   };
-
   const computeTotalPayment = (payoutValue, additionalPayout) => {
     const payout = parseFloat(payoutValue) || 0;
     const additional = parseFloat(additionalPayout) || 0;
     return payout + additional;
   };
-
   const getUserName = (userId) => {
     const user = users.find((u) => u._id === userId);
     return user ? user.username || user.name || "Unknown" : "Unknown";
   };
-
   const getLeadPayoutPercent = (lead) => lead.payout || 0;
   const getLeadNetPremium = (lead) => lead.netPremium || 0;
   const getLeadGSTPercent = (lead) => lead.gst || 0;
   const getLeadAdditionalPayout = (lead) => lead.additionalPayout || 0;
-
   const leadPayoutValue = (lead) =>
     computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
   const leadGrossPremium = (lead) =>
@@ -287,9 +273,56 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   const leadTotalPayment = (lead) =>
     lead.totalPayment ||
     computeTotalPayment(leadPayoutValue(lead), getLeadAdditionalPayout(lead));
-
   const formatNumber = (value) => (value ? value.toLocaleString() : "0");
-
+  // === NEW FILTERED LEADS WITH ADDITIONAL FILTERS ===
+  const filteredLeads = leads.filter((lead) => {
+    const matchesStatus = filter === "All" || lead.status === filter;
+    const matchesName = lead.name.toLowerCase().includes(searchName.toLowerCase());
+    const createdAt = new Date(lead.createdAt || lead.policyStartDate || new Date());
+    const matchesFromDate = !fromDate || createdAt >= new Date(fromDate);
+    const matchesToDate = !toDate || createdAt <= new Date(toDate);
+    return matchesStatus && matchesName && matchesFromDate && matchesToDate;
+  });
+  // === DOWNLOAD EXCEL ===
+  const downloadExcel = () => {
+    if (filteredLeads.length === 0) {
+      alert("No leads to download.");
+      return;
+    }
+    const excelData = filteredLeads.map((lead) => ({
+      Name: lead.name,
+      Email: lead.email,
+      Mobile: lead.mobileNo,
+      Source: lead.source,
+      Reference: lead.reference,
+      Status: lead.status,
+      OpenStatus: lead.openStatus,
+      PolicyNumber: lead.policyNumber,
+      LOB: lead.lob,
+      SumInsured: lead.sumInsured,
+      Endorsement: lead.endorsement,
+      PayoutPercent: `${getLeadPayoutPercent(lead)}%`,
+      PayoutValue: formatCurrency(leadPayoutValue(lead)),
+      NetPremium: formatCurrency(getLeadNetPremium(lead)),
+      GSTPercent: `${getLeadGSTPercent(lead)}%`,
+      GrossPremium: formatCurrency(leadGrossPremium(lead)),
+      AdditionalPayout: formatCurrency(getLeadAdditionalPayout(lead)),
+      TotalPayment: formatCurrency(leadTotalPayment(lead)),
+      PayoutStatus: lead.payoutStatus || "Pending",
+      PolicyStartDate: lead.policyStartDate,
+      PolicyExpiryDate: lead.policyExpiryDate,
+      Insurer: lead.insurer,
+      Remarks: lead.remarks,
+      Agency: lead.agency,
+      AssignedTo: normalizeAssignedTo(lead.assignedTo).map(getUserName).join(", "),
+      ImageUrl: lead.policyPdf?.url || lead.imageUrl || "", // Use policyPdf.url as image url hyperlink
+      CreatedAt: lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
+    }));
+    const ws = XLSX.utils.json_to_sheet(excelData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Leads");
+    XLSX.writeFile(wb, `leads_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
   // === EDIT MODAL HELPERS ===
   const openEditModal = (lead) => {
     const assignedTo = normalizeAssignedTo(lead.assignedTo);
@@ -304,12 +337,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       customAgency: lead.agency === "OTHERS" ? lead.agency : "",
       policyPdf: lead.policyPdf || null, // Ensure null if missing
       newPolicyPdf: null, // Reset new file
+      imageUrl: lead.imageUrl || "",
     });
     setEditSelectedUsers(assignedTo);
     setShowEditCustomAgency(lead.agency === "OTHERS");
     setShowEditModal(true);
   };
-
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditLead(null);
@@ -340,23 +373,20 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       customAgency: "",
       policyPdf: null,
       newPolicyPdf: null,
+      imageUrl: "",
     });
     setEditSelectedUsers([]);
     setShowEditCustomAgency(false);
     setShowEditFormDropdown(false);
   };
-
   const saveEdit = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
-
     const finalLOB = editData.lobOption === "Other Insurance" ? editData.lobCustom || "" : editData.lobOption || editData.lob;
     const finalAgency = editData.agency === "OTHERS" ? editData.customAgency || "" : editData.agency || editData.agency;
-
     const payoutValue = computePayoutValue(editData.netPremium, editData.payoutPercent);
     const grossPremium = computeGrossPremium(editData.netPremium, editData.gstPercent);
     const totalPayment = computeTotalPayment(payoutValue, editData.additionalPayout);
-
     const formData = new FormData();
     formData.append('name', editData.name);
     formData.append('email', editData.email);
@@ -382,13 +412,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     formData.append('insurer', editData.insurer);
     formData.append('remarks', editData.remarks);
     formData.append('agency', finalAgency);
+    formData.append('imageUrl', editData.imageUrl);
     editSelectedUsers.forEach(userId => formData.append('assignedTo', userId));
-
     if (editData.newPolicyPdf) {
       console.log('Uploading new PDF in edit:', editData.newPolicyPdf.name); // Debug log
       formData.append('policyPdf', editData.newPolicyPdf);
     }
-
     try {
       const res = await fetch(`${API_BASE}/api/leads/${editLead}`, {
         method: "PUT",
@@ -397,7 +426,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         },
         body: formData,
       });
-
       if (res.ok) {
         const updatedLead = await res.json();
         setLeads((prev) => prev.map((l) => (l._id === editLead ? updatedLead : l)));
@@ -411,7 +439,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error updating lead: " + err.message);
     }
   };
-
   // === ASSIGN LEAD ===
   const assignLead = async (leadId, assignedTo) => {
     const token = localStorage.getItem("token");
@@ -432,7 +459,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Assign error:", err);
     }
   };
-
   const toggleUserSelection = (leadId, userId, isForm = false, isEditForm = false) => {
     if (isForm) {
       setSelectedUsers((prev) =>
@@ -455,11 +481,9 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       assignLead(leadId, updated);
     }
   };
-
   // === DELETE LEAD ===
   const deleteLead = async (leadId) => {
     if (!confirm("Are you sure you want to delete this lead?")) return;
-
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
@@ -478,18 +502,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error deleting lead");
     }
   };
-
   // === ADD LEAD ===
   const handleAddLead = async (e) => {
     e.preventDefault();
-
     const payoutValue = computePayoutValue(newLead.netPremium, newLead.payoutPercent);
     const grossPremium = computeGrossPremium(newLead.netPremium, newLead.gstPercent);
     const totalPayment = computeTotalPayment(payoutValue, newLead.additionalPayout);
-
     const finalLOB = newLead.lobOption === "Other Insurance" ? newLead.lobCustom || "" : newLead.lobOption;
     const finalAgency = newLead.agency === "OTHERS" ? newLead.customAgency || "" : newLead.agency;
-
     const formData = new FormData();
     formData.append('name', newLead.name);
     formData.append('email', newLead.email);
@@ -515,13 +535,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     formData.append('insurer', newLead.insurer);
     formData.append('remarks', newLead.remarks);
     formData.append('agency', finalAgency);
+    formData.append('imageUrl', newLead.imageUrl);
     selectedUsers.forEach(userId => formData.append('assignedTo', userId));
-
     if (newLead.policyPdf) {
       console.log('Uploading PDF:', newLead.policyPdf.name); // Debug log
       formData.append('policyPdf', newLead.policyPdf);
     }
-
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads`, {
@@ -531,7 +550,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         },
         body: formData,
       });
-
       if (res.ok) {
         const savedLead = await res.json();
         setLeads((prev) => [savedLead, ...prev]);
@@ -545,7 +563,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error: " + err.message);
     }
   };
-
   const resetForm = () => {
     setNewLead({
       name: "",
@@ -573,21 +590,19 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       agency: "",
       customAgency: "",
       policyPdf: null,
+      imageUrl: "",
     });
     setSelectedUsers([]);
     setShowLeadForm(false);
     setShowCustomAgency(false);
     setShowFormDropdown(false);
   };
-
   // === EXCEL UPLOAD ===
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     const formData = new FormData();
     formData.append("file", file);
-
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads/upload`, {
@@ -595,7 +610,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       if (res.ok) {
         const result = await res.json();
         fetchLeads();
@@ -608,10 +622,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error: " + err.message);
     }
   };
-
-  // Filtered leads
-  const filteredLeads = leads.filter((lead) => filter === "All" || lead.status === filter);
-
+  // Filtered leads - already defined above
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -626,26 +637,71 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         transition={{ duration: 0.4 }}
         className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100"
       >
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
           <button
             onClick={() => setShowLeadForm(!showLeadForm)}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all"
           >
             {showLeadForm ? "Cancel" : "Add New Lead"}
           </button>
-          <label className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all cursor-pointer">
-            Upload Excel
-            <input
-              type="file"
-              accept=".xlsx, .xls"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
+          <div className="flex gap-2">
+            <label className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2">
+              <FaDownload className="h-4 w-4" />
+              Download Excel
+              <input
+                type="file"
+                accept=".xlsx, .xls"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+            </label>
+            <button
+              onClick={downloadExcel}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all flex items-center gap-2"
+            >
+              <FaDownload className="h-4 w-4" />
+              Export Excel
+            </button>
+          </div>
         </div>
-        <div className="w-full sm:w-auto">
+        {/* New Filter Section */}
+        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-stretch sm:items-center">
+          {/* Search by Name */}
+          <div className="relative flex-1">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search by name..."
+              value={searchName}
+              onChange={(e) => setSearchName(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          {/* Date Filter */}
+          <div className="flex gap-2">
+            <div className="flex items-center gap-1">
+              <FaCalendarAlt className="h-4 w-4 text-gray-400" />
+              <input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+            <span className="text-gray-500 self-center">-</span>
+            <div className="flex items-center gap-1">
+              <FaCalendarAlt className="h-4 w-4 text-gray-400" />
+              <input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+          {/* Status Filter */}
           <select
-            className="w-full sm:w-48 p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 transition-all"
+            className="p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 transition-all min-w-[150px]"
             value={filter || "All"}
             onChange={(e) => setFilter(e.target.value)}
           >
@@ -658,7 +714,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           </select>
         </div>
       </motion.div>
-
       {/* Lead Form */}
       {showLeadForm && (
         <motion.div
@@ -735,7 +790,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Status
@@ -754,7 +808,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 </option>
               </select>
             </div>
-
             {newLead.status === "Open" && (
               <div>
                 <label className="text-sm font-medium text-gray-700">
@@ -773,7 +826,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 </select>
               </div>
             )}
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Policy Number
@@ -787,7 +839,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">LOB</label>
               <select
@@ -820,7 +871,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 />
               )}
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Agency
@@ -852,7 +902,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 />
               )}
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Sum Insured
@@ -869,7 +918,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Endorsement
@@ -883,7 +931,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Net Premium
@@ -900,7 +947,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">GST %</label>
               <select
@@ -920,7 +966,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ))}
               </select>
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Gross Premium
@@ -934,7 +979,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout (%)
@@ -968,7 +1012,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 />
               </div>
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout (calc)
@@ -982,7 +1025,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Additional Payout
@@ -999,7 +1041,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Total Payment
@@ -1019,7 +1060,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Payout Status
@@ -1036,7 +1076,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <option value="Received">Received</option>
               </select>
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Policy Start
@@ -1050,7 +1089,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Policy Expiry
@@ -1064,7 +1102,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Insurer
@@ -1084,7 +1121,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ))}
               </select>
             </div>
-
             {/* Policy Upload */}
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Upload</label>
@@ -1100,7 +1136,19 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <p className="text-sm text-gray-500 mt-1">{newLead.policyPdf.name}</p>
               )}
             </div>
-
+            {/* Image URL - New Field */}
+            <div>
+              <label className="text-sm font-medium text-gray-700">Image URL</label>
+              <input
+                type="url"
+                value={newLead.imageUrl}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, imageUrl: e.target.value })
+                }
+                placeholder="Enter image URL"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+            </div>
             {/* ASSIGN TO - MULTI SELECT FOR FORM */}
             <div className="relative" ref={formDropdownRef}>
               <label className="text-sm font-medium text-gray-700">
@@ -1144,7 +1192,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 </div>
               )}
             </div>
-
             <div className="lg:col-span-3">
               <label className="text-sm font-medium text-gray-700">
                 Remarks
@@ -1158,7 +1205,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 rows="3"
               ></textarea>
             </div>
-
             <div className="lg:col-span-3">
               <button
                 type="submit"
@@ -1170,7 +1216,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           </form>
         </motion.div>
       )}
-
       {/* Edit Modal */}
       {showEditModal && (
         <motion.div
@@ -1467,7 +1512,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   ))}
                 </select>
               </div>
-
               {/* Policy Upload in Edit */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Upload</label>
@@ -1496,7 +1540,17 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   <p className="text-sm text-gray-500 mt-1">{editData.newPolicyPdf.name}</p>
                 )}
               </div>
-
+              {/* Image URL in Edit */}
+              <div>
+                <label className="text-sm font-medium text-gray-700">Image URL</label>
+                <input
+                  type="url"
+                  value={editData.imageUrl}
+                  onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
+                  placeholder="Enter image URL"
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
               <div className="relative" ref={editFormDropdownRef}>
                 <label className="text-sm font-medium text-gray-700">Assign To</label>
                 <button
@@ -1560,9 +1614,17 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           </motion.div>
         </motion.div>
       )}
-
       {/* TABLE */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        {/* Filter Summary */}
+        <div className="p-4 bg-gray-50 border-b">
+          <p className="text-sm text-gray-600">
+            Showing {filteredLeads.length} of {leads.length} leads
+            {searchName && ` | Filtered by name: "${searchName}"`}
+            {(fromDate || toDate) && ` | Date range: ${fromDate || 'Start'} to ${toDate || 'End'}`}
+            {filter !== "All" && ` | Status: ${filter}`}
+          </p>
+        </div>
         <div className="hidden lg:block overflow-x-auto">
           <table className="w-full table-auto min-w-full">
             <thead>
@@ -1584,6 +1646,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <th className="p-3">Pay Status</th>
                 <th className="p-3">Insurer</th>
                 <th className="p-3">Policy PDF</th>
+                <th className="p-3">Image URL</th>
                 <th className="p-3">Source</th>
                 <th className="p-3">Reference</th>
                 <th className="p-3">Status</th>
@@ -1595,7 +1658,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               {filteredLeads.map((lead) => {
                 const assignedTo = normalizeAssignedTo(lead.assignedTo);
                 const currentShowDropdown = showLeadDropdowns[lead._id] || false;
-
                 return (
                   <motion.tr
                     key={lead._id}
@@ -1629,6 +1691,20 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                         >
                           <FaFilePdf className="h-4 w-4" />
                           View PDF
+                        </a>
+                      ) : (
+                        "-"
+                      )}
+                    </td>
+                    <td className="p-3">
+                      {lead.imageUrl ? (
+                        <a
+                          href={lead.imageUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-green-500 hover:underline flex items-center gap-1 text-xs"
+                        >
+                          View Image
                         </a>
                       ) : (
                         "-"
@@ -1706,13 +1782,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             </tbody>
           </table>
         </div>
-
         {/* Mobile Cards */}
         <div className="block lg:hidden p-4 space-y-4">
           {filteredLeads.map((lead) => {
             const assignedTo = normalizeAssignedTo(lead.assignedTo);
             const currentShowDropdown = showLeadDropdowns[lead._id] || false;
-
             return (
               <div
                 key={lead._id}
@@ -1734,6 +1808,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                       <FaFilePdf className="h-4 w-4" /> View
                     </a>
                   ) : "-" }</div>
+                  <div><strong>Image:</strong> {lead.imageUrl ? (
+                    <a href={lead.imageUrl} target="_blank" rel="noopener noreferrer" className="text-green-500 flex items-center gap-1">
+                      View
+                    </a>
+                  ) : "-"}</div>
                   <div><strong>Source:</strong> {lead.source}</div>
                   <div><strong>Reference:</strong> {lead.reference || "-"}</div>
                   <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100 text-yellow-800" : lead.status === "Policy Issued" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{lead.status}</span></div>
@@ -1780,5 +1859,4 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     </motion.div>
   );
 }
-
 export default LeadTable;

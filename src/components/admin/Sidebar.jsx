@@ -16,7 +16,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
     { name: 'Arshyan Portable Equipments Insurance', icon: FaEnvelopeOpenText, key: 'welcome-letter' }, // ← ADDED
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
-    { name: 'Policy Upload', icon: FaFileUpload, key: 'policy-upload' },
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog, key: 'users' },
       { name: 'Attendance', icon: FaClock, key: 'attendance' }
@@ -35,7 +34,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     invoice: '/admin/invoice',
     'vehicle-admin': '/admin/vehicle-admin',
     'salary-slip': '/admin/salary-slip',
-    'policy-upload': '/admin/policy-upload',
     'welcome-letter': '/admin/welcome-letter', // ← ADDED
   };
 

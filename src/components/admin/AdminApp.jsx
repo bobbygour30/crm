@@ -12,7 +12,7 @@ import UserManagement from './UserManagement';
 import AdminAttendance from './AdminAttendance';
 import InvoiceGenerator from './InvoiceGenerator';
 import VehicleAdmin from './VehicleAdmin';
-import PolicyUpload from './PolicyUpload';
+// import PolicyUpload from './PolicyUpload';
 import LeadModal from './LeadModal';
 import { tasks, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
@@ -38,7 +38,7 @@ function AdminApp({ handleLogout }) {
       invoice: '/admin/invoice',
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
-      'policy-upload': '/admin/policy-upload',
+      // 'policy-upload': '/admin/policy-upload',
       'welcome-letter': '/admin/welcome-letter', // ← ADDED
     };
     const pathToTab = (pathname) => {
@@ -72,7 +72,7 @@ function AdminApp({ handleLogout }) {
       invoice: '/admin/invoice',
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
-      'policy-upload': '/admin/policy-upload',
+      // 'policy-upload': '/admin/policy-upload',
       'welcome-letter': '/admin/welcome-letter', // ← ADDED
     }),
     []
@@ -189,7 +189,7 @@ function AdminApp({ handleLogout }) {
       invoice: 'Invoice Generator',
       'vehicle-admin': 'Vehicle Admin',
       'salary-slip': 'Salary Slip Generator',
-      'policy-upload': 'Policy Upload',
+      // 'policy-upload': 'Policy Upload',
       'welcome-letter': 'Arshyan Portable Equipments Insurance', // ← ADDED
     };
     return (
@@ -213,7 +213,7 @@ function AdminApp({ handleLogout }) {
       invoice: 'Generate invoices for your services',
       'vehicle-admin': 'Manage all vehicle administration tasks',
       'salary-slip': 'Generate detailed employee salary slips',
-      'policy-upload': 'Upload and manage policy documents',
+      // 'policy-upload': 'Upload and manage policy documents',
       'welcome-letter': 'Generate professional welcome letters for mobile insurance customers', // ← ADDED
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
@@ -327,7 +327,7 @@ function AdminApp({ handleLogout }) {
                 {activeTab === 'invoice' && <InvoiceGenerator />}
                 {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
                 {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
-                {activeTab === 'policy-upload' && <PolicyUpload />}
+                {/* {activeTab === 'policy-upload' && <PolicyUpload />} */}
                 {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />} {/* ← ADDED */}
               </motion.div>
             </AnimatePresence>
