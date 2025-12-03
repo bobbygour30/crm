@@ -3,12 +3,13 @@ import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
 
 const defaultEarnings = {
-  Basic: 10000,
+  Basic: 0,
   Incentive: 0,
-  Conveyance: 1600,
-  "Allowance HRA": 5000,
-  "Leave Travel": 833.33,
-  "Allowance Medical": 1250,
+  Bonus: 0,
+  "Allowance HRA": 0,
+  "Leave Travel": 0,
+  "Allowance Medical": 0,
+  "Other Allowances": 0,
 };
 
 const defaultDeductions = {
@@ -73,10 +74,11 @@ const SalarySlipGenerator = () => {
     const newEarnings = {
       Basic: monthlyBasic * prorataFactor,
       Incentive: defaultEarnings.Incentive * ratio * prorataFactor,
-      Conveyance: defaultEarnings.Conveyance * ratio * prorataFactor,
+      Bonus: defaultEarnings.Bonus * ratio * prorataFactor,
       "Allowance HRA": defaultEarnings["Allowance HRA"] * ratio * prorataFactor,
       "Leave Travel": defaultEarnings["Leave Travel"] * ratio * prorataFactor,
       "Allowance Medical": defaultEarnings["Allowance Medical"] * ratio * prorataFactor,
+      "Other Allowances": defaultEarnings["Other Allowances"] * ratio * prorataFactor,
     };
     setEarnings(newEarnings);
   }, [employeeForm.basicSalary, payableDays, salaryMonth]);
