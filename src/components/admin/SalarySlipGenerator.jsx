@@ -9,8 +9,6 @@ const defaultEarnings = {
   "Allowance HRA": 5000,
   "Leave Travel": 833.33,
   "Allowance Medical": 1250,
-  Reimbursement: 6316.67,
-  "Special Pay": 0,
 };
 
 const defaultDeductions = {
@@ -79,8 +77,6 @@ const SalarySlipGenerator = () => {
       "Allowance HRA": defaultEarnings["Allowance HRA"] * ratio * prorataFactor,
       "Leave Travel": defaultEarnings["Leave Travel"] * ratio * prorataFactor,
       "Allowance Medical": defaultEarnings["Allowance Medical"] * ratio * prorataFactor,
-      Reimbursement: defaultEarnings.Reimbursement * ratio * prorataFactor,
-      "Special Pay": defaultEarnings["Special Pay"] * ratio * prorataFactor,
     };
     setEarnings(newEarnings);
   }, [employeeForm.basicSalary, payableDays, salaryMonth]);
@@ -298,7 +294,7 @@ const SalarySlipGenerator = () => {
                 <input name="location" value={employeeForm.location} onChange={onEmployeeChange} placeholder="Location" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="division" value={employeeForm.division} onChange={onEmployeeChange} placeholder="Division" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="pan" value={employeeForm.pan} onChange={onEmployeeChange} placeholder="PAN" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
-                <input name="grade" value={employeeForm.grade} onChange={onEmployeeChange} placeholder="Grade" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="grade" value={employeeForm.grade} onChange={onEmployeeChange} placeholder="Bank Name" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="mop" value={employeeForm.mop} onChange={onEmployeeChange} placeholder="MOP" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="dob" value={employeeForm.dob} onChange={onEmployeeChange} placeholder="DOB" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="doj" value={employeeForm.doj} onChange={onEmployeeChange} placeholder="DOJ" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
@@ -513,7 +509,7 @@ const SalarySlipGenerator = () => {
                     <tr>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.designation}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Grade:</td>
+                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Name:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.grade}</td>
                     </tr>
                     <tr>
