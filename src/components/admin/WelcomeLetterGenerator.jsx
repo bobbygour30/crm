@@ -315,8 +315,8 @@ const WelcomeLetterPage2 = ({ form }) => {
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insurerName}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Net Services Charges Including GST {form.membership.gstPercentage}%</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {form.insurancePremium}</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Net Services Charges</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {form.membership.netAmount}</td>
           </tr>
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST){form.membership.gstPercentage}%</td>
