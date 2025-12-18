@@ -109,7 +109,7 @@ const netPremiumData = {
 const pageContainerStyle = {
   background: "#ffffff",
   width: "794px",
-  minHeight: "1123px",
+  height: "1123px",
   margin: "0 auto",
   position: "relative",
   boxSizing: "border-box",
@@ -238,7 +238,7 @@ const WelcomeLetterPage1 = ({ form }) => {
 };
 
 const WelcomeLetterPage2 = ({ form }) => {
-  const periodText = form.selectedPeriod === 1 ? "1 Year" : form.selectedPeriod === 2 ? "2 Years" : "3 Years";
+  const periodText = form.selectedPeriod === "1" ? "1 Year" : form.selectedPeriod === "2" ? "2 Years" : "3 Years";
 
   return (
     <PageTemplate>
@@ -594,13 +594,15 @@ const WelcomeLetterGenerator = () => {
     if (!page1Ref.current) return;
     try {
       const canvas = await html2canvas(page1Ref.current, {
-        scale: 1.5,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        width: 794,
-        windowHeight: 1123,
+         scale: 4,                  // Highest practical value for sharpness
+          dpi: 300,                  // Target print DPI
+          letterRendering: true,     // Sharper text
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          width: 794,
+          height: 1123,
       });
       setPreviewUrl(canvas.toDataURL("image/png"));
     } catch (err) {
@@ -702,13 +704,13 @@ const WelcomeLetterGenerator = () => {
         if (!element) throw new Error(`Page ${i + 1} ref not found`);
 
         const canvas = await html2canvas(element, {
-          scale: 2,
+          scale: 3,
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
           logging: false,
           width: 794,
-          windowHeight: 1123,
+          height: 1123,
         });
 
         const imgData = canvas.toDataURL("image/png");
@@ -1028,19 +1030,19 @@ const WelcomeLetterGenerator = () => {
 
       {/* Hidden render area for html2canvas captures - visible for debug */}
       <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: 20, background: "#f0f0f0" }}>
-        <div ref={page1Ref} style={{ background: "#fff", width: 794, margin: "0 auto", position: "relative" }}>
+        <div ref={page1Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
           <WelcomeLetterPage1 form={form} />
         </div>
 
-        <div ref={page2Ref} style={{ background: "#fff", width: 794, margin: "0 auto", position: "relative" }}>
+        <div ref={page2Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
           <WelcomeLetterPage2 form={form} />
         </div>
 
-        <div ref={page3Ref} style={{ background: "#fff", width: 794, margin: "0 auto", position: "relative" }}>
+        <div ref={page3Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
           <WelcomeLetterPage3 form={form} />
         </div>
 
-        <div ref={page4Ref} style={{ background: "#fff", width: 794, margin: "0 auto", position: "relative" }}>
+        <div ref={page4Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
           <WelcomeLetterPage4 form={form} />
         </div>
       </div>
