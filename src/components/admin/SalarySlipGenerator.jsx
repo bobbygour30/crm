@@ -23,7 +23,7 @@ const SalarySlipGenerator = () => {
   const [employees, setEmployees] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   const [employeeForm, setEmployeeForm] = useState({
-    empCode: "Auto-generating...",
+    empCode: "", // Now manual – no auto text
     name: "",
     department: "Sales & Marketing",
     designation: "Executive-Sales & Marketing",
@@ -52,6 +52,7 @@ const SalarySlipGenerator = () => {
   const [earnings, setEarnings] = useState(defaultEarnings);
   const [deductions, setDeductions] = useState(defaultDeductions);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
+
   // Total days in month
   const getTotalDaysInMonth = () => {
     const [monthName, year] = salaryMonth.split(" ");
@@ -60,9 +61,11 @@ const SalarySlipGenerator = () => {
   };
   const totalDaysInMonth = getTotalDaysInMonth();
   const perDaySalary = employeeForm.basicSalary ? Number(employeeForm.basicSalary) / totalDaysInMonth : 0;
+
   useEffect(() => {
     setPayableDays(totalDaysInMonth);
   }, [salaryMonth]);
+
   useEffect(() => {
     if (!employeeForm.basicSalary || employeeForm.basicSalary <= 0) {
       setEarnings(defaultEarnings);
@@ -82,10 +85,12 @@ const SalarySlipGenerator = () => {
     };
     setEarnings(newEarnings);
   }, [employeeForm.basicSalary, payableDays, salaryMonth]);
+
   useEffect(() => {
     fetchEmployees();
     fetchSalarySlips();
   }, []);
+
   const fetchEmployees = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -101,6 +106,7 @@ const SalarySlipGenerator = () => {
       console.error("fetchEmployees error", e);
     }
   };
+
   const fetchSalarySlips = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -113,22 +119,24 @@ const SalarySlipGenerator = () => {
       console.error("fetchSalarySlips error", e);
     }
   };
+
   const onEmployeeChange = (e) => {
     const { name, value } = e.target;
     setEmployeeForm((s) => ({ ...s, [name]: value }));
   };
+
   const addOrUpdateEmployee = async () => {
     if (!employeeForm.name) return alert("Name is required");
+    if (!employeeForm.empCode) return alert("Employee Code is required");
     if (!employeeForm.basicSalary || employeeForm.basicSalary <= 0) return alert("Basic Salary is required");
+
     const token = localStorage.getItem("token");
     const url = editingIndex !== null
       ? `${API_BASE}/api/salary/employees/${employees[editingIndex]._id}`
       : `${API_BASE}/api/salary/employees`;
     const method = editingIndex !== null ? "PUT" : "POST";
     const payload = { ...employeeForm };
-    if (editingIndex === null) {
-      delete payload.empCode;
-    }
+
     try {
       const res = await fetch(url, {
         method,
@@ -145,7 +153,7 @@ const SalarySlipGenerator = () => {
       await fetchEmployees();
       setEditingIndex(null);
       setEmployeeForm({
-        empCode: "Auto-generating...",
+        empCode: "",
         name: "",
         department: "Sales & Marketing",
         designation: "Executive-Sales & Marketing",
@@ -164,11 +172,13 @@ const SalarySlipGenerator = () => {
       alert(e.message || "Save failed");
     }
   };
+
   const editEmployee = (idx) => {
     const emp = employees[idx];
     setEmployeeForm(emp);
     setEditingIndex(idx);
   };
+
   const deleteEmployee = async (id) => {
     if (!confirm("Delete this employee?")) return;
     const token = localStorage.getItem("token");
@@ -183,9 +193,11 @@ const SalarySlipGenerator = () => {
       alert("Delete failed");
     }
   };
+
   const selectEmployee = (idx) => {
     setEmployeeForm(employees[idx]);
   };
+
   // === EARNINGS / DEDUCTIONS ===
   const setEarningValue = (key, value) => {
     setEarnings((s) => ({ ...s, [key]: parseFloat(value) || 0 }));
@@ -193,11 +205,14 @@ const SalarySlipGenerator = () => {
   const setDeductionValue = (key, value) => {
     setDeductions((s) => ({ ...s, [key]: parseFloat(value) || 0 }));
   };
+
   const grossPay = Object.values(earnings).reduce((a, b) => a + (Number(b) || 0), 0);
   const totalDeductions = Object.values(deductions).reduce((a, b) => a + (Number(b) || 0), 0);
   const netPay = grossPay - totalDeductions;
+
   const fmt = (n) =>
     n != null ? n.toLocaleString("en-IN", { maximumFractionDigits: 2, minimumFractionDigits: 2 }) : "0.00";
+
   const numberToWords = (num) => {
     if (isNaN(num)) return "";
     const n = Math.abs(Number(num.toFixed(2)));
@@ -223,6 +238,7 @@ const SalarySlipGenerator = () => {
     words += " Only.";
     return words;
   };
+
   // === GENERATE & SAVE PDF ===
   const generatePDF = async () => {
     if (!employeeForm.name) return alert("Select or add an employee first");
@@ -264,6 +280,7 @@ const SalarySlipGenerator = () => {
       setIsGeneratingPDF(false);
     }
   };
+
   // === DELETE SLIP ===
   const handleDeleteSlip = async (id) => {
     if (!confirm("Delete this salary slip?")) return;
@@ -279,6 +296,7 @@ const SalarySlipGenerator = () => {
       alert("Delete failed");
     }
   };
+
   return (
     <div className="p-4 sm:p-6 bg-[#f7fafc] min-h-screen box-border">
       <div className="max-w-7xl mx-auto">
@@ -289,7 +307,13 @@ const SalarySlipGenerator = () => {
             <h3 className="font-semibold mb-2 text-[#1a202c]">Employee (Add / Edit)</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
-                <input value={employeeForm.empCode} disabled placeholder="Auto Generated" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm bg-gray-100 text-blue-600 font-bold" />
+                <input
+                  name="empCode"
+                  value={employeeForm.empCode}
+                  onChange={onEmployeeChange}
+                  placeholder="Emp Code (e.g. ARSYN-44715-01)"
+                  className="border border-[#d1d5db] p-2 rounded-md w-full text-sm font-bold text-blue-600"
+                />
                 <input name="name" value={employeeForm.name} onChange={onEmployeeChange} placeholder="Name" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="department" value={employeeForm.department} onChange={onEmployeeChange} placeholder="Department" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="designation" value={employeeForm.designation} onChange={onEmployeeChange} placeholder="Designation" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
@@ -324,7 +348,7 @@ const SalarySlipGenerator = () => {
                     onClick={() => {
                       setEditingIndex(null);
                       setEmployeeForm({
-                        empCode: "Auto-generating...",
+                        empCode: "",
                         name: "",
                         department: "Sales & Marketing",
                         designation: "Executive-Sales & Marketing",
@@ -374,6 +398,7 @@ const SalarySlipGenerator = () => {
               </div>
             </div>
           </div>
+
           {/* Earnings & Deductions */}
           <div className="col-span-1 bg-white p-4 rounded-lg shadow-sm min-w-0">
             <h3 className="font-semibold mb-2 text-[#1a202c]">Earnings & Deductions</h3>
@@ -472,9 +497,11 @@ const SalarySlipGenerator = () => {
               </button>
             </div>
           </div>
+
           {/* Preview / Payslip */}
           <div className="col-span-1 md:col-span-3">
             <div ref={slipRef} className="mx-auto bg-white border-2 border-[#000000] p-4" style={{ width: "900px", boxSizing: "border-box" }}>
+              {/* ... (rest of the payslip preview remains unchanged) ... */}
               <div className="flex justify-between items-start border-b border-[#000000] pb-2">
                 <div className="flex items-center gap-3">
                   <img src={assets?.logo || "/logo.png"} alt="logo" style={{ height: 60 }} onError={(e) => (e.target.src = "/logo.png")} />
@@ -502,6 +529,7 @@ const SalarySlipGenerator = () => {
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.division}</td>
                     </tr>
+                    {/* ... rest of table rows unchanged ... */}
                     <tr>
                       <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td>
                       <td className="border border-[#000000] p-2">{employeeForm.department}</td>
@@ -590,6 +618,7 @@ const SalarySlipGenerator = () => {
             </div>
           </div>
         </div>
+
         <div className="mt-12 border-t pt-6">
           <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
           {salarySlips.length === 0 ? (
@@ -629,4 +658,5 @@ const SalarySlipGenerator = () => {
     </div>
   );
 };
+
 export default SalarySlipGenerator;
