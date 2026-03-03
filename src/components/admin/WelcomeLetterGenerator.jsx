@@ -1,6 +1,7 @@
 // src/components/WelcomeLetterGenerator.jsx
 import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
+import { jsPDF } from "jspdf";
 import assets from "../../assets/assets";
 
 const API_BASE = import.meta.env.VITE_BACKEND_URL || "";
@@ -74,7 +75,7 @@ const insurerOptions = [
   "Bajaj Allianz Life Insurance",
 ];
 
-// UPDATED PREMIUM DATA - EXACTLY FROM YOUR IMAGE (With GST values for display)
+// Premium Data
 const premiumWithGST = {
   "0-20000": { 1: 2000, 2: 4620, 3: 7638 },
   "20001-30000": { 1: 2821, 2: 5313, 3: 7929 },
@@ -88,7 +89,6 @@ const premiumWithGST = {
   "200001-250000": { 1: 14298, 2: 25998, 3: 40298 },
 };
 
-// Net Premium Data (before GST) - Directly from image for accurate split
 const netPremiumData = {
   "0-20000": { 1: 1695, 2: 3915, 3: 6473 },
   "20001-30000": { 1: 2391, 2: 4503, 3: 6719.5 },
@@ -102,10 +102,7 @@ const netPremiumData = {
   "200001-250000": { 1: 12117, 2: 22032, 3: 34151 },
 };
 
-/* -----------------------
-   Page visual components (unchanged)
-   ----------------------- */
-
+// Page Styles (exactly as before)
 const pageContainerStyle = {
   background: "#ffffff",
   width: "794px",
@@ -170,10 +167,7 @@ const PageTemplate = ({ children }) => {
   );
 };
 
-/* -----------------------
-   Page content components (updated for new fields)
-   ----------------------- */
-
+// Page Components (exactly as before)
 const WelcomeLetterPage1 = ({ form }) => {
   const salut = (name) => {
     if (!name) return "Customer";
@@ -424,27 +418,22 @@ const WelcomeLetterPage4 = ({ form }) => {
    ----------------------- */
 
 const WelcomeLetterGenerator = () => {
-  // NEW STATE FOR TOGGLE
   const [showFormFields, setShowFormFields] = useState(true);
 
   const [form, setForm] = useState({
-    // Basic details
     refNo: "",
     customerName: "",
     customerEmail: "",
     customerAddress: "",
     customerPhone: "",
-    // Asset details
     asset: {
       mobileNo: "",
       brandModel: "",
       imei: "",
     },
-    // NEW FIELDS
     valueOfEquipment: "",
     selectedPeriod: "",
     insurancePremium: "",
-    // Membership / Plan details (now includes net/gst/total)
     membership: {
       productDetail: "",
       insuranceRefNo: "",
@@ -454,18 +443,13 @@ const WelcomeLetterGenerator = () => {
       gstPercentage: 18,
       totalAmount: "",
     },
-
-    // DATE FIELDS (manual)
-    purchaseDate: "", // YYYY-MM-DD
-    startDate: "", // YYYY-MM-DD
-    expiryDate: "", // YYYY-MM-DD
-    issueDate: todayISO(), // default to today but editable
+    purchaseDate: "",
+    startDate: "",
+    expiryDate: "",
+    issueDate: todayISO(),
   });
 
   const [autoCalcExpiry, setAutoCalcExpiry] = useState(true);
-  const [dateFormatDisplay, setDateFormatDisplay] = useState("DD-MM-YYYY");
-
-  const [previewUrl, setPreviewUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [pdfUrl, setPdfUrl] = useState("");
   const [success, setSuccess] = useState("");
@@ -496,13 +480,11 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // UPDATED CALCULATE PREMIUM - MATCHES IMAGE EXACTLY (With GST as total, net from table)
   const calculatePremium = (valueOfEquipment, selectedPeriod) => {
     const numValue = parseInt(valueOfEquipment) || 0;
     const period = parseInt(selectedPeriod) || 0;
     let selectedRange = null;
 
-    // Exact ranges from image
     const ranges = [
       { key: "0-20000", min: 0, max: 20000 },
       { key: "20001-30000", min: 20001, max: 30000 },
@@ -550,7 +532,6 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // when startDate changes, auto-calc expiry
   useEffect(() => {
     if (!form.startDate) return;
     if (!autoCalcExpiry) return;
@@ -566,13 +547,9 @@ const WelcomeLetterGenerator = () => {
         const dd = String(nextYear.getDate()).padStart(2, "0");
         setForm((p) => ({ ...p, expiryDate: `${yyyy}-${mm}-${dd}` }));
       }
-    } catch (e) {
-      // ignore
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    } catch (e) {}
   }, [form.startDate, autoCalcExpiry, form.selectedPeriod]);
 
-  // when net or gst changes -> recalc total
   useEffect(() => {
     const net = parseFloat(form.membership.netAmount || 0);
     const gst = parseFloat(form.membership.gstPercentage || 0);
@@ -587,36 +564,8 @@ const WelcomeLetterGenerator = () => {
         serviceCharges: displayTotal,
       },
     }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [form.membership.netAmount, form.membership.gstPercentage]);
 
-  const generatePreview = async () => {
-    if (!page1Ref.current) return;
-    try {
-      const canvas = await html2canvas(page1Ref.current, {
-         scale: 4,                  // Highest practical value for sharpness
-          dpi: 300,                  // Target print DPI
-          letterRendering: true,     // Sharper text
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          width: 794,
-          height: 1123,
-      });
-      setPreviewUrl(canvas.toDataURL("image/png"));
-    } catch (err) {
-      console.error("Preview error:", err);
-    }
-  };
-
-  useEffect(() => {
-    const t = setTimeout(() => generatePreview(), 380);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form]);
-
-  // Fetch saved letters
   const fetchLetters = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -631,7 +580,6 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // Fetch next ref from backend (server authoritative)
   const fetchNextRef = async () => {
     try {
       const token = localStorage.getItem("token");
@@ -650,7 +598,6 @@ const WelcomeLetterGenerator = () => {
   useEffect(() => {
     fetchNextRef();
     fetchLetters();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const validateFormBeforeGenerate = () => {
@@ -669,7 +616,6 @@ const WelcomeLetterGenerator = () => {
       if (!ok) return false;
     }
 
-    // Ensure dates are valid ISO format if present
     if (form.startDate && form.expiryDate) {
       const sd = new Date(form.startDate);
       const ed = new Date(form.expiryDate);
@@ -697,56 +643,87 @@ const WelcomeLetterGenerator = () => {
 
     try {
       const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
-      const pngImages = [];
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [794, 1123]
+      });
 
       for (let i = 0; i < pageRefs.length; i++) {
         const element = pageRefs[i].current;
         if (!element) throw new Error(`Page ${i + 1} ref not found`);
 
+        // Temporarily remove overflow hidden to capture full content
+        const originalOverflow = element.style.overflow;
+        element.style.overflow = 'visible';
+
         const canvas = await html2canvas(element, {
-          scale: 3,
+          scale: 3, // Higher scale for better quality
           useCORS: true,
           allowTaint: true,
           backgroundColor: "#ffffff",
           logging: false,
-          width: 794,
-          height: 1123,
+          windowWidth: 794,
+          windowHeight: 1123,
+          onclone: (clonedDoc) => {
+            const clonedElement = clonedDoc.querySelector(`[data-page="${i}"]`);
+            if (clonedElement) {
+              clonedElement.style.overflow = 'visible';
+            }
+          }
         });
 
-        const imgData = canvas.toDataURL("image/png");
-        pngImages.push(imgData);
+        // Restore overflow
+        element.style.overflow = originalOverflow;
+
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        
+        if (i > 0) {
+          pdf.addPage([794, 1123]);
+        }
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
       }
 
-      const token = localStorage.getItem("token");
-      const res = await fetch(`${API_BASE}/api/letter/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          pngImages,
-          letterData: {
-            ...form,
-            asset: form.asset,
-            membership: form.membership,
+      const pdfBlob = pdf.output('blob');
+      
+      // Convert blob to base64
+      const reader = new FileReader();
+      reader.readAsDataURL(pdfBlob);
+      
+      reader.onloadend = async () => {
+        const base64data = reader.result;
+        const base64String = base64data.split(',')[1];
+        
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${API_BASE}/api/letter/generate`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
           },
-        }),
-      });
+          body: JSON.stringify({
+            pdfBase64: base64String,
+            letterData: {
+              ...form,
+              asset: form.asset,
+              membership: form.membership,
+            },
+          }),
+        });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.msg || "Failed to generate");
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.msg || "Failed to generate");
 
-      setPdfUrl(data.pdfUrl);
-      setSuccess("Welcome Letter Generated & Saved Successfully!");
+        setPdfUrl(data.pdfUrl);
+        setSuccess("Welcome Letter Generated & Saved Successfully!");
 
-      // Show toast with generated refNo (backend authoritative)
-      const generatedRef = data.refNo || form.refNo;
-      show(`Letter ${generatedRef} generated successfully!`);
+        const generatedRef = data.refNo || form.refNo;
+        show(`Letter ${generatedRef} generated successfully!`);
 
-      // refresh list and next ref
-      await fetchLetters();
-      await fetchNextRef();
+        await fetchLetters();
+        await fetchNextRef();
+      };
     } catch (err) {
       console.error("Error generating PDF:", err);
       alert("Error: " + err.message);
@@ -825,15 +802,12 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-6" style={{ fontFamily: "Arial, sans-serif" }}>
       <div className="max-w-7xl mx-auto">
         <h1 className="text-4xl md:text-5xl font-bold text-center text-blue-900 mb-8">Arshyan Portable Equipments Insurance</h1>
 
-        {/* FORM */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8">
-          {/* TOGGLE BUTTON */}
           <div className="flex justify-end mb-4">
             <button
               onClick={() => setShowFormFields((prev) => !prev)}
@@ -843,11 +817,9 @@ const WelcomeLetterGenerator = () => {
             </button>
           </div>
 
-          {/* CONDITIONAL RENDERING OF ALL INPUT FIELDS */}
           {showFormFields && (
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* refNo: auto-generated (disabled) */}
                 <input name="refNo" value={form.refNo} readOnly disabled className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
                 <input name="customerName" value={form.customerName} onChange={onInputChange} placeholder="Customer Name" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="customerEmail" value={form.customerEmail} onChange={onInputChange} placeholder="Customer Email" type="email" className="px-4 py-3 border-2 rounded-xl" />
@@ -858,7 +830,6 @@ const WelcomeLetterGenerator = () => {
                 <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
 
-                {/* NEW FIELDS */}
                 <input name="valueOfEquipment" value={form.valueOfEquipment} onChange={onInputChange} placeholder="Value of Equipment (e.g. 15000)" type="number" className="px-4 py-3 border-2 rounded-xl" />
                 <select name="selectedPeriod" value={form.selectedPeriod} onChange={onInputChange} className="px-4 py-3 border-2 rounded-xl">
                   <option value="">Select Service Tenure</option>
@@ -868,10 +839,7 @@ const WelcomeLetterGenerator = () => {
                 </select>
                 <input name="insurancePremium" value={form.insurancePremium ? `₹ ${form.insurancePremium}` : "Please select value and period"} readOnly className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
 
-                {/* Product detail */}
                 <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
-
-                {/* Insurance ref and insurer select */}
                 <input name="membership.insuranceRefNo" value={form.membership.insuranceRefNo} onChange={onInputChange} placeholder="Insurance Ref No" className="px-4 py-3 border-2 rounded-xl" />
 
                 <select
@@ -882,13 +850,10 @@ const WelcomeLetterGenerator = () => {
                 >
                   <option value="">Select Insurer</option>
                   {insurerOptions.map((ins, idx) => (
-                    <option key={idx} value={ins}>
-                      {ins}
-                    </option>
+                    <option key={idx} value={ins}>{ins}</option>
                   ))}
                 </select>
 
-                {/* Net / GST / Total inputs */}
                 <input
                   name="membership.netAmount"
                   value={form.membership.netAmount}
@@ -905,9 +870,7 @@ const WelcomeLetterGenerator = () => {
                   className="px-4 py-3 border-2 rounded-xl"
                 >
                   {gstOptions.map((g) => (
-                    <option key={g} value={g}>
-                      {g}%
-                    </option>
+                    <option key={g} value={g}>{g}%</option>
                   ))}
                 </select>
 
@@ -919,7 +882,6 @@ const WelcomeLetterGenerator = () => {
                   className="px-4 py-3 border-2 rounded-xl bg-gray-100"
                 />
 
-                {/* keep original serviceCharges field in sync (displayed on pdf) */}
                 <input
                   name="membership.serviceCharges"
                   value={form.membership.serviceCharges}
@@ -929,42 +891,35 @@ const WelcomeLetterGenerator = () => {
                 />
               </div>
 
-              {/* Date inputs */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
                 <div>
                   <label className="block text-sm font-semibold mb-1">Issue Date</label>
                   <input type="date" name="issueDate" value={form.issueDate} onChange={(e) => onDateChange("issueDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-1">Date of Purchase</label>
                   <input type="date" name="purchaseDate" value={form.purchaseDate} onChange={(e) => onDateChange("purchaseDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-1">Coverage Start Date</label>
                   <input type="date" name="startDate" value={form.startDate} onChange={(e) => onDateChange("startDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
                 </div>
-
                 <div>
                   <label className="block text-sm font-semibold mb-1">Coverage Expiry Date</label>
                   <input type="date" name="expiryDate" value={form.expiryDate} onChange={(e) => onDateChange("expiryDate", e.target.value)} className="px-3 py-2 border rounded w-full" />
                 </div>
               </div>
               <button
-            onClick={generatePDF}
-            disabled={loading}
-            className={`mt-6 w-full py-4 text-xl font-bold text-white rounded-2xl transition-all ${loading ? "bg-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-105"}`}
-          >
-            {loading ? "Generating PDF..." : "Generate & Save Welcome Letter"}
-          </button>
+                onClick={generatePDF}
+                disabled={loading}
+                className={`mt-6 w-full py-4 text-xl font-bold text-white rounded-2xl transition-all ${loading ? "bg-gray-500 cursor-not-allowed" : "bg-gradient-to-r from-blue-600 to-indigo-700 hover:scale-105"}`}
+              >
+                {loading ? "Generating PDF..." : "Generate & Save Welcome Letter"}
+              </button>
             </>
           )}
-
-          
         </div>
 
-        {/* Success & download */}
         {success && (
           <div className="text-center bg-green-100 p-6 rounded-2xl mb-6 border-2 border-green-300">
             <h2 className="text-2xl font-bold text-green-800 mb-3">{success}</h2>
@@ -974,7 +929,6 @@ const WelcomeLetterGenerator = () => {
           </div>
         )}
 
-        {/* Saved Letters */}
         <div className="bg-white rounded-3xl shadow-2xl p-8 mb-10">
           <h2 className="text-2xl font-bold text-center mb-6 text-blue-800">Saved Arshyan Portable Equipments Insurance Letters</h2>
 
@@ -1028,26 +982,22 @@ const WelcomeLetterGenerator = () => {
         </div>
       </div>
 
-      {/* Hidden render area for html2canvas captures - visible for debug */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 20, padding: 20, background: "#f0f0f0" }}>
-        <div ref={page1Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
+      {/* Hidden render area for html2canvas captures */}
+      <div style={{ position: 'fixed', left: '-9999px', top: 0 }}>
+        <div ref={page1Ref} data-page="0" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
           <WelcomeLetterPage1 form={form} />
         </div>
-
-        <div ref={page2Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
+        <div ref={page2Ref} data-page="1" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
           <WelcomeLetterPage2 form={form} />
         </div>
-
-        <div ref={page3Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
+        <div ref={page3Ref} data-page="2" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
           <WelcomeLetterPage3 form={form} />
         </div>
-
-        <div ref={page4Ref} style={{ background: "#fff", width: 794, height: 1123, margin: "0 auto", position: "relative", overflow: "hidden" }}>
+        <div ref={page4Ref} data-page="3" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
           <WelcomeLetterPage4 form={form} />
         </div>
       </div>
 
-      {/* Toast (designed) */}
       {toast && (
         <div
           style={{
@@ -1077,8 +1027,6 @@ const WelcomeLetterGenerator = () => {
       )}
     </div>
   );
-
 };
-
 
 export default WelcomeLetterGenerator;
