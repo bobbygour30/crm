@@ -1,533 +1,504 @@
-  import React, { useState, useEffect } from "react";
-  import { FaCar, FaUser, FaEnvelope, FaMobileAlt, FaCity, FaSearch, FaEye, FaCheck, FaTimes } from "react-icons/fa";
+import React, { useState, useEffect } from "react";
+import { FaCar, FaUser, FaEnvelope, FaMobileAlt, FaCity, FaSearch, FaEye, FaCheck, FaTimes, FaTrash, FaDownload } from "react-icons/fa";
 
-  const initialState = {
-    regNumber: "",
-    make: "",
-    model: "",
-    variant: "",
-    fuelType: "Petrol",
-    regYear: "",
-    rtoState: "",
-    policyExpiry: "",
-    prevInsurer: "",
-    prevNCB: "",
-    claimInLastYear: "No",
-    ownerName: "",
-    mobile: "",
-    email: "",
-    city: "",
-    pincode: "",
-    kmsDriven: "",
-    ownershipType: "Individual",
-    notes: "",
+const API_BASE = import.meta.env.VITE_BACKEND_URL || "";
+
+export default function VehicleAdmin({ isAdmin }) {
+  const [requests, setRequests] = useState([]);
+  const [filteredRequests, setFilteredRequests] = useState([]);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [selectedQuote, setSelectedQuote] = useState(null);
+  const [showModal, setShowModal] = useState(false);
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  // Fetch quotes on mount
+  useEffect(() => {
+    fetchQuotes();
+  }, []);
+
+  const fetchQuotes = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/vehicle-quote`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      
+      if (data.success) {
+        setRequests(data.quotes);
+        setFilteredRequests(data.quotes);
+      } else {
+        console.error("Failed to fetch quotes:", data.message);
+      }
+    } catch (err) {
+      console.error("Error fetching quotes:", err);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const mockRequests = [
-    {
-      id: 1,
-      regNumber: "MH12AB1234",
-      make: "Maruti",
-      model: "Swift",
-      variant: "VXi",
-      fuelType: "Petrol",
-      regYear: "2018",
-      rtoState: "MH",
-      policyExpiry: "2024-12-31",
-      prevInsurer: "ICICI",
-      prevNCB: "20%",
-      claimInLastYear: "No",
-      ownerName: "John Doe",
-      mobile: "9876543210",
-      email: "john@example.com",
-      city: "Mumbai",
-      pincode: "400001",
-      kmsDriven: "50000",
-      ownershipType: "Individual",
-      notes: "Urgent request",
-      status: "Pending",
-      submittedAt: "2025-10-01",
-    },
-    {
-      id: 2,
-      regNumber: "DL01CD5678",
-      make: "Hyundai",
-      model: "i20",
-      variant: "Asta",
-      fuelType: "Diesel",
-      regYear: "2020",
-      rtoState: "DL",
-      policyExpiry: "2025-01-15",
-      prevInsurer: "HDFC",
-      prevNCB: "0%",
-      claimInLastYear: "Yes",
-      ownerName: "Jane Smith",
-      mobile: "8765432109",
-      email: "jane@example.com",
-      city: "Delhi",
-      pincode: "110001",
-      kmsDriven: "30000",
-      ownershipType: "Individual",
-      notes: "",
-      status: "Approved",
-      submittedAt: "2025-09-28",
-    },
-  ];
-
-  export default function VehicleAdmin({ isAdmin }) {
-    const [form, setForm] = useState(initialState);
-    const [errors, setErrors] = useState({});
-    const [files, setFiles] = useState({
-      rcCopy: null,
-      drivingLicense: null,
-      oldPolicy: null,
-      idProof: null,
-      vehiclePhotos: [],
-    });
-    const [previews, setPreviews] = useState({
-      rcCopy: null,
-      drivingLicense: null,
-      oldPolicy: null,
-      idProof: null,
-      vehiclePhotos: [],
-    });
-    const [submitting, setSubmitting] = useState(false);
-    const [requests, setRequests] = useState(mockRequests);
-    const [searchTerm, setSearchTerm] = useState("");
-    const [filteredRequests, setFilteredRequests] = useState(mockRequests);
-
-    function handleChange(e) {
-      const { name, value } = e.target;
-      setForm((prev) => ({ ...prev, [name]: value }));
-      setErrors((prev) => ({ ...prev, [name]: "" }));
-    }
-
-    function handleFileChange(e) {
-      const { name, files: fileList } = e.target;
-      if (!fileList) return;
-
-      if (name === "vehiclePhotos") {
-        const arr = Array.from(fileList).slice(0, 3);
-        setFiles((prev) => ({ ...prev, vehiclePhotos: arr }));
-        const p = arr.map((f) => URL.createObjectURL(f));
-        setPreviews((prev) => ({ ...prev, vehiclePhotos: p }));
-      } else {
-        const file = fileList[0];
-        setFiles((prev) => ({ ...prev, [name]: file }));
-        setPreviews((prev) => ({ ...prev, [name]: URL.createObjectURL(file) }));
-      }
-    }
-
-    function validate() {
-      const err = {};
-      if (!form.regNumber || form.regNumber.trim().length < 4)
-        err.regNumber = "Enter valid registration number";
-      if (!form.make) err.make = "Required";
-      if (!form.model) err.model = "Required";
-      if (!form.regYear || isNaN(Number(form.regYear)) || Number(form.regYear) < 1950)
-        err.regYear = "Enter valid year";
-      if (!form.rtoState) err.rtoState = "Required";
-      if (!form.ownerName) err.ownerName = "Required";
-      if (!form.mobile || !/^\d{10}$/.test(form.mobile)) err.mobile = "Enter 10 digit mobile";
-      if (!form.email || !/^\S+@\S+\.\S+$/.test(form.email)) err.email = "Enter valid email";
-      if (!form.city) err.city = "Required";
-      if (!form.pincode || !/^\d{6}$/.test(form.pincode)) err.pincode = "Enter 6 digit pincode";
-      if (!files.rcCopy) err.rcCopy = "RC copy required";
-      if (!files.drivingLicense) err.drivingLicense = "Driving license required";
-      setErrors(err);
-      return Object.keys(err).length === 0;
-    }
-
-    async function handleSubmit(e) {
-      e.preventDefault();
-      if (!validate()) {
-        window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-      setSubmitting(true);
-      try {
-        const newRequest = {
-          ...form,
-          id: Date.now(),
-          status: "Pending",
-          submittedAt: new Date().toISOString().split('T')[0],
-        };
-        setRequests((prev) => [...prev, newRequest]);
-        alert("Vehicle quotation request submitted successfully! (mock)");
-        setForm(initialState);
-        setFiles({ rcCopy: null, drivingLicense: null, oldPolicy: null, idProof: null, vehiclePhotos: [] });
-        setPreviews({ rcCopy: null, drivingLicense: null, oldPolicy: null, idProof: null, vehiclePhotos: [] });
-      } catch (err) {
-        console.error(err);
-        alert("Failed to submit quote.");
-      } finally {
-        setSubmitting(false);
-      }
-    }
-
-    useEffect(() => {
-      const filtered = requests.filter(
+  // Filter requests based on search and status
+  useEffect(() => {
+    let filtered = requests;
+    
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter(
         (req) =>
-          req.regNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.ownerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          req.mobile.includes(searchTerm)
+          req.regNumber?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.ownerName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          req.mobile?.includes(searchTerm) ||
+          req.email?.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      setFilteredRequests(filtered);
-    }, [searchTerm, requests]);
+    }
+    
+    // Apply status filter
+    if (statusFilter !== "All") {
+      filtered = filtered.filter((req) => req.status === statusFilter);
+    }
+    
+    setFilteredRequests(filtered);
+  }, [searchTerm, requests, statusFilter]);
 
-    const handleStatusChange = (id, newStatus) => {
-      setRequests((prev) =>
-        prev.map((req) => (req.id === id ? { ...req, status: newStatus } : req))
+  const handleStatusChange = async (id, newStatus) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/vehicle-quote/${id}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: newStatus }),
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setRequests((prev) =>
+          prev.map((req) => (req.id === id ? { ...req, status: newStatus } : req))
+        );
+        alert(`Quote ${newStatus} successfully!`);
+      } else {
+        alert(data.message || "Failed to update status");
+      }
+    } catch (err) {
+      console.error("Status update error:", err);
+      alert("Failed to update status");
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Are you sure you want to delete this quote? This action cannot be undone.")) return;
+    
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/vehicle-quote/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      
+      const data = await res.json();
+      
+      if (data.success) {
+        setRequests((prev) => prev.filter((req) => req._id !== id));
+        alert("Quote deleted successfully!");
+      } else {
+        alert(data.message || "Failed to delete quote");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Failed to delete quote");
+    }
+  };
+
+  const viewDetails = (quote) => {
+    setSelectedQuote(quote);
+    setShowModal(true);
+  };
+
+  const formatDate = (dateString) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-IN', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const getFileIcon = (url) => {
+    if (!url) return null;
+    if (url.match(/\.(jpg|jpeg|png|gif)$/i)) {
+      return <img src={url} alt="preview" className="h-16 w-16 object-cover rounded" />;
+    } else if (url.match(/\.pdf$/i)) {
+      return (
+        <a href={url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline flex items-center gap-1">
+          <FaDownload /> PDF
+        </a>
       );
-    };
-
+    }
     return (
-      <div className="max-w-7xl mx-auto p-6 bg-gray-50 rounded-lg shadow-lg">
-        {isAdmin ? (
-          <>
-            <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
-              🚗 Vehicle Quote Management
-            </h2>
-            <p className="text-center text-gray-600 mb-8">
-              Manage and review vehicle quotation requests submitted by users.
-            </p>
+      <a href={url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+        View File
+      </a>
+    );
+  };
 
-            <div className="mb-6 flex items-center gap-4">
-              <div className="relative flex-1">
-                <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search by Reg Number, Owner Name, or Mobile..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full rounded-lg border p-3 pl-10 shadow-sm border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-            </div>
+  return (
+    <div className="max-w-7xl mx-auto p-6 bg-gray-50 rounded-lg shadow-lg">
+      <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+        🚗 Vehicle Quote Management
+      </h2>
+      <p className="text-center text-gray-600 mb-8">
+        Manage and review vehicle quotation requests submitted by users.
+      </p>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full bg-white rounded-lg shadow-md">
-                <thead className="bg-indigo-600 text-white">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">ID</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Reg Number</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Make/Model</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Owner</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Contact</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Submitted</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRequests.map((req) => (
-                    <tr key={req.id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm">{req.id}</td>
-                      <td className="px-4 py-3 text-sm">{req.regNumber}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {req.make} {req.model} ({req.variant})
-                      </td>
-                      <td className="px-4 py-3 text-sm">{req.ownerName}</td>
-                      <td className="px-4 py-3 text-sm">
-                        {req.mobile} / {req.email}
-                      </td>
-                      <td className="px-4 py-3 text-sm">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            req.status === "Approved"
-                              ? "bg-green-100 text-green-800"
-                              : req.status === "Rejected"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {req.status}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm">{req.submittedAt}</td>
-                      <td className="px-4 py-3 text-sm flex gap-2">
-                        <button
-                          className="p-2 bg-indigo-100 text-indigo-600 rounded-md hover:bg-indigo-200"
-                          title="View Details"
-                        >
-                          <FaEye />
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(req.id, "Approved")}
-                          className="p-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200"
-                          title="Approve"
-                          disabled={req.status !== "Pending"}
-                        >
-                          <FaCheck />
-                        </button>
-                        <button
-                          onClick={() => handleStatusChange(req.id, "Rejected")}
-                          className="p-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200"
-                          title="Reject"
-                          disabled={req.status !== "Pending"}
-                        >
-                          <FaTimes />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {filteredRequests.length === 0 && (
-                    <tr>
-                      <td colSpan="8" className="px-4 py-3 text-center text-gray-500">
-                        No requests found.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </>
-        ) : (
-          <>
-            <h2 className="text-3xl font-bold text-gray-800 mb-2 text-center">🚗 Vehicle Quotation Request</h2>
-            <p className="text-center text-gray-600 mb-6">
-              Fill vehicle details and upload the required documents. We will contact you with quotes.
-            </p>
+      <div className="mb-6 flex flex-col md:flex-row items-center gap-4">
+        <div className="relative flex-1">
+          <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by Reg Number, Owner Name, Mobile, or Email..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full rounded-lg border p-3 pl-10 shadow-sm border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="px-4 py-3 border rounded-lg shadow-sm border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="All">All Status</option>
+          <option value="Pending">Pending</option>
+          <option value="Approved">Approved</option>
+          <option value="Rejected">Rejected</option>
+        </select>
+      </div>
 
-            {Object.keys(errors).length > 0 && (
-              <div className="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 rounded shadow-sm">
-                Please correct the highlighted fields.
-              </div>
-            )}
-
-            <form onSubmit={handleSubmit} className="space-y-8">
-              <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">Vehicle Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <label className="block text-sm font-medium">Registration Number</label>
-                    <input
-                      name="regNumber"
-                      value={form.regNumber}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 pr-10 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.regNumber ? "border-red-500" : "border-gray-300"
+      {loading ? (
+        <div className="text-center py-8">
+          <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+          <p className="mt-2 text-gray-600">Loading quotes...</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="min-w-full bg-white rounded-lg shadow-md">
+            <thead className="bg-indigo-600 text-white">
+              <tr>
+                <th className="px-4 py-3 text-left text-sm font-semibold">S.No</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Reg Number</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Make/Model</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Owner</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Contact</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Status</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Submitted</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredRequests.map((req, index) => (
+                <tr key={req._id} className="border-b hover:bg-gray-50">
+                  <td className="px-4 py-3 text-sm">{index + 1}</td>
+                  <td className="px-4 py-3 text-sm font-medium text-indigo-600">{req.regNumber}</td>
+                  <td className="px-4 py-3 text-sm">
+                    {req.make} {req.model} ({req.variant || 'N/A'})
+                  </td>
+                  <td className="px-4 py-3 text-sm">{req.ownerName}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <div>{req.mobile}</div>
+                    <div className="text-xs text-gray-500">{req.email}</div>
+                  </td>
+                  <td className="px-4 py-3 text-sm">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        req.status === "Approved"
+                          ? "bg-green-100 text-green-800"
+                          : req.status === "Rejected"
+                          ? "bg-red-100 text-red-800"
+                          : "bg-yellow-100 text-yellow-800"
                       }`}
-                      placeholder="MH12AB1234"
-                    />
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm font-medium">Make</label>
-                    <input
-                      name="make"
-                      value={form.make}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.make ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Maruti, Hyundai..."
-                    />
-                  </div>
-                  <div className="relative">
-                    <label className="block text-sm font-medium">Model</label>
-                    <input
-                      name="model"
-                      value={form.model}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.model ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Swift / i20"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Variant</label>
-                    <input
-                      name="variant"
-                      value={form.variant}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-lg border p-3 shadow-sm border-gray-300"
-                      placeholder="VXi, ZXI, etc"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Fuel Type</label>
-                    <select
-                      name="fuelType"
-                      value={form.fuelType}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-lg border p-3 shadow-sm border-gray-300"
                     >
-                      <option>Petrol</option>
-                      <option>Diesel</option>
-                      <option>CNG</option>
-                      <option>Electric</option>
-                      <option>Hybrid</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Registration Year</label>
-                    <input
-                      name="regYear"
-                      value={form.regYear}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.regYear ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="2018"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">RTO / State</label>
-                    <input
-                      name="rtoState"
-                      value={form.rtoState}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.rtoState ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Mumbai (MH-01) / MH"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium">Ownership Type</label>
-                    <select
-                      name="ownershipType"
-                      value={form.ownershipType}
-                      onChange={handleChange}
-                      className="mt-1 block w-full rounded-lg border p-3 shadow-sm border-gray-300"
-                    >
-                      <option>Individual</option>
-                      <option>Company</option>
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">Owner Details</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="relative flex items-center">
-                    <FaUser className="absolute left-3 text-gray-400" />
-                    <input
-                      name="ownerName"
-                      value={form.ownerName}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 pl-10 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.ownerName ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="Owner Name"
-                    />
-                  </div>
-                  <div className="relative flex items-center">
-                    <FaMobileAlt className="absolute left-3 text-gray-400" />
-                    <input
-                      name="mobile"
-                      value={form.mobile}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 pl-10 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.mobile ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="9876543210"
-                    />
-                  </div>
-                  <div className="relative flex items-center">
-                    <FaEnvelope className="absolute left-3 text-gray-400" />
-                    <input
-                      name="email"
-                      value={form.email}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 pl-10 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.email ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                  <div className="relative flex items-center">
-                    <FaCity className="absolute left-3 text-gray-400" />
-                    <input
-                      name="city"
-                      value={form.city}
-                      onChange={handleChange}
-                      className={`mt-1 block w-full rounded-lg border p-3 pl-10 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 ${
-                        errors.city ? "border-red-500" : "border-gray-300"
-                      }`}
-                      placeholder="City"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
-                <h3 className="text-xl font-semibold text-gray-700 mb-3">Upload Documents</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {["rcCopy", "drivingLicense", "oldPolicy", "idProof"].map((fileKey) => (
-                    <div key={fileKey}>
-                      <label className="block text-sm font-medium capitalize">{fileKey.replace(/([A-Z])/g, " $1")}</label>
-                      <input
-                        type="file"
-                        name={fileKey}
-                        accept="image/*,application/pdf"
-                        onChange={handleFileChange}
-                        className="mt-1 block w-full"
-                      />
-                      {previews[fileKey] && (
-                        <div className="mt-2">
-                          <a href={previews[fileKey]} target="_blank" rel="noreferrer" className="text-indigo-600 text-sm hover:underline">
-                            Preview
-                          </a>
-                        </div>
-                      )}
-                      {errors[fileKey] && <p className="text-red-600 text-sm mt-1">{errors[fileKey]}</p>}
+                      {req.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-sm">{formatDate(req.submittedAt)}</td>
+                  <td className="px-4 py-3 text-sm">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => viewDetails(req)}
+                        className="p-2 bg-indigo-100 text-indigo-600 rounded-md hover:bg-indigo-200"
+                        title="View Details"
+                      >
+                        <FaEye />
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(req._id, "Approved")}
+                        className={`p-2 bg-green-100 text-green-600 rounded-md hover:bg-green-200 ${
+                          req.status !== "Pending" ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                        title="Approve"
+                        disabled={req.status !== "Pending"}
+                      >
+                        <FaCheck />
+                      </button>
+                      <button
+                        onClick={() => handleStatusChange(req._id, "Rejected")}
+                        className={`p-2 bg-red-100 text-red-600 rounded-md hover:bg-red-200 ${
+                          req.status !== "Pending" ? "opacity-50 cursor-not-allowed" : ""
+                        }`}
+                        title="Reject"
+                        disabled={req.status !== "Pending"}
+                      >
+                        <FaTimes />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(req._id)}
+                        className="p-2 bg-gray-100 text-gray-600 rounded-md hover:bg-gray-200"
+                        title="Delete"
+                      >
+                        <FaTrash />
+                      </button>
                     </div>
-                  ))}
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium">Vehicle Photos (up to 3)</label>
-                    <input
-                      type="file"
-                      name="vehiclePhotos"
-                      accept="image/*"
-                      onChange={handleFileChange}
-                      multiple
-                      className="mt-1 block w-full"
-                    />
-                    <div className="flex gap-3 mt-3">
-                      {previews.vehiclePhotos.map((p, i) => (
-                        <img key={i} src={p} alt={`vehicle-${i}`} className="w-24 h-16 object-cover rounded-lg border shadow-sm" />
+                  </td>
+                </tr>
+              ))}
+              {filteredRequests.length === 0 && (
+                <tr>
+                  <td colSpan="8" className="px-4 py-8 text-center text-gray-500">
+                    No vehicle quotes found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {showModal && selectedQuote && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b p-4 flex justify-between items-center">
+              <h3 className="text-xl font-bold">Vehicle Quote Details</h3>
+              <button
+                onClick={() => setShowModal(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <FaTimes size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-6">
+              {/* Status Badge */}
+              <div className="flex justify-between items-center">
+                <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                  selectedQuote.status === "Approved"
+                    ? "bg-green-100 text-green-800"
+                    : selectedQuote.status === "Rejected"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-yellow-100 text-yellow-800"
+                }`}>
+                  {selectedQuote.status}
+                </span>
+                <span className="text-sm text-gray-500">
+                  Submitted: {formatDate(selectedQuote.submittedAt)}
+                </span>
+              </div>
+
+              {/* Vehicle Details */}
+              <div className="border rounded-lg p-4">
+                <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <FaCar className="text-indigo-600" /> Vehicle Details
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Reg Number</p>
+                    <p className="font-medium">{selectedQuote.regNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Make</p>
+                    <p className="font-medium">{selectedQuote.make}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Model</p>
+                    <p className="font-medium">{selectedQuote.model}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Variant</p>
+                    <p className="font-medium">{selectedQuote.variant || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Fuel Type</p>
+                    <p className="font-medium">{selectedQuote.fuelType}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Reg Year</p>
+                    <p className="font-medium">{selectedQuote.regYear}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">RTO/State</p>
+                    <p className="font-medium">{selectedQuote.rtoState}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Ownership</p>
+                    <p className="font-medium">{selectedQuote.ownershipType}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Owner Details */}
+              <div className="border rounded-lg p-4">
+                <h4 className="font-semibold text-lg mb-3 flex items-center gap-2">
+                  <FaUser className="text-indigo-600" /> Owner Details
+                </h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Name</p>
+                    <p className="font-medium">{selectedQuote.ownerName}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Mobile</p>
+                    <p className="font-medium">{selectedQuote.mobile}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Email</p>
+                    <p className="font-medium">{selectedQuote.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">City</p>
+                    <p className="font-medium">{selectedQuote.city}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Pincode</p>
+                    <p className="font-medium">{selectedQuote.pincode}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Info */}
+              {(selectedQuote.notes || selectedQuote.kmsDriven || selectedQuote.policyExpiry) && (
+                <div className="border rounded-lg p-4">
+                  <h4 className="font-semibold text-lg mb-3">Additional Information</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    {selectedQuote.kmsDriven && (
+                      <div>
+                        <p className="text-sm text-gray-500">KMs Driven</p>
+                        <p className="font-medium">{selectedQuote.kmsDriven}</p>
+                      </div>
+                    )}
+                    {selectedQuote.policyExpiry && (
+                      <div>
+                        <p className="text-sm text-gray-500">Policy Expiry</p>
+                        <p className="font-medium">{selectedQuote.policyExpiry}</p>
+                      </div>
+                    )}
+                    {selectedQuote.prevInsurer && (
+                      <div>
+                        <p className="text-sm text-gray-500">Previous Insurer</p>
+                        <p className="font-medium">{selectedQuote.prevInsurer}</p>
+                      </div>
+                    )}
+                    {selectedQuote.prevNCB && (
+                      <div>
+                        <p className="text-sm text-gray-500">Previous NCB</p>
+                        <p className="font-medium">{selectedQuote.prevNCB}</p>
+                      </div>
+                    )}
+                    {selectedQuote.claimInLastYear && (
+                      <div>
+                        <p className="text-sm text-gray-500">Claim in Last Year</p>
+                        <p className="font-medium">{selectedQuote.claimInLastYear}</p>
+                      </div>
+                    )}
+                  </div>
+                  {selectedQuote.notes && (
+                    <div className="mt-3">
+                      <p className="text-sm text-gray-500">Notes</p>
+                      <p className="font-medium bg-gray-50 p-3 rounded">{selectedQuote.notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Documents */}
+              <div className="border rounded-lg p-4">
+                <h4 className="font-semibold text-lg mb-3">Uploaded Documents</h4>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {selectedQuote.rcCopy && (
+                    <div>
+                      <p className="text-sm text-gray-500">RC Copy</p>
+                      {getFileIcon(selectedQuote.rcCopy)}
+                    </div>
+                  )}
+                  {selectedQuote.drivingLicense && (
+                    <div>
+                      <p className="text-sm text-gray-500">Driving License</p>
+                      {getFileIcon(selectedQuote.drivingLicense)}
+                    </div>
+                  )}
+                  {selectedQuote.oldPolicy && (
+                    <div>
+                      <p className="text-sm text-gray-500">Old Policy</p>
+                      {getFileIcon(selectedQuote.oldPolicy)}
+                    </div>
+                  )}
+                  {selectedQuote.idProof && (
+                    <div>
+                      <p className="text-sm text-gray-500">ID Proof</p>
+                      {getFileIcon(selectedQuote.idProof)}
+                    </div>
+                  )}
+                </div>
+                {selectedQuote.vehiclePhotos && selectedQuote.vehiclePhotos.length > 0 && (
+                  <div className="mt-4">
+                    <p className="text-sm text-gray-500 mb-2">Vehicle Photos</p>
+                    <div className="flex gap-3 flex-wrap">
+                      {selectedQuote.vehiclePhotos.map((photo, idx) => (
+                        <a key={idx} href={photo} target="_blank" rel="noreferrer">
+                          <img src={photo} alt={`vehicle-${idx}`} className="h-20 w-20 object-cover rounded-lg border shadow-sm hover:opacity-80 transition" />
+                        </a>
                       ))}
                     </div>
                   </div>
-                </div>
+                )}
               </div>
 
-              <div className="bg-white p-6 rounded-lg shadow-md space-y-4">
-                <textarea
-                  name="notes"
-                  value={form.notes}
-                  onChange={handleChange}
-                  className="w-full rounded-lg border p-3 shadow-sm border-gray-300 focus:ring-indigo-500 focus:border-indigo-500"
-                  placeholder="Additional notes (optional)"
-                  rows={3}
-                />
-                <div className="flex items-center gap-4">
+              {/* Action Buttons in Modal */}
+              {selectedQuote.status === "Pending" && (
+                <div className="flex justify-end gap-3 pt-4 border-t">
                   <button
-                    type="submit"
-                    disabled={submitting}
-                    className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 disabled:opacity-60 shadow-md"
+                    onClick={() => {
+                      handleStatusChange(selectedQuote._id, "Approved");
+                      setShowModal(false);
+                    }}
+                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                   >
-                    {submitting ? "Submitting..." : "Request Quote"}
+                    Approve Quote
                   </button>
                   <button
-                    type="button"
                     onClick={() => {
-                      setForm(initialState);
-                      setFiles({ rcCopy: null, drivingLicense: null, oldPolicy: null, idProof: null, vehiclePhotos: [] });
-                      setPreviews({ rcCopy: null, drivingLicense: null, oldPolicy: null, idProof: null, vehiclePhotos: [] });
+                      handleStatusChange(selectedQuote._id, "Rejected");
+                      setShowModal(false);
                     }}
-                    className="px-6 py-3 border rounded-lg hover:bg-gray-100 shadow-sm"
+                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                   >
-                    Reset
+                    Reject Quote
                   </button>
                 </div>
-              </div>
-            </form>
-          </>
-        )}
-      </div>
-    );
-  }
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

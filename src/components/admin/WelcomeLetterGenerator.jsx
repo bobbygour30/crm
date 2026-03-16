@@ -634,103 +634,125 @@ const WelcomeLetterGenerator = () => {
     return true;
   };
 
-  const generatePDF = async () => {
-    if (!validateFormBeforeGenerate()) return;
 
-    setLoading(true);
-    setSuccess("");
-    setPdfUrl("");
+// Replace it with this corrected version:
+const generatePDF = async () => {
+  if (!validateFormBeforeGenerate()) return;
 
-    try {
-      const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [794, 1123]
+  setLoading(true);
+  setSuccess("");
+  setPdfUrl("");
+
+  try {
+    const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'px',
+      format: [794, 1123]
+    });
+
+    for (let i = 0; i < pageRefs.length; i++) {
+      const element = pageRefs[i].current;
+      if (!element) throw new Error(`Page ${i + 1} ref not found`);
+
+      // Store original styles
+      const originalOverflow = element.style.overflow;
+      const originalPosition = element.style.position;
+      const originalLeft = element.style.left;
+      const originalTop = element.style.top;
+
+      // Make element visible for capture
+      element.style.overflow = 'visible';
+      element.style.position = 'relative';
+      element.style.left = '0';
+      element.style.top = '0';
+
+      const canvas = await html2canvas(element, {
+        scale: 3,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: 794,
+        windowHeight: 1123,
       });
 
-      for (let i = 0; i < pageRefs.length; i++) {
-        const element = pageRefs[i].current;
-        if (!element) throw new Error(`Page ${i + 1} ref not found`);
+      // Restore original styles
+      element.style.overflow = originalOverflow;
+      element.style.position = originalPosition;
+      element.style.left = originalLeft;
+      element.style.top = originalTop;
 
-        // Temporarily remove overflow hidden to capture full content
-        const originalOverflow = element.style.overflow;
-        element.style.overflow = 'visible';
-
-        const canvas = await html2canvas(element, {
-          scale: 3, // Higher scale for better quality
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          windowWidth: 794,
-          windowHeight: 1123,
-          onclone: (clonedDoc) => {
-            const clonedElement = clonedDoc.querySelector(`[data-page="${i}"]`);
-            if (clonedElement) {
-              clonedElement.style.overflow = 'visible';
-            }
-          }
-        });
-
-        // Restore overflow
-        element.style.overflow = originalOverflow;
-
-        const imgData = canvas.toDataURL("image/png", 1.0);
-        
-        if (i > 0) {
-          pdf.addPage([794, 1123]);
-        }
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
+      const imgData = canvas.toDataURL("image/png", 1.0);
+      
+      if (i > 0) {
+        pdf.addPage([794, 1123]);
       }
-
-      const pdfBlob = pdf.output('blob');
       
-      // Convert blob to base64
-      const reader = new FileReader();
-      reader.readAsDataURL(pdfBlob);
-      
-      reader.onloadend = async () => {
-        const base64data = reader.result;
-        const base64String = base64data.split(',')[1];
-        
-        const token = localStorage.getItem("token");
-        const res = await fetch(`${API_BASE}/api/letter/generate`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            pdfBase64: base64String,
-            letterData: {
-              ...form,
-              asset: form.asset,
-              membership: form.membership,
-            },
-          }),
-        });
-
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.msg || "Failed to generate");
-
-        setPdfUrl(data.pdfUrl);
-        setSuccess("Welcome Letter Generated & Saved Successfully!");
-
-        const generatedRef = data.refNo || form.refNo;
-        show(`Letter ${generatedRef} generated successfully!`);
-
-        await fetchLetters();
-        await fetchNextRef();
-      };
-    } catch (err) {
-      console.error("Error generating PDF:", err);
-      alert("Error: " + err.message);
-    } finally {
-      setLoading(false);
+      pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
     }
-  };
+
+    // Get PDF as base64 string (without the data:application/pdf;base64 prefix)
+    const pdfBase64 = pdf.output('datauristring').split(',')[1];
+    
+    const token = localStorage.getItem("token");
+    const res = await fetch(`${API_BASE}/api/letter/generate`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        pdfBase64: pdfBase64,
+        letterData: {
+          refNo: form.refNo,
+          customerName: form.customerName,
+          customerEmail: form.customerEmail,
+          customerAddress: form.customerAddress,
+          customerPhone: form.customerPhone,
+          valueOfEquipment: form.valueOfEquipment,
+          selectedPeriod: form.selectedPeriod,
+          insurancePremium: form.insurancePremium,
+          asset: {
+            mobileNo: form.asset.mobileNo,
+            brandModel: form.asset.brandModel,
+            imei: form.asset.imei,
+          },
+          membership: {
+            productDetail: form.membership.productDetail,
+            insuranceRefNo: form.membership.insuranceRefNo,
+            insurerName: form.membership.insurerName,
+            serviceCharges: form.membership.serviceCharges,
+            netAmount: form.membership.netAmount,
+            gstPercentage: form.membership.gstPercentage,
+            totalAmount: form.membership.totalAmount,
+          },
+          purchaseDate: form.purchaseDate,
+          startDate: form.startDate,
+          expiryDate: form.expiryDate,
+          issueDate: form.issueDate,
+        },
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.msg || "Failed to generate");
+
+    setPdfUrl(data.pdfUrl);
+    setSuccess("Welcome Letter Generated & Saved Successfully!");
+
+    const generatedRef = data.refNo || form.refNo;
+    show(`Letter ${generatedRef} generated successfully!`);
+
+    await fetchLetters();
+    await fetchNextRef();
+  } catch (err) {
+    console.error("Error generating PDF:", err);
+    alert("Error: " + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this welcome letter? This action cannot be undone.")) return;
