@@ -82,9 +82,10 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "OTHERS",
   ];
   const gstOptions = [0, 5, 12, 18];
+  
   // === STATE ===
   const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]); // Real users from backend
+  const [users, setUsers] = useState([]);
   const [showLeadForm, setShowLeadForm] = useState(false);
   const [newLead, setNewLead] = useState({
     name: "",
@@ -111,13 +112,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     assignedTo: [],
     agency: "",
     customAgency: "",
-    policyPdf: null, // File object for new upload
-    imageUrl: "", // Added for image if needed, but using policyPdf.url as image url
+    policyPdf: null,
+    imageUrl: "",
   });
-  const [selectedUsers, setSelectedUsers] = useState([]); // For form
+  const [selectedUsers, setSelectedUsers] = useState([]);
   const [showFormDropdown, setShowFormDropdown] = useState(false);
-  const [showLeadDropdowns, setShowLeadDropdowns] = useState({}); // Object for each lead
+  const [showLeadDropdowns, setShowLeadDropdowns] = useState({});
   const [showCustomAgency, setShowCustomAgency] = useState(false);
+  
   // Edit Modal State
   const [showEditModal, setShowEditModal] = useState(false);
   const [editLead, setEditLead] = useState(null);
@@ -146,26 +148,34 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     assignedTo: [],
     agency: "",
     customAgency: "",
-    policyPdf: null, // Current PDF object
-    newPolicyPdf: null, // New file object for update
-    imageUrl: "", // Added for image
+    policyPdf: null,
+    newPolicyPdf: null,
+    imageUrl: "",
   });
   const [editSelectedUsers, setEditSelectedUsers] = useState([]);
   const [showEditCustomAgency, setShowEditCustomAgency] = useState(false);
   const [showEditFormDropdown, setShowEditFormDropdown] = useState(false);
-  // New Filter States
+  
+  // Filter States
   const [searchName, setSearchName] = useState('');
+  const [searchPolicyNumber, setSearchPolicyNumber] = useState('');
+  const [searchMobile, setSearchMobile] = useState('');
+  const [searchEmail, setSearchEmail] = useState('');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
+  
   const formDropdownRef = useRef(null);
   const editFormDropdownRef = useRef(null);
-  const leadDropdownRefs = useRef({}); // Map of refs for each lead
+  const leadDropdownRefs = useRef({});
+  const fileInputRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
+
   // === FETCH DATA ===
   useEffect(() => {
     fetchLeads();
     fetchAllUsers();
   }, []);
+
   const fetchLeads = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -181,6 +191,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Fetch leads error:", err);
     }
   };
+
   const fetchAllUsers = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -196,18 +207,16 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Fetch users error:", err);
     }
   };
+
   // === CLICK OUTSIDE FOR DROPDOWNS ===
   useEffect(() => {
     const handleClickOutside = (event) => {
-      // Form dropdown
       if (formDropdownRef.current && !formDropdownRef.current.contains(event.target)) {
         setShowFormDropdown(false);
       }
-      // Edit form dropdown
       if (editFormDropdownRef.current && !editFormDropdownRef.current.contains(event.target)) {
         setShowEditFormDropdown(false);
       }
-      // Lead dropdowns
       Object.entries(leadDropdownRefs.current).forEach(([leadId, ref]) => {
         if (ref && !ref.contains(event.target)) {
           setShowLeadDropdowns(prev => ({ ...prev, [leadId]: false }));
@@ -217,12 +226,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
   // === HELPERS ===
   const normalizeAssignedTo = (assignedTo) => {
     if (Array.isArray(assignedTo)) return assignedTo.map(id => typeof id === 'object' ? id._id : id);
     if (!assignedTo) return [];
     return [typeof assignedTo === 'object' ? assignedTo._id : assignedTo];
   };
+
   const clampPercent = (val) => {
     let n = parseFloat(val);
     if (isNaN(n)) return 0;
@@ -230,6 +241,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     if (n > 100) n = 100;
     return Math.round(n);
   };
+
   const formatCurrency = (value) => {
     const v = parseFloat(value) || 0;
     return v.toLocaleString("en-IN", {
@@ -237,34 +249,41 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       maximumFractionDigits: 2,
     });
   };
+
   const computePayoutValue = (netPremium, payoutPercent) => {
     const net = parseFloat(netPremium) || 0;
     const pct = parseFloat(payoutPercent) || 0;
     return (net * pct) / 100;
   };
+
   const computeGSTAmount = (amount, gstPercent) => {
     const a = parseFloat(amount) || 0;
     const g = parseFloat(gstPercent) || 0;
     return (a * g) / 100;
   };
+
   const computeGrossPremium = (netPremium, gstPercent) => {
     const net = parseFloat(netPremium) || 0;
     const gstAmt = computeGSTAmount(net, gstPercent);
     return net + gstAmt;
   };
+
   const computeTotalPayment = (payoutValue, additionalPayout) => {
     const payout = parseFloat(payoutValue) || 0;
     const additional = parseFloat(additionalPayout) || 0;
     return payout + additional;
   };
+
   const getUserName = (userId) => {
     const user = users.find((u) => u._id === userId);
     return user ? user.username || user.name || "Unknown" : "Unknown";
   };
+
   const getLeadPayoutPercent = (lead) => lead.payout || 0;
   const getLeadNetPremium = (lead) => lead.netPremium || 0;
   const getLeadGSTPercent = (lead) => lead.gst || 0;
   const getLeadAdditionalPayout = (lead) => lead.additionalPayout || 0;
+  
   const leadPayoutValue = (lead) =>
     computePayoutValue(getLeadNetPremium(lead), getLeadPayoutPercent(lead));
   const leadGrossPremium = (lead) =>
@@ -274,55 +293,112 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     lead.totalPayment ||
     computeTotalPayment(leadPayoutValue(lead), getLeadAdditionalPayout(lead));
   const formatNumber = (value) => (value ? value.toLocaleString() : "0");
-  // === NEW FILTERED LEADS WITH ADDITIONAL FILTERS ===
+
+  // === FIXED FILTERED LEADS WITH ALL FILTER OPTIONS ===
   const filteredLeads = leads.filter((lead) => {
     const matchesStatus = filter === "All" || lead.status === filter;
-    const matchesName = lead.name.toLowerCase().includes(searchName.toLowerCase());
-    const createdAt = new Date(lead.createdAt || lead.policyStartDate || new Date());
-    const matchesFromDate = !fromDate || createdAt >= new Date(fromDate);
-    const matchesToDate = !toDate || createdAt <= new Date(toDate);
-    return matchesStatus && matchesName && matchesFromDate && matchesToDate;
+    const matchesName = lead.name?.toLowerCase().includes(searchName.toLowerCase()) || !searchName;
+    const matchesPolicyNumber = lead.policyNumber?.toLowerCase().includes(searchPolicyNumber.toLowerCase()) || !searchPolicyNumber;
+    const matchesMobile = lead.mobileNo?.includes(searchMobile) || !searchMobile;
+    const matchesEmail = lead.email?.toLowerCase().includes(searchEmail.toLowerCase()) || !searchEmail;
+    
+    // Fix date filter - use createdAt field
+    let matchesFromDate = true;
+    let matchesToDate = true;
+    
+    if (fromDate) {
+      const leadDate = new Date(lead.createdAt);
+      const filterDate = new Date(fromDate);
+      filterDate.setHours(0, 0, 0, 0);
+      matchesFromDate = leadDate >= filterDate;
+    }
+    
+    if (toDate) {
+      const leadDate = new Date(lead.createdAt);
+      const filterDate = new Date(toDate);
+      filterDate.setHours(23, 59, 59, 999);
+      matchesToDate = leadDate <= filterDate;
+    }
+    
+    return matchesStatus && matchesName && matchesPolicyNumber && matchesMobile && matchesEmail && matchesFromDate && matchesToDate;
   });
-  // === DOWNLOAD EXCEL ===
+
+  // === FIXED DOWNLOAD EXCEL ===
   const downloadExcel = () => {
     if (filteredLeads.length === 0) {
       alert("No leads to download.");
       return;
     }
     const excelData = filteredLeads.map((lead) => ({
-      Name: lead.name,
-      Email: lead.email,
-      Mobile: lead.mobileNo,
-      Source: lead.source,
-      Reference: lead.reference,
-      Status: lead.status,
-      OpenStatus: lead.openStatus,
-      PolicyNumber: lead.policyNumber,
-      LOB: lead.lob,
-      SumInsured: lead.sumInsured,
-      Endorsement: lead.endorsement,
-      PayoutPercent: `${getLeadPayoutPercent(lead)}%`,
-      PayoutValue: formatCurrency(leadPayoutValue(lead)),
-      NetPremium: formatCurrency(getLeadNetPremium(lead)),
-      GSTPercent: `${getLeadGSTPercent(lead)}%`,
-      GrossPremium: formatCurrency(leadGrossPremium(lead)),
-      AdditionalPayout: formatCurrency(getLeadAdditionalPayout(lead)),
-      TotalPayment: formatCurrency(leadTotalPayment(lead)),
-      PayoutStatus: lead.payoutStatus || "Pending",
-      PolicyStartDate: lead.policyStartDate,
-      PolicyExpiryDate: lead.policyExpiryDate,
-      Insurer: lead.insurer,
-      Remarks: lead.remarks,
-      Agency: lead.agency,
-      AssignedTo: normalizeAssignedTo(lead.assignedTo).map(getUserName).join(", "),
-      ImageUrl: lead.policyPdf?.url || lead.imageUrl || "", // Use policyPdf.url as image url hyperlink
-      CreatedAt: lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
+      "Name": lead.name,
+      "Email": lead.email,
+      "Mobile": lead.mobileNo,
+      "Policy Number": lead.policyNumber,
+      "LOB": lead.lob,
+      "Agency": lead.agency,
+      "Source": lead.source,
+      "Reference": lead.reference,
+      "Status": lead.status,
+      "Open Status": lead.openStatus,
+      "Sum Insured": lead.sumInsured,
+      "Endorsement": lead.endorsement,
+      "Net Premium": getLeadNetPremium(lead),
+      "GST %": getLeadGSTPercent(lead),
+      "Gross Premium": leadGrossPremium(lead),
+      "Payout %": getLeadPayoutPercent(lead),
+      "Payout Value": leadPayoutValue(lead),
+      "Additional Payout": getLeadAdditionalPayout(lead),
+      "Total Payment": leadTotalPayment(lead),
+      "Payout Status": lead.payoutStatus || "Pending",
+      "Policy Start Date": lead.policyStartDate,
+      "Policy Expiry Date": lead.policyExpiryDate,
+      "Insurer": lead.insurer,
+      "Remarks": lead.remarks,
+      "Assigned To": normalizeAssignedTo(lead.assignedTo).map(getUserName).join(", "),
+      "Created At": lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
     }));
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Leads");
     XLSX.writeFile(wb, `leads_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
+
+  // === FIXED EXCEL UPLOAD ===
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    // Check if it's an Excel file
+    if (!file.name.match(/\.(xlsx|xls)$/)) {
+      alert("Please upload an Excel file (.xlsx or .xls)");
+      e.target.value = '';
+      return;
+    }
+    
+    const formData = new FormData();
+    formData.append("file", file);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/upload`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      });
+      if (res.ok) {
+        const result = await res.json();
+        fetchLeads();
+        alert(`${result.count || result.leads?.length || 0} leads uploaded successfully!`);
+      } else {
+        const error = await res.json();
+        alert("Upload failed: " + (error.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Error: " + err.message);
+    } finally {
+      e.target.value = ''; // Reset file input
+    }
+  };
+
   // === EDIT MODAL HELPERS ===
   const openEditModal = (lead) => {
     const assignedTo = normalizeAssignedTo(lead.assignedTo);
@@ -335,14 +411,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       lobCustom: lead.lob === "Other Insurance" ? lead.lob : "",
       agency: lead.agency === "OTHERS" ? "OTHERS" : lead.agency,
       customAgency: lead.agency === "OTHERS" ? lead.agency : "",
-      policyPdf: lead.policyPdf || null, // Ensure null if missing
-      newPolicyPdf: null, // Reset new file
+      policyPdf: lead.policyPdf || null,
+      newPolicyPdf: null,
       imageUrl: lead.imageUrl || "",
     });
     setEditSelectedUsers(assignedTo);
     setShowEditCustomAgency(lead.agency === "OTHERS");
     setShowEditModal(true);
   };
+
   const closeEditModal = () => {
     setShowEditModal(false);
     setEditLead(null);
@@ -379,6 +456,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     setShowEditCustomAgency(false);
     setShowEditFormDropdown(false);
   };
+
   const saveEdit = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -415,15 +493,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     formData.append('imageUrl', editData.imageUrl);
     editSelectedUsers.forEach(userId => formData.append('assignedTo', userId));
     if (editData.newPolicyPdf) {
-      console.log('Uploading new PDF in edit:', editData.newPolicyPdf.name); // Debug log
       formData.append('policyPdf', editData.newPolicyPdf);
     }
     try {
       const res = await fetch(`${API_BASE}/api/leads/${editLead}`, {
         method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (res.ok) {
@@ -439,6 +514,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error updating lead: " + err.message);
     }
   };
+
   // === ASSIGN LEAD ===
   const assignLead = async (leadId, assignedTo) => {
     const token = localStorage.getItem("token");
@@ -459,18 +535,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       console.error("Assign error:", err);
     }
   };
+
   const toggleUserSelection = (leadId, userId, isForm = false, isEditForm = false) => {
     if (isForm) {
       setSelectedUsers((prev) =>
-        prev.includes(userId)
-          ? prev.filter((id) => id !== userId)
-          : [...prev, userId]
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
       );
     } else if (isEditForm) {
       setEditSelectedUsers((prev) =>
-        prev.includes(userId)
-          ? prev.filter((id) => id !== userId)
-          : [...prev, userId]
+        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
       );
     } else {
       const lead = leads.find((l) => l._id === leadId);
@@ -481,6 +554,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       assignLead(leadId, updated);
     }
   };
+
   // === DELETE LEAD ===
   const deleteLead = async (leadId) => {
     if (!confirm("Are you sure you want to delete this lead?")) return;
@@ -488,9 +562,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     try {
       const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
         method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         setLeads((prev) => prev.filter((l) => l._id !== leadId));
@@ -502,6 +574,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error deleting lead");
     }
   };
+
   // === ADD LEAD ===
   const handleAddLead = async (e) => {
     e.preventDefault();
@@ -538,16 +611,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     formData.append('imageUrl', newLead.imageUrl);
     selectedUsers.forEach(userId => formData.append('assignedTo', userId));
     if (newLead.policyPdf) {
-      console.log('Uploading PDF:', newLead.policyPdf.name); // Debug log
       formData.append('policyPdf', newLead.policyPdf);
     }
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (res.ok) {
@@ -563,6 +633,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       alert("Error: " + err.message);
     }
   };
+
   const resetForm = () => {
     setNewLead({
       name: "",
@@ -597,32 +668,18 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     setShowCustomAgency(false);
     setShowFormDropdown(false);
   };
-  // === EXCEL UPLOAD ===
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const formData = new FormData();
-    formData.append("file", file);
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/upload`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (res.ok) {
-        const result = await res.json();
-        fetchLeads();
-        alert(`${result.count} leads uploaded successfully!`);
-      } else {
-        const error = await res.json();
-        alert("Upload failed: " + (error.error || "Unknown error"));
-      }
-    } catch (err) {
-      alert("Error: " + err.message);
-    }
+
+  // Clear all filters
+  const clearFilters = () => {
+    setSearchName('');
+    setSearchPolicyNumber('');
+    setSearchMobile('');
+    setSearchEmail('');
+    setFromDate('');
+    setToDate('');
+    setFilter('All');
   };
-  // Filtered leads - already defined above
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -647,12 +704,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           <div className="flex gap-2">
             <label className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all cursor-pointer flex items-center gap-2">
               <FaDownload className="h-4 w-4" />
-              Download Excel
+              Upload Excel
               <input
                 type="file"
                 accept=".xlsx, .xls"
                 onChange={handleFileUpload}
                 className="hidden"
+                ref={fileInputRef}
               />
             </label>
             <button
@@ -664,10 +722,17 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             </button>
           </div>
         </div>
-        {/* New Filter Section */}
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto items-stretch sm:items-center">
+      </motion.div>
+
+      {/* Filter Section - Enhanced with all filters */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-4 rounded-2xl shadow-lg border border-gray-100 mb-4"
+      >
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
           {/* Search by Name */}
-          <div className="relative flex-1">
+          <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <input
               type="text"
@@ -677,44 +742,89 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
             />
           </div>
-          {/* Date Filter */}
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1">
-              <FaCalendarAlt className="h-4 w-4 text-gray-400" />
-              <input
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <span className="text-gray-500 self-center">-</span>
-            <div className="flex items-center gap-1">
-              <FaCalendarAlt className="h-4 w-4 text-gray-400" />
-              <input
-                type="date"
-                value={toDate}
-                onChange={(e) => setToDate(e.target.value)}
-                className="p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
+          
+          {/* Search by Policy Number */}
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search by policy number..."
+              value={searchPolicyNumber}
+              onChange={(e) => setSearchPolicyNumber(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
           </div>
+          
+          {/* Search by Mobile */}
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search by mobile number..."
+              value={searchMobile}
+              onChange={(e) => setSearchMobile(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+          
+          {/* Search by Email */}
+          <div className="relative">
+            <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+            <input
+              type="text"
+              placeholder="Search by email..."
+              value={searchEmail}
+              onChange={(e) => setSearchEmail(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Date Filter */}
+          <div className="flex gap-2 items-center">
+            <FaCalendarAlt className="h-5 w-5 text-gray-400" />
+            <input
+              type="date"
+              value={fromDate}
+              onChange={(e) => setFromDate(e.target.value)}
+              className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="From Date"
+            />
+            <span className="text-gray-500">to</span>
+            <input
+              type="date"
+              value={toDate}
+              onChange={(e) => setToDate(e.target.value)}
+              className="flex-1 p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              placeholder="To Date"
+            />
+          </div>
+          
           {/* Status Filter */}
           <select
-            className="p-3 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 transition-all min-w-[150px]"
+            className="p-2 border border-gray-300 rounded-lg text-sm bg-gray-50 focus:ring-2 focus:ring-indigo-500 transition-all"
             value={filter || "All"}
             onChange={(e) => setFilter(e.target.value)}
           >
-            <option value="All">All Leads</option>
+            <option value="All">All Status</option>
             <option value="Open">Open</option>
             <option value="Policy Issued">Policy Issued</option>
-            <option value="Closed Without Issuance">
-              Closed Without Issuance
-            </option>
+            <option value="Closed Without Issuance">Closed Without Issuance</option>
           </select>
+          
+          {/* Clear Filters Button */}
+          <button
+            onClick={clearFilters}
+            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-all flex items-center justify-center gap-2"
+          >
+            <FaTimes className="h-4 w-4" />
+            Clear All Filters
+          </button>
         </div>
       </motion.div>
-      {/* Lead Form */}
+
+      {/* Lead Form (same as before, unchanged) */}
       {showLeadForm && (
         <motion.div
           initial={{ opacity: 0, height: 0 }}
@@ -722,32 +832,24 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           transition={{ duration: 0.3 }}
           className="bg-white p-6 rounded-2xl shadow-lg border border-gray-100 mb-6 overflow-hidden"
         >
-          <form
-            onSubmit={handleAddLead}
-            className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
-          >
+          <form onSubmit={handleAddLead} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* ... (keep all form fields same as before) ... */}
             <div>
               <label className="text-sm font-medium text-gray-700">Name</label>
               <input
                 type="text"
                 value={newLead.name}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, name: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, name: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 required
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Mobile No
-              </label>
+              <label className="text-sm font-medium text-gray-700">Mobile No</label>
               <input
                 type="text"
                 value={newLead.mobileNo}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, mobileNo: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, mobileNo: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 required
               />
@@ -757,67 +859,47 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="email"
                 value={newLead.email}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, email: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Source
-              </label>
+              <label className="text-sm font-medium text-gray-700">Source</label>
               <input
                 type="text"
                 value={newLead.source}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, source: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Reference
-              </label>
+              <label className="text-sm font-medium text-gray-700">Reference</label>
               <input
                 type="text"
                 value={newLead.reference}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, reference: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, reference: e.target.value })}
                 placeholder="e.g. Facebook, Agent Name, Walk-in"
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Status
-              </label>
+              <label className="text-sm font-medium text-gray-700">Status</label>
               <select
                 value={newLead.status}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, status: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="Open">Open</option>
                 <option value="Policy Issued">Policy Issued</option>
-                <option value="Closed Without Issuance">
-                  Closed Without Issuance
-                </option>
+                <option value="Closed Without Issuance">Closed Without Issuance</option>
               </select>
             </div>
             {newLead.status === "Open" && (
               <div>
-                <label className="text-sm font-medium text-gray-700">
-                  Next Step
-                </label>
+                <label className="text-sm font-medium text-gray-700">Next Step</label>
                 <select
                   value={newLead.openStatus}
-                  onChange={(e) =>
-                    setNewLead({ ...newLead, openStatus: e.target.value })
-                  }
+                  onChange={(e) => setNewLead({ ...newLead, openStatus: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
                   <option value="">Select</option>
@@ -827,15 +909,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               </div>
             )}
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Policy Number
-              </label>
+              <label className="text-sm font-medium text-gray-700">Policy Number</label>
               <input
                 type="text"
                 value={newLead.policyNumber}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, policyNumber: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, policyNumber: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -843,20 +921,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">LOB</label>
               <select
                 value={newLead.lobOption}
-                onChange={(e) =>
-                  setNewLead({
-                    ...newLead,
-                    lobOption: e.target.value,
-                    lobCustom: "",
-                  })
-                }
+                onChange={(e) => setNewLead({ ...newLead, lobOption: e.target.value, lobCustom: "" })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">-- Select LOB --</option>
                 {lobOptions.map((lob) => (
-                  <option key={lob} value={lob}>
-                    {lob}
-                  </option>
+                  <option key={lob} value={lob}>{lob}</option>
                 ))}
               </select>
               {newLead.lobOption === "Other Insurance" && (
@@ -864,17 +934,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   type="text"
                   placeholder="Enter Custom LOB"
                   value={newLead.lobCustom}
-                  onChange={(e) =>
-                    setNewLead({ ...newLead, lobCustom: e.target.value })
-                  }
+                  onChange={(e) => setNewLead({ ...newLead, lobCustom: e.target.value })}
                   className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
                 />
               )}
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Agency
-              </label>
+              <label className="text-sm font-medium text-gray-700">Agency</label>
               <select
                 value={newLead.agency}
                 onChange={(e) => {
@@ -885,9 +951,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               >
                 <option value="">-- Select Agency --</option>
                 {agencyOptions.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
+                  <option key={a} value={a}>{a}</option>
                 ))}
               </select>
               {showCustomAgency && (
@@ -895,55 +959,35 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   type="text"
                   placeholder="Enter Custom Agency"
                   value={newLead.customAgency}
-                  onChange={(e) =>
-                    setNewLead({ ...newLead, customAgency: e.target.value })
-                  }
+                  onChange={(e) => setNewLead({ ...newLead, customAgency: e.target.value })}
                   className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
                 />
               )}
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Sum Insured
-              </label>
+              <label className="text-sm font-medium text-gray-700">Sum Insured</label>
               <input
                 type="number"
                 value={newLead.sumInsured}
-                onChange={(e) =>
-                  setNewLead({
-                    ...newLead,
-                    sumInsured: parseFloat(e.target.value) || 0,
-                  })
-                }
+                onChange={(e) => setNewLead({ ...newLead, sumInsured: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Endorsement
-              </label>
+              <label className="text-sm font-medium text-gray-700">Endorsement</label>
               <input
                 type="text"
                 value={newLead.endorsement}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, endorsement: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, endorsement: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Net Premium
-              </label>
+              <label className="text-sm font-medium text-gray-700">Net Premium</label>
               <input
                 type="number"
                 value={newLead.netPremium}
-                onChange={(e) =>
-                  setNewLead({
-                    ...newLead,
-                    netPremium: parseFloat(e.target.value) || 0,
-                  })
-                }
+                onChange={(e) => setNewLead({ ...newLead, netPremium: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -951,50 +995,32 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">GST %</label>
               <select
                 value={newLead.gstPercent}
-                onChange={(e) =>
-                  setNewLead({
-                    ...newLead,
-                    gstPercent: parseFloat(e.target.value) || 0,
-                  })
-                }
+                onChange={(e) => setNewLead({ ...newLead, gstPercent: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 {gstOptions.map((g) => (
-                  <option key={g} value={g}>
-                    {g}%
-                  </option>
+                  <option key={g} value={g}>{g}%</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Gross Premium
-              </label>
+              <label className="text-sm font-medium text-gray-700">Gross Premium</label>
               <input
                 type="text"
                 readOnly
-                value={formatCurrency(
-                  computeGrossPremium(newLead.netPremium, newLead.gstPercent)
-                )}
+                value={formatCurrency(computeGrossPremium(newLead.netPremium, newLead.gstPercent))}
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Payout (%)
-              </label>
+              <label className="text-sm font-medium text-gray-700">Payout (%)</label>
               <div className="flex items-center gap-3">
                 <input
                   type="range"
                   min={0}
                   max={100}
                   value={newLead.payoutPercent}
-                  onChange={(e) =>
-                    setNewLead({
-                      ...newLead,
-                      payoutPercent: clampPercent(e.target.value),
-                    })
-                  }
+                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
                   className="w-full"
                 />
                 <input
@@ -1002,73 +1028,43 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   min={0}
                   max={100}
                   value={newLead.payoutPercent}
-                  onChange={(e) =>
-                    setNewLead({
-                      ...newLead,
-                      payoutPercent: clampPercent(e.target.value),
-                    })
-                  }
+                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
                   className="w-20 p-2 border border-gray-300 rounded-lg"
                 />
               </div>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Payout (calc)
-              </label>
+              <label className="text-sm font-medium text-gray-700">Payout (calc)</label>
               <input
                 type="text"
                 readOnly
-                value={formatCurrency(
-                  computePayoutValue(newLead.netPremium, newLead.payoutPercent)
-                )}
+                value={formatCurrency(computePayoutValue(newLead.netPremium, newLead.payoutPercent))}
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Additional Payout
-              </label>
+              <label className="text-sm font-medium text-gray-700">Additional Payout</label>
               <input
                 type="number"
                 value={newLead.additionalPayout}
-                onChange={(e) =>
-                  setNewLead({
-                    ...newLead,
-                    additionalPayout: parseFloat(e.target.value) || 0,
-                  })
-                }
+                onChange={(e) => setNewLead({ ...newLead, additionalPayout: parseFloat(e.target.value) || 0 })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Total Payment
-              </label>
+              <label className="text-sm font-medium text-gray-700">Total Payment</label>
               <input
                 type="text"
                 readOnly
-                value={formatCurrency(
-                  computeTotalPayment(
-                    computePayoutValue(
-                      newLead.netPremium,
-                      newLead.payoutPercent
-                    ),
-                    newLead.additionalPayout
-                  )
-                )}
+                value={formatCurrency(computeTotalPayment(computePayoutValue(newLead.netPremium, newLead.payoutPercent), newLead.additionalPayout))}
                 className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Payout Status
-              </label>
+              <label className="text-sm font-medium text-gray-700">Payout Status</label>
               <select
                 value={newLead.payoutStatus}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, payoutStatus: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, payoutStatus: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">-- Select --</option>
@@ -1077,93 +1073,66 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               </select>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Policy Start
-              </label>
+              <label className="text-sm font-medium text-gray-700">Policy Start</label>
               <input
                 type="date"
                 value={newLead.policyStartDate}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, policyStartDate: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, policyStartDate: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Policy Expiry
-              </label>
+              <label className="text-sm font-medium text-gray-700">Policy Expiry</label>
               <input
                 type="date"
                 value={newLead.policyExpiryDate}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, policyExpiryDate: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, policyExpiryDate: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">
-                Insurer
-              </label>
+              <label className="text-sm font-medium text-gray-700">Insurer</label>
               <select
                 value={newLead.insurer}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, insurer: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, insurer: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">-- Select --</option>
                 {insurerOptions.map((ins) => (
-                  <option key={ins} value={ins}>
-                    {ins}
-                  </option>
+                  <option key={ins} value={ins}>{ins}</option>
                 ))}
               </select>
             </div>
-            {/* Policy Upload */}
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Upload</label>
               <input
                 type="file"
                 accept=".pdf"
-                onChange={(e) =>
-                  setNewLead({ ...newLead, policyPdf: e.target.files[0] })
-                }
+                onChange={(e) => setNewLead({ ...newLead, policyPdf: e.target.files[0] })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
               {newLead.policyPdf && (
                 <p className="text-sm text-gray-500 mt-1">{newLead.policyPdf.name}</p>
               )}
             </div>
-            {/* Image URL - New Field */}
             <div>
               <label className="text-sm font-medium text-gray-700">Image URL</label>
               <input
                 type="url"
                 value={newLead.imageUrl}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, imageUrl: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, imageUrl: e.target.value })}
                 placeholder="Enter image URL"
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
-            {/* ASSIGN TO - MULTI SELECT FOR FORM */}
             <div className="relative" ref={formDropdownRef}>
-              <label className="text-sm font-medium text-gray-700">
-                Assign To
-              </label>
+              <label className="text-sm font-medium text-gray-700">Assign To</label>
               <button
                 type="button"
-                onClick={() =>
-                  setShowFormDropdown(!showFormDropdown)
-                }
+                onClick={() => setShowFormDropdown(!showFormDropdown)}
                 className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
               >
-                {selectedUsers.length > 0
-                  ? selectedUsers.map(getUserName).join(", ")
-                  : "-- Select Users --"}
+                {selectedUsers.length > 0 ? selectedUsers.map(getUserName).join(", ") : "-- Select Users --"}
               </button>
               {showFormDropdown && (
                 <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -1171,21 +1140,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     <div className="p-3 text-gray-500">Loading users...</div>
                   ) : (
                     users.map((user) => (
-                      <label
-                        key={user._id}
-                        className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
-                      >
+                      <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
                         <input
                           type="checkbox"
                           checked={selectedUsers.includes(user._id)}
-                          onChange={() =>
-                            toggleUserSelection(null, user._id, true)
-                          }
+                          onChange={() => toggleUserSelection(null, user._id, true)}
                           className="mr-3"
                         />
-                        <span className="text-sm">
-                          {user.username || user.name || user.email}
-                        </span>
+                        <span className="text-sm">{user.username || user.name || user.email}</span>
                       </label>
                     ))
                   )}
@@ -1193,30 +1155,24 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               )}
             </div>
             <div className="lg:col-span-3">
-              <label className="text-sm font-medium text-gray-700">
-                Remarks
-              </label>
+              <label className="text-sm font-medium text-gray-700">Remarks</label>
               <textarea
                 value={newLead.remarks}
-                onChange={(e) =>
-                  setNewLead({ ...newLead, remarks: e.target.value })
-                }
+                onChange={(e) => setNewLead({ ...newLead, remarks: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 rows="3"
               ></textarea>
             </div>
             <div className="lg:col-span-3">
-              <button
-                type="submit"
-                className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium"
-              >
+              <button type="submit" className="px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all font-medium">
                 Submit
               </button>
             </div>
           </form>
         </motion.div>
       )}
-      {/* Edit Modal */}
+
+      {/* Edit Modal (same as before, unchanged) */}
       {showEditModal && (
         <motion.div
           initial={{ opacity: 0 }}
@@ -1230,6 +1186,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           >
             <h2 className="text-xl font-bold mb-4">Edit Lead</h2>
             <form className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {/* ... (keep all edit form fields same as before) ... */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Name</label>
                 <input
@@ -1316,20 +1273,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <label className="text-sm font-medium text-gray-700">LOB</label>
                 <select
                   value={editData.lobOption}
-                  onChange={(e) => {
-                    setEditData({
-                      ...editData,
-                      lobOption: e.target.value,
-                      lobCustom: "",
-                    });
-                  }}
+                  onChange={(e) => setEditData({ ...editData, lobOption: e.target.value, lobCustom: "" })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
                   <option value="">-- Select LOB --</option>
                   {lobOptions.map((lob) => (
-                    <option key={lob} value={lob}>
-                      {lob}
-                    </option>
+                    <option key={lob} value={lob}>{lob}</option>
                   ))}
                 </select>
                 {editData.lobOption === "Other Insurance" && (
@@ -1354,9 +1303,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 >
                   <option value="">-- Select Agency --</option>
                   {agencyOptions.map((a) => (
-                    <option key={a} value={a}>
-                      {a}
-                    </option>
+                    <option key={a} value={a}>{a}</option>
                   ))}
                 </select>
                 {showEditCustomAgency && (
@@ -1404,9 +1351,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
                   {gstOptions.map((g) => (
-                    <option key={g} value={g}>
-                      {g}%
-                    </option>
+                    <option key={g} value={g}>{g}%</option>
                   ))}
                 </select>
               </div>
@@ -1506,23 +1451,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 >
                   <option value="">-- Select --</option>
                   {insurerOptions.map((ins) => (
-                    <option key={ins} value={ins}>
-                      {ins}
-                    </option>
+                    <option key={ins} value={ins}>{ins}</option>
                   ))}
                 </select>
               </div>
-              {/* Policy Upload in Edit */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Upload</label>
                 {editData.policyPdf?.url && (
                   <div className="mb-2">
-                    <a
-                      href={editData.policyPdf.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-500 text-sm flex items-center gap-1"
-                    >
+                    <a href={editData.policyPdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-sm flex items-center gap-1">
                       <FaFilePdf className="h-4 w-4" />
                       Current PDF
                     </a>
@@ -1531,16 +1468,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <input
                   type="file"
                   accept=".pdf"
-                  onChange={(e) =>
-                    setEditData({ ...editData, newPolicyPdf: e.target.files[0] })
-                  }
+                  onChange={(e) => setEditData({ ...editData, newPolicyPdf: e.target.files[0] })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
                 {editData.newPolicyPdf && (
                   <p className="text-sm text-gray-500 mt-1">{editData.newPolicyPdf.name}</p>
                 )}
               </div>
-              {/* Image URL in Edit */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Image URL</label>
                 <input
@@ -1558,9 +1492,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   onClick={() => setShowEditFormDropdown(!showEditFormDropdown)}
                   className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
                 >
-                  {editSelectedUsers.length > 0
-                    ? editSelectedUsers.map(getUserName).join(", ")
-                    : "-- Select Users --"}
+                  {editSelectedUsers.length > 0 ? editSelectedUsers.map(getUserName).join(", ") : "-- Select Users --"}
                 </button>
                 {showEditFormDropdown && (
                   <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
@@ -1568,10 +1500,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                       <div className="p-3 text-gray-500">Loading users...</div>
                     ) : (
                       users.map((user) => (
-                        <label
-                          key={user._id}
-                          className="flex items-center p-2 hover:bg-gray-100 cursor-pointer"
-                        >
+                        <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
                           <input
                             type="checkbox"
                             checked={editSelectedUsers.includes(user._id)}
@@ -1595,18 +1524,10 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ></textarea>
               </div>
               <div className="lg:col-span-3 flex gap-4 justify-end">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-                >
+                <button type="button" onClick={closeEditModal} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
                   Cancel
                 </button>
-                <button
-                  type="button"
-                  onClick={saveEdit}
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
-                >
+                <button type="button" onClick={saveEdit} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
                   Update Lead
                 </button>
               </div>
@@ -1614,17 +1535,23 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           </motion.div>
         </motion.div>
       )}
+
       {/* TABLE */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         {/* Filter Summary */}
         <div className="p-4 bg-gray-50 border-b">
           <p className="text-sm text-gray-600">
             Showing {filteredLeads.length} of {leads.length} leads
-            {searchName && ` | Filtered by name: "${searchName}"`}
-            {(fromDate || toDate) && ` | Date range: ${fromDate || 'Start'} to ${toDate || 'End'}`}
+            {searchName && ` | Name: "${searchName}"`}
+            {searchPolicyNumber && ` | Policy: "${searchPolicyNumber}"`}
+            {searchMobile && ` | Mobile: "${searchMobile}"`}
+            {searchEmail && ` | Email: "${searchEmail}"`}
+            {(fromDate || toDate) && ` | Date: ${fromDate || 'Start'} to ${toDate || 'End'}`}
             {filter !== "All" && ` | Status: ${filter}`}
           </p>
         </div>
+        
+        {/* Desktop Table */}
         <div className="hidden lg:block overflow-x-auto">
           <table className="w-full table-auto min-w-full">
             <thead>
@@ -1652,19 +1579,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <th className="p-3">Status</th>
                 <th className="p-3">Assigned To</th>
                 <th className="p-3">Actions</th>
-              </tr>
+               </tr>
             </thead>
             <tbody>
               {filteredLeads.map((lead) => {
                 const assignedTo = normalizeAssignedTo(lead.assignedTo);
                 const currentShowDropdown = showLeadDropdowns[lead._id] || false;
                 return (
-                  <motion.tr
-                    key={lead._id}
-                    className="border-b hover:bg-gray-50 text-xs"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
+                  <motion.tr key={lead._id} className="border-b hover:bg-gray-50 text-xs" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
                     <td className="p-3">{lead.name}</td>
                     <td className="p-3">{lead.email}</td>
                     <td className="p-3">{lead.mobileNo}</td>
@@ -1683,80 +1605,45 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     <td className="p-3">{lead.insurer}</td>
                     <td className="p-3">
                       {lead.policyPdf?.url ? (
-                        <a
-                          href={lead.policyPdf.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-500 hover:underline flex items-center gap-1 text-xs"
-                        >
-                          <FaFilePdf className="h-4 w-4" />
-                          View PDF
+                        <a href={lead.policyPdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline flex items-center gap-1 text-xs">
+                          <FaFilePdf className="h-4 w-4" /> View PDF
                         </a>
-                      ) : (
-                        "-"
-                      )}
+                      ) : "-"}
                     </td>
                     <td className="p-3">
                       {lead.imageUrl ? (
-                        <a
-                          href={lead.imageUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-green-500 hover:underline flex items-center gap-1 text-xs"
-                        >
+                        <a href={lead.imageUrl} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:underline flex items-center gap-1 text-xs">
                           View Image
                         </a>
-                      ) : (
-                        "-"
-                      )}
+                      ) : "-"}
                     </td>
                     <td className="p-3">{lead.source}</td>
                     <td className="p-3">{lead.reference || "-"}</td>
                     <td className="p-3">
-                      <span
-                        className={`px-2 py-1 rounded-full text-xs ${
-                          lead.status === "Open"
-                            ? "bg-yellow-100 text-yellow-800"
-                            : lead.status === "Policy Issued"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
+                      <span className={`px-2 py-1 rounded-full text-xs ${
+                        lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
+                        lead.status === "Policy Issued" ? "bg-green-100 text-green-800" :
+                        "bg-red-100 text-red-800"
+                      }`}>
                         {lead.status}
                       </span>
                     </td>
-                    <td className="p-3">
-                      {assignedTo
-                        .map(getUserName)
-                        .join(", ") || "Unassigned"}
-                    </td>
+                    <td className="p-3">{assignedTo.map(getUserName).join(", ") || "Unassigned"}</td>
                     <td className="p-3 flex gap-2 items-center">
-                      <button
-                        onClick={() => setSelectedLead(lead)}
-                        className="text-indigo-600 hover:text-indigo-800"
-                      >
+                      <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
                         <FaEye className="h-5 w-5" />
                       </button>
-                      <button
-                        onClick={() => openEditModal(lead)}
-                        className="text-blue-600 hover:text-blue-800"
-                      >
+                      <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
                         <FaEdit className="h-5 w-5" />
                       </button>
                       <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
-                        <button
-                          onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))}
-                          className="px-3 py-1 text-xs border rounded bg-gray-50 hover:bg-gray-100"
-                        >
+                        <button onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))} className="px-3 py-1 text-xs border rounded bg-gray-50 hover:bg-gray-100">
                           Assign
                         </button>
                         {currentShowDropdown && (
                           <div className="absolute z-50 mt-1 w-56 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
                             {users.map((user) => (
-                              <label
-                                key={user._id}
-                                className="flex items-center p-2 hover:bg-gray-100 cursor-pointer text-xs"
-                              >
+                              <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer text-xs">
                                 <input
                                   type="checkbox"
                                   checked={assignedTo.includes(user._id)}
@@ -1769,10 +1656,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                           </div>
                         )}
                       </div>
-                      <button
-                        onClick={() => deleteLead(lead._id)}
-                        className="text-red-600 hover:text-red-800"
-                      >
+                      <button onClick={() => deleteLead(lead._id)} className="text-red-600 hover:text-red-800">
                         <FaTrash className="h-5 w-5" />
                       </button>
                     </td>
@@ -1780,18 +1664,16 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 );
               })}
             </tbody>
-          </table>
+           </table>
         </div>
+        
         {/* Mobile Cards */}
         <div className="block lg:hidden p-4 space-y-4">
           {filteredLeads.map((lead) => {
             const assignedTo = normalizeAssignedTo(lead.assignedTo);
             const currentShowDropdown = showLeadDropdowns[lead._id] || false;
             return (
-              <div
-                key={lead._id}
-                className="border rounded-lg p-4 bg-gray-50 shadow-sm"
-              >
+              <div key={lead._id} className="border rounded-lg p-4 bg-gray-50 shadow-sm">
                 <div className="space-y-2 text-sm">
                   <div><strong>Name:</strong> {lead.name}</div>
                   <div><strong>Mobile:</strong> {lead.mobileNo}</div>
@@ -1807,7 +1689,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     <a href={lead.policyPdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 flex items-center gap-1">
                       <FaFilePdf className="h-4 w-4" /> View
                     </a>
-                  ) : "-" }</div>
+                  ) : "-"}</div>
                   <div><strong>Image:</strong> {lead.imageUrl ? (
                     <a href={lead.imageUrl} target="_blank" rel="noopener noreferrer" className="text-green-500 flex items-center gap-1">
                       View
@@ -1815,7 +1697,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   ) : "-"}</div>
                   <div><strong>Source:</strong> {lead.source}</div>
                   <div><strong>Reference:</strong> {lead.reference || "-"}</div>
-                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${lead.status === "Open" ? "bg-yellow-100 text-yellow-800" : lead.status === "Policy Issued" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>{lead.status}</span></div>
+                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${
+                    lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
+                    lead.status === "Policy Issued" ? "bg-green-100 text-green-800" :
+                    "bg-red-100 text-red-800"
+                  }`}>{lead.status}</span></div>
                   <div><strong>Assigned:</strong> {assignedTo.map(getUserName).join(", ") || "Unassigned"}</div>
                   <div className="pt-2 flex gap-3">
                     <button onClick={() => setSelectedLead(lead)} className="text-indigo-600">
@@ -1825,10 +1711,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                       <FaEdit className="h-5 w-5" />
                     </button>
                     <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
-                      <button
-                        onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))}
-                        className="text-xs px-3 py-1 border rounded bg-white"
-                      >
+                      <button onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))} className="text-xs px-3 py-1 border rounded bg-white">
                         Assign
                       </button>
                       {currentShowDropdown && (
