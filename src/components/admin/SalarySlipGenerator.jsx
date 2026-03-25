@@ -2,12 +2,11 @@ import React, { useState, useRef, useEffect } from "react";
 import html2canvas from "html2canvas";
 import assets from "../../assets/assets";
 
+// Default earnings structure
 const defaultEarnings = {
   Basic: 0,
   Incentive: 0,
-  Bonus: 0,
   "Allowance HRA": 0,
-  "Leave Travel": 0,
   "Allowance Medical": 0,
   "Other Allowances": 0,
 };
@@ -22,8 +21,10 @@ const SalarySlipGenerator = () => {
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
   const [employees, setEmployees] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
+  
+  // Employee form with all earning fields
   const [employeeForm, setEmployeeForm] = useState({
-    empCode: "", // Now manual – no auto text
+    empCode: "",
     name: "",
     department: "Sales & Marketing",
     designation: "Executive-Sales & Marketing",
@@ -33,12 +34,21 @@ const SalarySlipGenerator = () => {
     location: "Delhi Office",
     division: "Delhi Region",
     pan: "",
-    grade: "",
+    bankName: "",
     dob: "",
     uan: "",
     basicSalary: "",
+    // Earning components as percentage or fixed values
+    incentivePercent: 5, // 5% of basic
+    hraPercent: 40, // 40% of basic
+    medicalAllowance: 1500, // Fixed amount
+    otherAllowancesPercent: 10, // 10% of basic
+    pfPercent: 12, // 12% of basic
+    tdsAmount: 0, // Fixed TDS amount
   });
+  
   const [salarySlips, setSalarySlips] = useState([]);
+  
   const getCurrentMonthYear = () => {
     const now = new Date();
     const months = [
@@ -47,6 +57,7 @@ const SalarySlipGenerator = () => {
     ];
     return `${months[now.getMonth()]} ${now.getFullYear()}`;
   };
+  
   const [salaryMonth, setSalaryMonth] = useState(getCurrentMonthYear());
   const [payableDays, setPayableDays] = useState(31);
   const [earnings, setEarnings] = useState(defaultEarnings);
@@ -59,32 +70,55 @@ const SalarySlipGenerator = () => {
     const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
     return new Date(Number(year), monthIndex + 1, 0).getDate();
   };
+  
   const totalDaysInMonth = getTotalDaysInMonth();
   const perDaySalary = employeeForm.basicSalary ? Number(employeeForm.basicSalary) / totalDaysInMonth : 0;
 
+  // Auto-set payable days to total days in current month
   useEffect(() => {
     setPayableDays(totalDaysInMonth);
   }, [salaryMonth]);
 
+  // Calculate earnings based on employee settings and payable days
   useEffect(() => {
     if (!employeeForm.basicSalary || employeeForm.basicSalary <= 0) {
-      setEarnings(defaultEarnings);
+      setEarnings({
+        Basic: 0,
+        Incentive: 0,
+        "Allowance HRA": 0,
+        "Allowance Medical": 0,
+        "Other Allowances": 0,
+      });
+      setDeductions({
+        "PF (Employee Contribution)": 0,
+        "Tax Deducted at Source": 0,
+      });
       return;
     }
+    
     const monthlyBasic = Number(employeeForm.basicSalary);
-    const ratio = monthlyBasic / 10000;
     const prorataFactor = payableDays / totalDaysInMonth;
+    
+    // Calculate earnings based on employee settings
     const newEarnings = {
       Basic: monthlyBasic * prorataFactor,
-      Incentive: defaultEarnings.Incentive * ratio * prorataFactor,
-      Bonus: defaultEarnings.Bonus * ratio * prorataFactor,
-      "Allowance HRA": defaultEarnings["Allowance HRA"] * ratio * prorataFactor,
-      "Leave Travel": defaultEarnings["Leave Travel"] * ratio * prorataFactor,
-      "Allowance Medical": defaultEarnings["Allowance Medical"] * ratio * prorataFactor,
-      "Other Allowances": defaultEarnings["Other Allowances"] * ratio * prorataFactor,
+      Incentive: (monthlyBasic * (employeeForm.incentivePercent / 100)) * prorataFactor,
+      "Allowance HRA": (monthlyBasic * (employeeForm.hraPercent / 100)) * prorataFactor,
+      "Allowance Medical": (Number(employeeForm.medicalAllowance)) * prorataFactor,
+      "Other Allowances": (monthlyBasic * (employeeForm.otherAllowancesPercent / 100)) * prorataFactor,
     };
+    
     setEarnings(newEarnings);
-  }, [employeeForm.basicSalary, payableDays, salaryMonth]);
+    
+    // Calculate deductions based on employee settings
+    const pfAmount = (monthlyBasic * (employeeForm.pfPercent / 100)) * prorataFactor;
+    setDeductions({
+      "PF (Employee Contribution)": pfAmount,
+      "Tax Deducted at Source": Number(employeeForm.tdsAmount) * prorataFactor,
+    });
+  }, [employeeForm.basicSalary, employeeForm.incentivePercent, employeeForm.hraPercent, 
+      employeeForm.medicalAllowance, employeeForm.otherAllowancesPercent, 
+      employeeForm.pfPercent, employeeForm.tdsAmount, payableDays, salaryMonth]);
 
   useEffect(() => {
     fetchEmployees();
@@ -163,10 +197,16 @@ const SalarySlipGenerator = () => {
         location: "Delhi Office",
         division: "Delhi Region",
         pan: "",
-        grade: "",
+        bankName: "",
         dob: "",
         uan: "",
         basicSalary: "",
+        incentivePercent: 5,
+        hraPercent: 40,
+        medicalAllowance: 1500,
+        otherAllowancesPercent: 10,
+        pfPercent: 12,
+        tdsAmount: 0,
       });
     } catch (e) {
       alert(e.message || "Save failed");
@@ -198,7 +238,7 @@ const SalarySlipGenerator = () => {
     setEmployeeForm(employees[idx]);
   };
 
-  // === EARNINGS / DEDUCTIONS ===
+  // === EARNINGS / DEDUCTIONS MANUAL OVERRIDE ===
   const setEarningValue = (key, value) => {
     setEarnings((s) => ({ ...s, [key]: parseFloat(value) || 0 }));
   };
@@ -245,7 +285,7 @@ const SalarySlipGenerator = () => {
     setIsGeneratingPDF(true);
     try {
       const canvas = await html2canvas(slipRef.current, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         backgroundColor: "#ffffff",
         width: 900,
@@ -272,8 +312,14 @@ const SalarySlipGenerator = () => {
         body: JSON.stringify({ html: imgData, slipData }),
       });
       if (!res.ok) throw new Error("Server error");
+      
       alert("Salary slip saved successfully!");
       fetchSalarySlips();
+      
+      const data = await res.json();
+      if (data.pdfUrl) {
+        window.open(data.pdfUrl, '_blank');
+      }
     } catch (err) {
       alert(`Failed: ${err.message}`);
     } finally {
@@ -301,9 +347,9 @@ const SalarySlipGenerator = () => {
     <div className="p-4 sm:p-6 bg-[#f7fafc] min-h-screen box-border">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-2xl font-semibold mb-6 text-center text-[#1a202c]">Salary Slip Generator</h2>
-        <div className="">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Employee Form */}
-          <div className="col-span-1 bg-white p-4 rounded-lg shadow-sm min-w-0">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
             <h3 className="font-semibold mb-2 text-[#1a202c]">Employee (Add / Edit)</h3>
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">
@@ -320,25 +366,108 @@ const SalarySlipGenerator = () => {
                 <input name="location" value={employeeForm.location} onChange={onEmployeeChange} placeholder="Location" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="division" value={employeeForm.division} onChange={onEmployeeChange} placeholder="Division" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="pan" value={employeeForm.pan} onChange={onEmployeeChange} placeholder="PAN" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
-                <input name="grade" value={employeeForm.grade} onChange={onEmployeeChange} placeholder="Bank Name" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="bankName" value={employeeForm.bankName} onChange={onEmployeeChange} placeholder="Bank Name" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="mop" value={employeeForm.mop} onChange={onEmployeeChange} placeholder="MOP" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
-                <input name="dob" value={employeeForm.dob} onChange={onEmployeeChange} placeholder="DOB" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
-                <input name="doj" value={employeeForm.doj} onChange={onEmployeeChange} placeholder="DOJ" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="dob" value={employeeForm.dob} onChange={onEmployeeChange} placeholder="DOB (DD/MM/YYYY)" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
+                <input name="doj" value={employeeForm.doj} onChange={onEmployeeChange} placeholder="DOJ (DD/MM/YYYY)" className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="uan" value={employeeForm.uan} onChange={onEmployeeChange} placeholder="UAN No." className="border border-[#d1d5db] p-2 rounded-md w-full text-sm" />
                 <input name="bankAcc" value={employeeForm.bankAcc} onChange={onEmployeeChange} placeholder="Bank Account No." className="border border-[#d1d5db] p-2 rounded-md w-full text-sm col-span-2" />
-                <div className="col-span-2">
-                  <label className="block text-xs font-medium mb-1">Basic Salary (Monthly)</label>
-                  <input
-                    type="number"
-                    name="basicSalary"
-                    value={employeeForm.basicSalary || ""}
-                    onChange={onEmployeeChange}
-                    placeholder="30000"
-                    className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                    min="0"
-                  />
+              </div>
+              
+              <div className="border-t border-[#e5e7eb] pt-3 mt-2">
+                <h4 className="font-medium text-sm text-[#1a202c] mb-2">Salary Structure</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="col-span-2">
+                    <label className="block text-xs font-medium mb-1">Basic Salary (Monthly) *</label>
+                    <input
+                      type="number"
+                      name="basicSalary"
+                      value={employeeForm.basicSalary || ""}
+                      onChange={onEmployeeChange}
+                      placeholder="30000"
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Incentive (% of Basic)</label>
+                    <input
+                      type="number"
+                      name="incentivePercent"
+                      value={employeeForm.incentivePercent}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      max="100"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">HRA (% of Basic)</label>
+                    <input
+                      type="number"
+                      name="hraPercent"
+                      value={employeeForm.hraPercent}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      max="100"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Medical Allowance (Fixed ₹)</label>
+                    <input
+                      type="number"
+                      name="medicalAllowance"
+                      value={employeeForm.medicalAllowance}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">Other Allowances (% of Basic)</label>
+                    <input
+                      type="number"
+                      name="otherAllowancesPercent"
+                      value={employeeForm.otherAllowancesPercent}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      max="100"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">PF (% of Basic)</label>
+                    <input
+                      type="number"
+                      name="pfPercent"
+                      value={employeeForm.pfPercent}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      max="12"
+                      step="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium mb-1">TDS (Fixed Amount ₹)</label>
+                    <input
+                      type="number"
+                      name="tdsAmount"
+                      value={employeeForm.tdsAmount}
+                      onChange={onEmployeeChange}
+                      className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
+                      min="0"
+                      step="100"
+                    />
+                  </div>
                 </div>
               </div>
+              
               <div className="flex gap-2">
                 <button onClick={addOrUpdateEmployee} className="bg-[#2563eb] text-white px-3 py-2 rounded-md hover:bg-[#1d4ed8] text-sm">
                   {editingIndex !== null ? "Update" : "Add Employee"}
@@ -358,10 +487,16 @@ const SalarySlipGenerator = () => {
                         location: "Delhi Office",
                         division: "Delhi Region",
                         pan: "",
-                        grade: "",
+                        bankName: "",
                         dob: "",
                         uan: "",
-                        basicSalary: ""
+                        basicSalary: "",
+                        incentivePercent: 5,
+                        hraPercent: 40,
+                        medicalAllowance: 1500,
+                        otherAllowancesPercent: 10,
+                        pfPercent: 12,
+                        tdsAmount: 0,
                       });
                     }}
                     className="px-3 py-2 border border-[#d1d5db] rounded-md text-sm hover:bg-[#f3f4f6]"
@@ -370,8 +505,9 @@ const SalarySlipGenerator = () => {
                   </button>
                 )}
               </div>
+              
               <div>
-                <h4 className="font-semibold mt-4 text-[#1a202c]">Employees</h4>
+                <h4 className="font-semibold mt-4 text-[#1a202c]">Employees List</h4>
                 {employees.length === 0 ? (
                   <p className="text-sm text-[#6b7280]">No employees added yet.</p>
                 ) : (
@@ -400,10 +536,10 @@ const SalarySlipGenerator = () => {
           </div>
 
           {/* Earnings & Deductions */}
-          <div className="col-span-1 bg-white p-4 rounded-lg shadow-sm min-w-0">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
             <h3 className="font-semibold mb-2 text-[#1a202c]">Earnings & Deductions</h3>
             <div className="mb-4 p-3 bg-[#dbeafe] rounded-md border border-[#93c5fd]">
-              <label className="block text-sm font-medium text-[#1e40af] mb-1">Payable Days</label>
+              <label className="block text-sm font-medium text-[#1e40af] mb-1">Payable Days (Auto-filled from month)</label>
               <input
                 type="number"
                 value={payableDays}
@@ -481,12 +617,11 @@ const SalarySlipGenerator = () => {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => {
-                  setEarnings(defaultEarnings);
                   setPayableDays(totalDaysInMonth);
                 }}
                 className="px-3 py-2 border border-[#d1d5db] rounded-md text-sm hover:bg-[#f3f4f6]"
               >
-                Reset Earnings
+                Reset Days
               </button>
               <button
                 onClick={generatePDF}
@@ -497,128 +632,100 @@ const SalarySlipGenerator = () => {
               </button>
             </div>
           </div>
+        </div>
 
-          {/* Preview / Payslip */}
-          <div className="col-span-1 md:col-span-3">
-            <div ref={slipRef} className="mx-auto bg-white border-2 border-[#000000] p-4" style={{ width: "900px", boxSizing: "border-box" }}>
-              {/* ... (rest of the payslip preview remains unchanged) ... */}
-              <div className="flex justify-between items-start border-b border-[#000000] pb-2">
-                <div className="flex items-center gap-3">
-                  <img src={assets?.logo || "/logo.png"} alt="logo" style={{ height: 60 }} onError={(e) => (e.target.src = "/logo.png")} />
-                </div>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-[#1e40af]">Arshyan Insurance Marketing & Services Pvt. Ltd</div>
-                  <div className="text-sm text-[#1a202c]">Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089</div>
-                  <div className="text-sm text-[#1a202c]">Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com</div>
-                  <div className="text-sm text-[#1a202c]">Website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715</div>
-                </div>
+        {/* Preview / Payslip */}
+        <div className="mt-6">
+          <div ref={slipRef} className="mx-auto bg-white border-2 border-[#000000] p-4" style={{ width: "900px", boxSizing: "border-box" }}>
+            <div className="flex justify-between items-start border-b border-[#000000] pb-2">
+              <div className="flex items-center gap-3">
+                <img src={assets?.logo || "/logo.png"} alt="logo" style={{ height: 60 }} onError={(e) => (e.target.src = "/logo.png")} />
               </div>
-              <div className="text-center font-semibold mt-4 mb-2 text-[#1a202c]">Pay Slip for the month of {salaryMonth}</div>
-              <div className="border border-[#000000]">
-                <table className="w-full text-sm border-collapse">
-                  <tbody>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Emp. Code:</td>
-                      <td className="border border-[#000000] p-2 w-2/6">{employeeForm.empCode}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Location:</td>
-                      <td className="border border-[#000000] p-2 w-2/6">{employeeForm.location}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Name:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.name}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.division}</td>
-                    </tr>
-                    {/* ... rest of table rows unchanged ... */}
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.department}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">PAN:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.pan}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.designation}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Name:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.grade}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">MOP:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.mop}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOB:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.dob}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOJ:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.doj}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.uan}</td>
-                    </tr>
-                    <tr>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td>
-                      <td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td>
-                      <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td>
-                      <td className="border border-[#000000] p-2 text-right">{payableDays} / {totalDaysInMonth}</td>
-                    </tr>
-                  </tbody>
-                </table>
+              <div className="text-right">
+                <div className="text-xl font-bold text-[#1e40af]">Arshyan Insurance Marketing & Services Pvt. Ltd</div>
+                <div className="text-sm text-[#1a202c]">Office No.212, 1st Floor, Block-G3, Sector-16 Rohini New Delhi-110089</div>
+                <div className="text-sm text-[#1a202c]">Tel (+9111-43592951), E-mail: sales.support@arshyaninsurance.com</div>
+                <div className="text-sm text-[#1a202c]">Website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715</div>
               </div>
-              <div className="mt-3 border border-[#000000]">
-                <table className="w-full text-sm border-collapse">
-                  <thead>
-                    <tr className="bg-[#e5e7eb]">
-                      <th className="border border-[#000000] p-2 text-left">Earning</th>
-                      <th className="border border-[#000000] p-2 text-right">Monthly</th>
-                      <th className="border border-[#000000] p-2 text-right">Payable Amount</th>
-                      <th className="border border-[#000000] p-2 text-left">Deduction</th>
-                      <th className="border border-[#000000] p-2 text-right">Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {Object.keys(earnings).map((key, idx) => {
-                      const monthlyValue = key === "Basic"
-                        ? Number(employeeForm.basicSalary || 0)
-                        : defaultEarnings[key] * (Number(employeeForm.basicSalary || 10000) / 10000);
-                      return (
-                        <tr key={key}>
-                          <td className="border border-[#000000] p-2">{key}</td>
-                          <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
-                          <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])}</td>
-                          {idx === 0 && (
-                            <>
-                              <td className="border border-[#000000] p-2" rowSpan={Object.keys(earnings).length}>
-                                {Object.keys(deductions).map((k) => (
-                                  <div key={k} className="text-sm font-semibold py-1">{k}</div>
-                                ))}
-                              </td>
-                              <td className="border border-[#000000] p-2 text-right" rowSpan={Object.keys(earnings).length}>
-                                {Object.keys(deductions).map((k) => (
-                                  <div key={k} className="py-1">₹ {fmt(deductions[k])}</div>
-                                ))}
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      );
-                    })}
-                    <tr>
-                      <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">GROSS PAY</td>
-                      <td className="border border-[#000000] p-2 text-right font-semibold">₹ {fmt(grossPay)}</td>
-                    </tr>
-                    <tr>
-                      <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">Net Salary: ₹ {fmt(netPay)}</td>
-                      <td className="border border-[#000000] p-2 text-right font-semibold">({numberToWords(netPay)})</td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-3 text-sm font-semibold text-[#1a202c]">
-                This is a computer generated payslip and does not require any signature.
-              </div>
+            </div>
+            <div className="text-center font-semibold mt-4 mb-2 text-[#1a202c]">Pay Slip for the month of {salaryMonth}</div>
+            <div className="border border-[#000000]">
+              <table className="w-full text-sm border-collapse">
+                <tbody>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Emp. Code:</td><td className="border border-[#000000] p-2 w-2/6">{employeeForm.empCode}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Location:</td><td className="border border-[#000000] p-2 w-2/6">{employeeForm.location}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Name:</td><td className="border border-[#000000] p-2">{employeeForm.name}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td><td className="border border-[#000000] p-2">{employeeForm.division}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td><td className="border border-[#000000] p-2">{employeeForm.department}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">PAN:</td><td className="border border-[#000000] p-2">{employeeForm.pan}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td><td className="border border-[#000000] p-2">{employeeForm.designation}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Name:</td><td className="border border-[#000000] p-2">{employeeForm.bankName}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">MOP:</td><td className="border border-[#000000] p-2">{employeeForm.mop}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOB:</td><td className="border border-[#000000] p-2">{employeeForm.dob}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOJ:</td><td className="border border-[#000000] p-2">{employeeForm.doj}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td><td className="border border-[#000000] p-2">{employeeForm.uan}</td></tr>
+                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td><td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td><td className="border border-[#000000] p-2 text-right">{payableDays} / {totalDaysInMonth}</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <div className="mt-3 border border-[#000000]">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-[#e5e7eb]">
+                    <th className="border border-[#000000] p-2 text-left">Earning</th>
+                    <th className="border border-[#000000] p-2 text-right">Monthly</th>
+                    <th className="border border-[#000000] p-2 text-right">Payable Amount</th>
+                    <th className="border border-[#000000] p-2 text-left">Deduction</th>
+                    <th className="border border-[#000000] p-2 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.keys(earnings).map((key, idx) => {
+                    const monthlyValue = key === "Basic"
+                      ? Number(employeeForm.basicSalary || 0)
+                      : key === "Incentive"
+                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.incentivePercent / 100)
+                      : key === "Allowance HRA"
+                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.hraPercent / 100)
+                      : key === "Allowance Medical"
+                      ? Number(employeeForm.medicalAllowance || 0)
+                      : key === "Other Allowances"
+                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.otherAllowancesPercent / 100)
+                      : 0;
+                    return (
+                      <tr key={key}>
+                        <td className="border border-[#000000] p-2">{key}</td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])}</td>
+                        {idx === 0 && (
+                          <>
+                            <td className="border border-[#000000] p-2" rowSpan={Object.keys(earnings).length}>
+                              {Object.keys(deductions).map((k) => (
+                                <div key={k} className="text-sm font-semibold py-1">{k}</div>
+                              ))}
+                            </td>
+                            <td className="border border-[#000000] p-2 text-right" rowSpan={Object.keys(earnings).length}>
+                              {Object.keys(deductions).map((k) => (
+                                <div key={k} className="py-1">₹ {fmt(deductions[k])}</div>
+                              ))}
+                            </td>
+                          </>
+                        )}
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">GROSS PAY</td>
+                    <td className="border border-[#000000] p-2 text-right font-semibold">₹ {fmt(grossPay)}</td>
+                  </tr>
+                  <tr>
+                    <td colSpan={2} className="border border-[#000000] p-2 font-semibold text-right">Net Salary: ₹ {fmt(netPay)}</td>
+                    <td className="border border-[#000000] p-2 text-right font-semibold">({numberToWords(netPay)})</td>
+                  </tr>
+                </tbody>
+               </table>
+            </div>
+            <div className="mt-3 text-sm font-semibold text-[#1a202c]">
+              This is a computer generated payslip and does not require any signature.
             </div>
           </div>
         </div>
 
+        {/* Generated Salary Slips */}
         <div className="mt-12 border-t pt-6">
           <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
           {salarySlips.length === 0 ? (
@@ -632,7 +739,7 @@ const SalarySlipGenerator = () => {
                     <th className="border border-[#d1d5db] p-2 text-left">Employee</th>
                     <th className="border border-[#d1d5db] p-2 text-right">Net Pay</th>
                     <th className="border border-[#d1d5db] p-2 text-center">Actions</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody>
                   {salarySlips.map((slip) => (
