@@ -22,7 +22,7 @@ const SalarySlipGenerator = () => {
   const [employees, setEmployees] = useState([]);
   const [editingIndex, setEditingIndex] = useState(null);
   
-  // Employee form with all earning fields
+  // Employee form with all earning fields (MANUAL AMOUNTS)
   const [employeeForm, setEmployeeForm] = useState({
     empCode: "",
     name: "",
@@ -38,12 +38,12 @@ const SalarySlipGenerator = () => {
     dob: "",
     uan: "",
     basicSalary: "",
-    // Earning components as percentage or fixed values
-    incentivePercent: 5, // 5% of basic
-    hraPercent: 40, // 40% of basic
+    // Earning components as MANUAL AMOUNTS (not percentages)
+    incentiveAmount: 0, // Manual amount
+    hraAmount: 0, // Manual amount
     medicalAllowance: 1500, // Fixed amount
-    otherAllowancesPercent: 10, // 10% of basic
-    pfPercent: 12, // 12% of basic
+    otherAllowancesAmount: 0, // Manual amount
+    pfAmount: 0, // Manual amount
     tdsAmount: 0, // Fixed TDS amount
   });
   
@@ -59,12 +59,14 @@ const SalarySlipGenerator = () => {
   };
   
   const [salaryMonth, setSalaryMonth] = useState(getCurrentMonthYear());
-  const [payableDays, setPayableDays] = useState(31);
+  
+  // FIXED PAYABLE DAYS - 30 (not auto-filled)
+  const [payableDays, setPayableDays] = useState(30);
   const [earnings, setEarnings] = useState(defaultEarnings);
   const [deductions, setDeductions] = useState(defaultDeductions);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-  // Total days in month
+  // Total days in month - still needed for display only
   const getTotalDaysInMonth = () => {
     const [monthName, year] = salaryMonth.split(" ");
     const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
@@ -72,14 +74,11 @@ const SalarySlipGenerator = () => {
   };
   
   const totalDaysInMonth = getTotalDaysInMonth();
-  const perDaySalary = employeeForm.basicSalary ? Number(employeeForm.basicSalary) / totalDaysInMonth : 0;
+  
+  // Calculate per day salary based on 30 days (fixed)
+  const perDaySalary = employeeForm.basicSalary ? Number(employeeForm.basicSalary) / 30 : 0;
 
-  // Auto-set payable days to total days in current month
-  useEffect(() => {
-    setPayableDays(totalDaysInMonth);
-  }, [salaryMonth]);
-
-  // Calculate earnings based on employee settings and payable days
+  // Calculate earnings based on employee settings and payable days (using fixed 30 days as base)
   useEffect(() => {
     if (!employeeForm.basicSalary || employeeForm.basicSalary <= 0) {
       setEarnings({
@@ -96,29 +95,29 @@ const SalarySlipGenerator = () => {
       return;
     }
     
+    // Use fixed 30 days as base for calculation
     const monthlyBasic = Number(employeeForm.basicSalary);
-    const prorataFactor = payableDays / totalDaysInMonth;
+    const prorataFactor = payableDays / 30; // Using fixed 30 days
     
-    // Calculate earnings based on employee settings
+    // Calculate earnings based on employee settings (MANUAL AMOUNTS)
     const newEarnings = {
-      Basic: monthlyBasic * prorataFactor,
-      Incentive: (monthlyBasic * (employeeForm.incentivePercent / 100)) * prorataFactor,
-      "Allowance HRA": (monthlyBasic * (employeeForm.hraPercent / 100)) * prorataFactor,
-      "Allowance Medical": (Number(employeeForm.medicalAllowance)) * prorataFactor,
-      "Other Allowances": (monthlyBasic * (employeeForm.otherAllowancesPercent / 100)) * prorataFactor,
+      Basic: (monthlyBasic / 30) * payableDays, // Basic prorated based on payable days
+      Incentive: Number(employeeForm.incentiveAmount) * prorataFactor,
+      "Allowance HRA": Number(employeeForm.hraAmount) * prorataFactor,
+      "Allowance Medical": Number(employeeForm.medicalAllowance) * prorataFactor,
+      "Other Allowances": Number(employeeForm.otherAllowancesAmount) * prorataFactor,
     };
     
     setEarnings(newEarnings);
     
-    // Calculate deductions based on employee settings
-    const pfAmount = (monthlyBasic * (employeeForm.pfPercent / 100)) * prorataFactor;
+    // Calculate deductions based on employee settings (MANUAL AMOUNTS)
     setDeductions({
-      "PF (Employee Contribution)": pfAmount,
+      "PF (Employee Contribution)": Number(employeeForm.pfAmount) * prorataFactor,
       "Tax Deducted at Source": Number(employeeForm.tdsAmount) * prorataFactor,
     });
-  }, [employeeForm.basicSalary, employeeForm.incentivePercent, employeeForm.hraPercent, 
-      employeeForm.medicalAllowance, employeeForm.otherAllowancesPercent, 
-      employeeForm.pfPercent, employeeForm.tdsAmount, payableDays, salaryMonth]);
+  }, [employeeForm.basicSalary, employeeForm.incentiveAmount, employeeForm.hraAmount, 
+      employeeForm.medicalAllowance, employeeForm.otherAllowancesAmount, 
+      employeeForm.pfAmount, employeeForm.tdsAmount, payableDays]);
 
   useEffect(() => {
     fetchEmployees();
@@ -201,11 +200,11 @@ const SalarySlipGenerator = () => {
         dob: "",
         uan: "",
         basicSalary: "",
-        incentivePercent: 5,
-        hraPercent: 40,
+        incentiveAmount: 0,
+        hraAmount: 0,
         medicalAllowance: 1500,
-        otherAllowancesPercent: 10,
-        pfPercent: 12,
+        otherAllowancesAmount: 0,
+        pfAmount: 0,
         tdsAmount: 0,
       });
     } catch (e) {
@@ -301,6 +300,8 @@ const SalarySlipGenerator = () => {
         totalDeductions,
         netPay,
         numberInWords: numberToWords(netPay),
+        payableDays, // Save payable days to slip
+        totalDaysInMonth: 30, // Save fixed base days
       };
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/api/salary/slips`, {
@@ -375,7 +376,7 @@ const SalarySlipGenerator = () => {
               </div>
               
               <div className="border-t border-[#e5e7eb] pt-3 mt-2">
-                <h4 className="font-medium text-sm text-[#1a202c] mb-2">Salary Structure</h4>
+                <h4 className="font-medium text-sm text-[#1a202c] mb-2">Salary Structure (Monthly Amounts)</h4>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="col-span-2">
                     <label className="block text-xs font-medium mb-1">Basic Salary (Monthly) *</label>
@@ -390,33 +391,33 @@ const SalarySlipGenerator = () => {
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Incentive (% of Basic)</label>
+                    <label className="block text-xs font-medium mb-1">Incentive (Monthly Amount ₹)</label>
                     <input
                       type="number"
-                      name="incentivePercent"
-                      value={employeeForm.incentivePercent}
+                      name="incentiveAmount"
+                      value={employeeForm.incentiveAmount}
                       onChange={onEmployeeChange}
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
-                      max="100"
-                      step="1"
+                      step="100"
+                      placeholder="e.g., 5000"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">HRA (% of Basic)</label>
+                    <label className="block text-xs font-medium mb-1">HRA (Monthly Amount ₹)</label>
                     <input
                       type="number"
-                      name="hraPercent"
-                      value={employeeForm.hraPercent}
+                      name="hraAmount"
+                      value={employeeForm.hraAmount}
                       onChange={onEmployeeChange}
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
-                      max="100"
-                      step="1"
+                      step="100"
+                      placeholder="e.g., 12000"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Medical Allowance (Fixed ₹)</label>
+                    <label className="block text-xs font-medium mb-1">Medical Allowance (Monthly Amount ₹)</label>
                     <input
                       type="number"
                       name="medicalAllowance"
@@ -425,36 +426,37 @@ const SalarySlipGenerator = () => {
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
                       step="100"
+                      placeholder="e.g., 1500"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">Other Allowances (% of Basic)</label>
+                    <label className="block text-xs font-medium mb-1">Other Allowances (Monthly Amount ₹)</label>
                     <input
                       type="number"
-                      name="otherAllowancesPercent"
-                      value={employeeForm.otherAllowancesPercent}
+                      name="otherAllowancesAmount"
+                      value={employeeForm.otherAllowancesAmount}
                       onChange={onEmployeeChange}
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
-                      max="100"
-                      step="1"
+                      step="100"
+                      placeholder="e.g., 3000"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">PF (% of Basic)</label>
+                    <label className="block text-xs font-medium mb-1">PF (Monthly Amount ₹)</label>
                     <input
                       type="number"
-                      name="pfPercent"
-                      value={employeeForm.pfPercent}
+                      name="pfAmount"
+                      value={employeeForm.pfAmount}
                       onChange={onEmployeeChange}
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
-                      max="12"
-                      step="1"
+                      step="100"
+                      placeholder="e.g., 3600"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1">TDS (Fixed Amount ₹)</label>
+                    <label className="block text-xs font-medium mb-1">TDS (Monthly Amount ₹)</label>
                     <input
                       type="number"
                       name="tdsAmount"
@@ -463,6 +465,7 @@ const SalarySlipGenerator = () => {
                       className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
                       min="0"
                       step="100"
+                      placeholder="e.g., 2000"
                     />
                   </div>
                 </div>
@@ -491,11 +494,11 @@ const SalarySlipGenerator = () => {
                         dob: "",
                         uan: "",
                         basicSalary: "",
-                        incentivePercent: 5,
-                        hraPercent: 40,
+                        incentiveAmount: 0,
+                        hraAmount: 0,
                         medicalAllowance: 1500,
-                        otherAllowancesPercent: 10,
-                        pfPercent: 12,
+                        otherAllowancesAmount: 0,
+                        pfAmount: 0,
                         tdsAmount: 0,
                       });
                     }}
@@ -539,21 +542,21 @@ const SalarySlipGenerator = () => {
           <div className="bg-white p-4 rounded-lg shadow-sm">
             <h3 className="font-semibold mb-2 text-[#1a202c]">Earnings & Deductions</h3>
             <div className="mb-4 p-3 bg-[#dbeafe] rounded-md border border-[#93c5fd]">
-              <label className="block text-sm font-medium text-[#1e40af] mb-1">Payable Days (Auto-filled from month)</label>
+              <label className="block text-sm font-medium text-[#1e40af] mb-1">Payable Days (Fixed at 30 days)</label>
               <input
                 type="number"
                 value={payableDays}
-                onChange={(e) => setPayableDays(Math.max(0, Math.min(totalDaysInMonth, Number(e.target.value) || 0)))}
+                onChange={(e) => setPayableDays(Math.max(0, Number(e.target.value) || 0))}
                 min="0"
-                max={totalDaysInMonth}
+                max="31"
                 className="border border-[#3b82f6] p-2 rounded-md w-full text-sm font-bold text-[#1e40af] bg-white"
               />
               <div className="mt-2 text-xs text-[#1e40af]">
-                Per Day Salary: ₹{fmt(perDaySalary)} | Total Days: {totalDaysInMonth} | Payable: {payableDays}
+                Per Day Salary: ₹{fmt(perDaySalary)} | Base Days: 30 | Payable: {payableDays} days
               </div>
             </div>
             <div className="text-xs text-[#6b7280] mb-2">
-              Month has {totalDaysInMonth} days • Payable: {payableDays} days
+              Salary is calculated on 30 days base • Payable: {payableDays} days
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -617,11 +620,11 @@ const SalarySlipGenerator = () => {
             <div className="mt-4 flex gap-2">
               <button
                 onClick={() => {
-                  setPayableDays(totalDaysInMonth);
+                  setPayableDays(30);
                 }}
                 className="px-3 py-2 border border-[#d1d5db] rounded-md text-sm hover:bg-[#f3f4f6]"
               >
-                Reset Days
+                Reset to 30 Days
               </button>
               <button
                 onClick={generatePDF}
@@ -652,13 +655,48 @@ const SalarySlipGenerator = () => {
             <div className="border border-[#000000]">
               <table className="w-full text-sm border-collapse">
                 <tbody>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Emp. Code:</td><td className="border border-[#000000] p-2 w-2/6">{employeeForm.empCode}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Location:</td><td className="border border-[#000000] p-2 w-2/6">{employeeForm.location}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Name:</td><td className="border border-[#000000] p-2">{employeeForm.name}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td><td className="border border-[#000000] p-2">{employeeForm.division}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td><td className="border border-[#000000] p-2">{employeeForm.department}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">PAN:</td><td className="border border-[#000000] p-2">{employeeForm.pan}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td><td className="border border-[#000000] p-2">{employeeForm.designation}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Name:</td><td className="border border-[#000000] p-2">{employeeForm.bankName}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">MOP:</td><td className="border border-[#000000] p-2">{employeeForm.mop}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOB:</td><td className="border border-[#000000] p-2">{employeeForm.dob}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOJ:</td><td className="border border-[#000000] p-2">{employeeForm.doj}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td><td className="border border-[#000000] p-2">{employeeForm.uan}</td></tr>
-                  <tr><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td><td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td><td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td><td className="border border-[#000000] p-2 text-right">{payableDays} / {totalDaysInMonth}</td></tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Emp. Code:</td>
+                    <td className="border border-[#000000] p-2 w-2/6">{employeeForm.empCode}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6] w-1/6">Location:</td>
+                    <td className="border border-[#000000] p-2 w-2/6">{employeeForm.location}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Name:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.name}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Division:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.division}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Department:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.department}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">PAN:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.pan}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Designation:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.designation}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Name:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.bankName}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">MOP:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.mop}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOB:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.dob}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">DOJ:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.doj}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">UAN No.:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.uan}</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td>
+                    <td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td>
+                    <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td>
+                    <td className="border border-[#000000] p-2 text-right">{payableDays} / 30</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
@@ -678,19 +716,19 @@ const SalarySlipGenerator = () => {
                     const monthlyValue = key === "Basic"
                       ? Number(employeeForm.basicSalary || 0)
                       : key === "Incentive"
-                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.incentivePercent / 100)
+                      ? Number(employeeForm.incentiveAmount || 0)
                       : key === "Allowance HRA"
-                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.hraPercent / 100)
+                      ? Number(employeeForm.hraAmount || 0)
                       : key === "Allowance Medical"
                       ? Number(employeeForm.medicalAllowance || 0)
                       : key === "Other Allowances"
-                      ? Number(employeeForm.basicSalary || 0) * (employeeForm.otherAllowancesPercent / 100)
+                      ? Number(employeeForm.otherAllowancesAmount || 0)
                       : 0;
                     return (
                       <tr key={key}>
-                        <td className="border border-[#000000] p-2">{key}</td>
-                        <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
-                        <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])}</td>
+                        <td className="border border-[#000000] p-2">{key} </td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)} </td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])} </td>
                         {idx === 0 && (
                           <>
                             <td className="border border-[#000000] p-2" rowSpan={Object.keys(earnings).length}>
@@ -717,7 +755,7 @@ const SalarySlipGenerator = () => {
                     <td className="border border-[#000000] p-2 text-right font-semibold">({numberToWords(netPay)})</td>
                   </tr>
                 </tbody>
-               </table>
+              </table>
             </div>
             <div className="mt-3 text-sm font-semibold text-[#1a202c]">
               This is a computer generated payslip and does not require any signature.
@@ -739,7 +777,7 @@ const SalarySlipGenerator = () => {
                     <th className="border border-[#d1d5db] p-2 text-left">Employee</th>
                     <th className="border border-[#d1d5db] p-2 text-right">Net Pay</th>
                     <th className="border border-[#d1d5db] p-2 text-center">Actions</th>
-                   </tr>
+                  </tr>
                 </thead>
                 <tbody>
                   {salarySlips.map((slip) => (
