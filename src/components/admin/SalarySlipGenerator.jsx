@@ -16,6 +16,11 @@ const defaultDeductions = {
   "Tax Deducted at Source": 0,
 };
 
+const monthsList = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+
 const SalarySlipGenerator = () => {
   const slipRef = useRef();
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
@@ -38,39 +43,50 @@ const SalarySlipGenerator = () => {
     dob: "",
     uan: "",
     basicSalary: "",
-    // Earning components as MANUAL AMOUNTS (not percentages)
-    incentiveAmount: 0, // Manual amount
-    hraAmount: 0, // Manual amount
-    medicalAllowance: 1500, // Fixed amount
-    otherAllowancesAmount: 0, // Manual amount
-    pfAmount: 0, // Manual amount
-    tdsAmount: 0, // Fixed TDS amount
+    incentiveAmount: 0,
+    hraAmount: 0,
+    medicalAllowance: 1500,
+    otherAllowancesAmount: 0,
+    pfAmount: 0,
+    tdsAmount: 0,
   });
   
   const [salarySlips, setSalarySlips] = useState([]);
   
-  const getCurrentMonthYear = () => {
-    const now = new Date();
-    const months = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-    return `${months[now.getMonth()]} ${now.getFullYear()}`;
+  // Month and Year selection state
+  const currentYear = new Date().getFullYear();
+  const [selectedMonth, setSelectedMonth] = useState(monthsList[new Date().getMonth()]);
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  
+  // Filter states for salary slips table
+  const [filterEmployeeName, setFilterEmployeeName] = useState("");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterYear, setFilterYear] = useState("");
+  
+  // Generate years array (10 years back and 10 years forward)
+  const generateYears = () => {
+    const years = [];
+    for (let i = currentYear - 10; i <= currentYear + 10; i++) {
+      years.push(i);
+    }
+    return years;
+  };
+  const yearsList = generateYears();
+  
+  // Get current month and year as string
+  const getSalaryMonthString = () => {
+    return `${selectedMonth} ${selectedYear}`;
   };
   
-  const [salaryMonth, setSalaryMonth] = useState(getCurrentMonthYear());
-  
-  // FIXED PAYABLE DAYS - 30 (not auto-filled)
   const [payableDays, setPayableDays] = useState(30);
   const [earnings, setEarnings] = useState(defaultEarnings);
   const [deductions, setDeductions] = useState(defaultDeductions);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-  // Total days in month - still needed for display only
+  // Total days in month - for display only
   const getTotalDaysInMonth = () => {
-    const [monthName, year] = salaryMonth.split(" ");
-    const monthIndex = new Date(`${monthName} 1, ${year}`).getMonth();
-    return new Date(Number(year), monthIndex + 1, 0).getDate();
+    const monthIndex = monthsList.indexOf(selectedMonth);
+    return new Date(selectedYear, monthIndex + 1, 0).getDate();
   };
   
   const totalDaysInMonth = getTotalDaysInMonth();
@@ -95,13 +111,11 @@ const SalarySlipGenerator = () => {
       return;
     }
     
-    // Use fixed 30 days as base for calculation
     const monthlyBasic = Number(employeeForm.basicSalary);
-    const prorataFactor = payableDays / 30; // Using fixed 30 days
+    const prorataFactor = payableDays / 30;
     
-    // Calculate earnings based on employee settings (MANUAL AMOUNTS)
     const newEarnings = {
-      Basic: (monthlyBasic / 30) * payableDays, // Basic prorated based on payable days
+      Basic: (monthlyBasic / 30) * payableDays,
       Incentive: Number(employeeForm.incentiveAmount) * prorataFactor,
       "Allowance HRA": Number(employeeForm.hraAmount) * prorataFactor,
       "Allowance Medical": Number(employeeForm.medicalAllowance) * prorataFactor,
@@ -110,7 +124,6 @@ const SalarySlipGenerator = () => {
     
     setEarnings(newEarnings);
     
-    // Calculate deductions based on employee settings (MANUAL AMOUNTS)
     setDeductions({
       "PF (Employee Contribution)": Number(employeeForm.pfAmount) * prorataFactor,
       "Tax Deducted at Source": Number(employeeForm.tdsAmount) * prorataFactor,
@@ -291,17 +304,18 @@ const SalarySlipGenerator = () => {
         height: 1200,
       });
       const imgData = canvas.toDataURL("image/png");
+      const salaryMonthString = getSalaryMonthString();
       const slipData = {
         employee: employeeForm,
-        salaryMonth,
+        salaryMonth: salaryMonthString,
         earnings,
         deductions,
         grossPay,
         totalDeductions,
         netPay,
         numberInWords: numberToWords(netPay),
-        payableDays, // Save payable days to slip
-        totalDaysInMonth: 30, // Save fixed base days
+        payableDays,
+        totalDaysInMonth: 30,
       };
       const token = localStorage.getItem("token");
       const res = await fetch(`${API_BASE}/api/salary/slips`, {
@@ -342,6 +356,21 @@ const SalarySlipGenerator = () => {
     } catch (e) {
       alert("Delete failed");
     }
+  };
+
+  // Filtered salary slips based on search criteria
+  const filteredSalarySlips = salarySlips.filter((slip) => {
+    const matchesName = slip.employee?.name?.toLowerCase().includes(filterEmployeeName.toLowerCase()) || !filterEmployeeName;
+    const matchesMonth = !filterMonth || (slip.salaryMonth && slip.salaryMonth.includes(filterMonth));
+    const matchesYear = !filterYear || (slip.salaryMonth && slip.salaryMonth.includes(filterYear.toString()));
+    return matchesName && matchesMonth && matchesYear;
+  });
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilterEmployeeName("");
+    setFilterMonth("");
+    setFilterYear("");
   };
 
   return (
@@ -609,13 +638,30 @@ const SalarySlipGenerator = () => {
               </div>
             </div>
             <div className="mt-4">
-              <label className="block text-sm text-[#1a202c]">Salary month</label>
-              <input
-                value={salaryMonth}
-                onChange={(e) => setSalaryMonth(e.target.value)}
-                className="border border-[#d1d5db] p-2 rounded-md w-full text-sm"
-                placeholder={getCurrentMonthYear()}
-              />
+              <label className="block text-sm font-medium text-[#1a202c] mb-1">Salary Month</label>
+              <div className="flex gap-3">
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="flex-1 border border-[#d1d5db] p-2 rounded-md text-sm"
+                >
+                  {monthsList.map((month) => (
+                    <option key={month} value={month}>{month}</option>
+                  ))}
+                </select>
+                <select
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(Number(e.target.value))}
+                  className="flex-1 border border-[#d1d5db] p-2 rounded-md text-sm"
+                >
+                  {yearsList.map((year) => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              <p className="text-xs text-[#6b7280] mt-1">
+                Selected: {selectedMonth} {selectedYear} (Total days: {totalDaysInMonth})
+              </p>
             </div>
             <div className="mt-4 flex gap-2">
               <button
@@ -651,7 +697,7 @@ const SalarySlipGenerator = () => {
                 <div className="text-sm text-[#1a202c]">Website: www.arshyaninsurance.com | CIN: U66290DL2025PTC441715</div>
               </div>
             </div>
-            <div className="text-center font-semibold mt-4 mb-2 text-[#1a202c]">Pay Slip for the month of {salaryMonth}</div>
+            <div className="text-center font-semibold mt-4 mb-2 text-[#1a202c]">Pay Slip for the month of {getSalaryMonthString()}</div>
             <div className="border border-[#000000]">
               <table className="w-full text-sm border-collapse">
                 <tbody>
@@ -695,8 +741,8 @@ const SalarySlipGenerator = () => {
                     <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Bank Account No:</td>
                     <td className="border border-[#000000] p-2">{employeeForm.bankAcc}</td>
                     <td className="border border-[#000000] p-2 bg-[#f3f4f6]">Payable Days:</td>
-                    <td className="border border-[#000000] p-2 text-right">{payableDays} / 30</td>
-                  </tr>
+                    <td className="border border-[#000000] p-2 text-right">{payableDays} / 30  </td>
+                   </tr>
                 </tbody>
               </table>
             </div>
@@ -709,7 +755,7 @@ const SalarySlipGenerator = () => {
                     <th className="border border-[#000000] p-2 text-right">Payable Amount</th>
                     <th className="border border-[#000000] p-2 text-left">Deduction</th>
                     <th className="border border-[#000000] p-2 text-right">Amount</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody>
                   {Object.keys(earnings).map((key, idx) => {
@@ -726,9 +772,9 @@ const SalarySlipGenerator = () => {
                       : 0;
                     return (
                       <tr key={key}>
-                        <td className="border border-[#000000] p-2">{key} </td>
-                        <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)} </td>
-                        <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])} </td>
+                        <td className="border border-[#000000] p-2">{key}</td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(monthlyValue)}</td>
+                        <td className="border border-[#000000] p-2 text-right">{fmt(earnings[key])}</td>
                         {idx === 0 && (
                           <>
                             <td className="border border-[#000000] p-2" rowSpan={Object.keys(earnings).length}>
@@ -763,11 +809,52 @@ const SalarySlipGenerator = () => {
           </div>
         </div>
 
-        {/* Generated Salary Slips */}
+        {/* Generated Salary Slips with Filters */}
         <div className="mt-12 border-t pt-6">
-          <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({salarySlips.length})</h3>
-          {salarySlips.length === 0 ? (
-            <p className="text-sm text-[#6b7280]">No salary slips generated yet.</p>
+          <h3 className="text-xl font-bold mb-4 text-[#1a202c]">Generated Salary Slips ({filteredSalarySlips.length})</h3>
+          
+          {/* Filter Section */}
+          <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h4 className="font-medium mb-3 text-[#1a202c]">Filter Slips</h4>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+              <input
+                type="text"
+                placeholder="Filter by Employee Name..."
+                value={filterEmployeeName}
+                onChange={(e) => setFilterEmployeeName(e.target.value)}
+                className="border border-[#d1d5db] p-2 rounded-md text-sm"
+              />
+              <select
+                value={filterMonth}
+                onChange={(e) => setFilterMonth(e.target.value)}
+                className="border border-[#d1d5db] p-2 rounded-md text-sm"
+              >
+                <option value="">All Months</option>
+                {monthsList.map((month) => (
+                  <option key={month} value={month}>{month}</option>
+                ))}
+              </select>
+              <select
+                value={filterYear}
+                onChange={(e) => setFilterYear(e.target.value)}
+                className="border border-[#d1d5db] p-2 rounded-md text-sm"
+              >
+                <option value="">All Years</option>
+                {yearsList.map((year) => (
+                  <option key={year} value={year}>{year}</option>
+                ))}
+              </select>
+              <button
+                onClick={clearFilters}
+                className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 text-sm"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+          
+          {filteredSalarySlips.length === 0 ? (
+            <p className="text-sm text-[#6b7280]">No salary slips found.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">
@@ -777,13 +864,13 @@ const SalarySlipGenerator = () => {
                     <th className="border border-[#d1d5db] p-2 text-left">Employee</th>
                     <th className="border border-[#d1d5db] p-2 text-right">Net Pay</th>
                     <th className="border border-[#d1d5db] p-2 text-center">Actions</th>
-                  </tr>
+                   </tr>
                 </thead>
                 <tbody>
-                  {salarySlips.map((slip) => (
+                  {filteredSalarySlips.map((slip) => (
                     <tr key={slip._id} className="hover:bg-[#f9fafb]">
                       <td className="border border-[#d1d5db] p-2">{slip.salaryMonth}</td>
-                      <td className="border border-[#d1d5db] p-2">{slip.employee.name}</td>
+                      <td className="border border-[#d1d5db] p-2">{slip.employee?.name || "N/A"}</td>
                       <td className="border border-[#d1d5db] p-2 text-right">₹ {slip.netPay.toLocaleString("en-IN", { maximumFractionDigits: 2 })}</td>
                       <td className="border border-[#d1d5db] p-2 text-center">
                         <div className="flex justify-center gap-2 text-xs">
