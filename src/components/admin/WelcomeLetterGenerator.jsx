@@ -43,36 +43,8 @@ const todayISO = () => {
 const gstOptions = [0, 5, 12, 18];
 
 const insurerOptions = [
-  "Bajaj Allianz General Insurance Co Ltd",
+  "BAJAJ GENERAL INSURANCE LIMITED",
   "Tata Aig General Insurance Co Ltd",
-  "HDFC Ergo General Insurance Co Ltd",
-  "ICICI Lombard General Insurance Co Ltd",
-  "Digit General Insurance Co Ltd",
-  "Reliance General Insurance Co Ltd",
-  "SBI General Insurance Co Ltd",
-  "Future General General Insurance Co Ltd",
-  "Magma HDI General Insurance Co Ltd",
-  "Royal Sundram General Insurance Co Ltd",
-  "Kotak Mahindra General Insurance Co Ltd",
-  "Liberty General Insurance Co Ltd",
-  "Shriram General Insurance Co Ltd",
-  "United India General Insurance Co Ltd",
-  "Oriental General Insurance Co Ltd",
-  "National General Insurance Co Ltd",
-  "New India General Insurance Co Ltd",
-  "Chola MS General Insurance Co Ltd",
-  "Universal Sompo General Insurance Co Ltd",
-  "Iffco Tokio General Insurance Co Ltd",
-  "ICICI Prudential Life Insurance",
-  "TATA AIA Life Insurance",
-  "HDFC Life Insurance",
-  "Reliance Nippon Life Insurance",
-  "Axis Max Life Insurance",
-  "Niva Bupa Health Insurance",
-  "Care Health Insurance",
-  "Star Health Insurance",
-  "Aditya Birla Health Insurance",
-  "Bajaj Allianz Life Insurance",
 ];
 
 // Premium Data
@@ -167,7 +139,7 @@ const PageTemplate = ({ children }) => {
   );
 };
 
-// Page Components (exactly as before)
+// Page Components
 const WelcomeLetterPage1 = ({ form }) => {
   const salut = (name) => {
     if (!name) return "Customer";
@@ -256,6 +228,10 @@ const WelcomeLetterPage2 = ({ form }) => {
           <tr>
             <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Value of Equipment</td>
             <td style={{ border: "1px solid #000", padding: 8 }}>₹ {form.valueOfEquipment}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Pincode</td>
+            <td style={{ border: "1px solid #000", padding: 8 }}>{form.pincode || ""}</td>
           </tr>
         </tbody>
       </table>
@@ -352,6 +328,8 @@ const WelcomeLetterPage3 = ({ form }) => {
     "Loss, damage or consequential loss directly or indirectly caused by any functioning or malfunctioning of the internet or similar facility.",
   ];
 
+  const isBajajSelected = form.membership.insurerName === "BAJAJ GENERAL INSURANCE LIMITED";
+
   return (
     <PageTemplate>
       <PageHeader small />
@@ -365,7 +343,9 @@ const WelcomeLetterPage3 = ({ form }) => {
       </div>
 
       <p style={{ fontSize: 11, marginBottom: 6 }}><strong>Loss Depreciation:</strong> NIL</p>
-      <p style={{ fontSize: 11, marginBottom: 12 }}><strong>Excess:</strong> First 5% of each and every claim minimum Rs.2500/-</p>
+      {isBajajSelected && (
+        <p style={{ fontSize: 11, marginBottom: 12 }}><strong>Excess:</strong> First 5% of each and every claim minimum Rs.2500/-</p>
+      )}
 
       <h4 style={{ marginBottom: 8, fontSize: 12 }}>General Exclusions:</h4>
 
@@ -426,6 +406,7 @@ const WelcomeLetterGenerator = () => {
     customerEmail: "",
     customerAddress: "",
     customerPhone: "",
+    pincode: "",
     asset: {
       mobileNo: "",
       brandModel: "",
@@ -532,23 +513,63 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  useEffect(() => {
-    if (!form.startDate) return;
-    if (!autoCalcExpiry) return;
-    if (!form.selectedPeriod) return;
+  // FIXED: Auto-calculate expiry date when start date or selected period changes
+  const calculateExpiryDate = (startDate, selectedPeriod) => {
+    if (!startDate || !selectedPeriod) return "";
+    
     try {
-      const [y, m, d] = form.startDate.split("-");
-      if (y && m && d) {
-        const dt = new Date(Number(y), Number(m) - 1, Number(d));
-        const nextYear = new Date(dt);
-        nextYear.setFullYear(dt.getFullYear() + parseInt(form.selectedPeriod));
-        const yyyy = nextYear.getFullYear();
-        const mm = String(nextYear.getMonth() + 1).padStart(2, "0");
-        const dd = String(nextYear.getDate()).padStart(2, "0");
-        setForm((p) => ({ ...p, expiryDate: `${yyyy}-${mm}-${dd}` }));
-      }
-    } catch (e) {}
-  }, [form.startDate, autoCalcExpiry, form.selectedPeriod]);
+      const [y, m, d] = startDate.split("-");
+      if (!y || !m || !d) return "";
+      
+      const dt = new Date(Number(y), Number(m) - 1, Number(d));
+      // Add selectedPeriod years
+      const expiryDate = new Date(dt);
+      expiryDate.setFullYear(dt.getFullYear() + parseInt(selectedPeriod));
+      // Subtract one day
+      expiryDate.setDate(expiryDate.getDate() - 1);
+      
+      const yyyy = expiryDate.getFullYear();
+      const mm = String(expiryDate.getMonth() + 1).padStart(2, "0");
+      const dd = String(expiryDate.getDate()).padStart(2, "0");
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+      console.error("Error calculating expiry date:", e);
+      return "";
+    }
+  };
+
+  // Replace the existing calculateExpiryDate function and useEffect with this:
+
+// Auto-calculate expiry date when start date or selected period changes
+useEffect(() => {
+  if (!autoCalcExpiry) return;
+  if (!form.startDate || !form.selectedPeriod) return;
+  
+  try {
+    const startDateObj = new Date(form.startDate);
+    if (isNaN(startDateObj.getTime())) return;
+    
+    // Add selectedPeriod years
+    const expiryDateObj = new Date(startDateObj);
+    expiryDateObj.setFullYear(startDateObj.getFullYear() + parseInt(form.selectedPeriod));
+    
+    // Subtract one day
+    expiryDateObj.setDate(expiryDateObj.getDate() - 1);
+    
+    // Format to YYYY-MM-DD
+    const yyyy = expiryDateObj.getFullYear();
+    const mm = String(expiryDateObj.getMonth() + 1).padStart(2, "0");
+    const dd = String(expiryDateObj.getDate()).padStart(2, "0");
+    const newExpiryDate = `${yyyy}-${mm}-${dd}`;
+    
+    // Only update if different from current expiry date
+    if (newExpiryDate !== form.expiryDate) {
+      setForm(prev => ({ ...prev, expiryDate: newExpiryDate }));
+    }
+  } catch (error) {
+    console.error("Error calculating expiry date:", error);
+  }
+}, [form.startDate, form.selectedPeriod, autoCalcExpiry]);
 
   useEffect(() => {
     const net = parseFloat(form.membership.netAmount || 0);
@@ -634,125 +655,120 @@ const WelcomeLetterGenerator = () => {
     return true;
   };
 
+  const generatePDF = async () => {
+    if (!validateFormBeforeGenerate()) return;
 
-// Replace it with this corrected version:
-const generatePDF = async () => {
-  if (!validateFormBeforeGenerate()) return;
+    setLoading(true);
+    setSuccess("");
+    setPdfUrl("");
 
-  setLoading(true);
-  setSuccess("");
-  setPdfUrl("");
-
-  try {
-    const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
-    const pdf = new jsPDF({
-      orientation: 'portrait',
-      unit: 'px',
-      format: [794, 1123]
-    });
-
-    for (let i = 0; i < pageRefs.length; i++) {
-      const element = pageRefs[i].current;
-      if (!element) throw new Error(`Page ${i + 1} ref not found`);
-
-      // Store original styles
-      const originalOverflow = element.style.overflow;
-      const originalPosition = element.style.position;
-      const originalLeft = element.style.left;
-      const originalTop = element.style.top;
-
-      // Make element visible for capture
-      element.style.overflow = 'visible';
-      element.style.position = 'relative';
-      element.style.left = '0';
-      element.style.top = '0';
-
-      const canvas = await html2canvas(element, {
-        scale: 3,
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: "#ffffff",
-        logging: false,
-        windowWidth: 794,
-        windowHeight: 1123,
+    try {
+      const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'px',
+        format: [794, 1123]
       });
 
-      // Restore original styles
-      element.style.overflow = originalOverflow;
-      element.style.position = originalPosition;
-      element.style.left = originalLeft;
-      element.style.top = originalTop;
+      for (let i = 0; i < pageRefs.length; i++) {
+        const element = pageRefs[i].current;
+        if (!element) throw new Error(`Page ${i + 1} ref not found`);
 
-      const imgData = canvas.toDataURL("image/png", 1.0);
-      
-      if (i > 0) {
-        pdf.addPage([794, 1123]);
+        const originalOverflow = element.style.overflow;
+        const originalPosition = element.style.position;
+        const originalLeft = element.style.left;
+        const originalTop = element.style.top;
+
+        element.style.overflow = 'visible';
+        element.style.position = 'relative';
+        element.style.left = '0';
+        element.style.top = '0';
+
+        const canvas = await html2canvas(element, {
+          scale: 3,
+          useCORS: true,
+          allowTaint: true,
+          backgroundColor: "#ffffff",
+          logging: false,
+          windowWidth: 794,
+          windowHeight: 1123,
+        });
+
+        element.style.overflow = originalOverflow;
+        element.style.position = originalPosition;
+        element.style.left = originalLeft;
+        element.style.top = originalTop;
+
+        const imgData = canvas.toDataURL("image/png", 1.0);
+        
+        if (i > 0) {
+          pdf.addPage([794, 1123]);
+        }
+        
+        pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
       }
+
+      const pdfBase64 = pdf.output('datauristring').split(',')[1];
       
-      pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
-    }
-
-    // Get PDF as base64 string (without the data:application/pdf;base64 prefix)
-    const pdfBase64 = pdf.output('datauristring').split(',')[1];
-    
-    const token = localStorage.getItem("token");
-    const res = await fetch(`${API_BASE}/api/letter/generate`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        pdfBase64: pdfBase64,
-        letterData: {
-          refNo: form.refNo,
-          customerName: form.customerName,
-          customerEmail: form.customerEmail,
-          customerAddress: form.customerAddress,
-          customerPhone: form.customerPhone,
-          valueOfEquipment: form.valueOfEquipment,
-          selectedPeriod: form.selectedPeriod,
-          insurancePremium: form.insurancePremium,
-          asset: {
-            mobileNo: form.asset.mobileNo,
-            brandModel: form.asset.brandModel,
-            imei: form.asset.imei,
-          },
-          membership: {
-            productDetail: form.membership.productDetail,
-            insuranceRefNo: form.membership.insuranceRefNo,
-            insurerName: form.membership.insurerName,
-            serviceCharges: form.membership.serviceCharges,
-            netAmount: form.membership.netAmount,
-            gstPercentage: form.membership.gstPercentage,
-            totalAmount: form.membership.totalAmount,
-          },
-          purchaseDate: form.purchaseDate,
-          startDate: form.startDate,
-          expiryDate: form.expiryDate,
-          issueDate: form.issueDate,
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${API_BASE}/api/letter/generate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      }),
-    });
+        body: JSON.stringify({
+          pdfBase64: pdfBase64,
+          letterData: {
+            refNo: form.refNo,
+            customerName: form.customerName,
+            customerEmail: form.customerEmail,
+            customerAddress: form.customerAddress,
+            customerPhone: form.customerPhone,
+            pincode: form.pincode,
+            valueOfEquipment: form.valueOfEquipment,
+            selectedPeriod: form.selectedPeriod,
+            insurancePremium: form.insurancePremium,
+            asset: {
+              mobileNo: form.asset.mobileNo,
+              brandModel: form.asset.brandModel,
+              imei: form.asset.imei,
+            },
+            membership: {
+              productDetail: form.membership.productDetail,
+              insuranceRefNo: form.membership.insuranceRefNo,
+              insurerName: form.membership.insurerName,
+              serviceCharges: form.membership.serviceCharges,
+              netAmount: form.membership.netAmount,
+              gstPercentage: form.membership.gstPercentage,
+              totalAmount: form.membership.totalAmount,
+            },
+            purchaseDate: form.purchaseDate,
+            startDate: form.startDate,
+            expiryDate: form.expiryDate,
+            issueDate: form.issueDate,
+          },
+        }),
+      });
 
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.msg || "Failed to generate");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.msg || "Failed to generate");
 
-    setPdfUrl(data.pdfUrl);
-    setSuccess("Welcome Letter Generated & Saved Successfully!");
+      setPdfUrl(data.pdfUrl);
+      setSuccess("Welcome Letter Generated & Saved Successfully!");
 
-    const generatedRef = data.refNo || form.refNo;
-    show(`Letter ${generatedRef} generated successfully!`);
+      const generatedRef = data.refNo || form.refNo;
+      show(`Letter ${generatedRef} generated successfully!`);
 
-    await fetchLetters();
-    await fetchNextRef();
-  } catch (err) {
-    console.error("Error generating PDF:", err);
-    alert("Error: " + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+      await fetchLetters();
+      await fetchNextRef();
+    } catch (err) {
+      console.error("Error generating PDF:", err);
+      alert("Error: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this welcome letter? This action cannot be undone.")) return;
@@ -811,8 +827,8 @@ const generatePDF = async () => {
   };
 
   const onDateChange = (field, value) => {
-    setForm((p) => ({ ...p, [field]: value }));
-  };
+  setForm(prev => ({ ...prev, [field]: value }));
+};
 
   const friendlyDate = (iso) => {
     if (!iso) return "";
@@ -822,6 +838,10 @@ const generatePDF = async () => {
     } catch {
       return iso;
     }
+  };
+
+  const handleViewPDF = (pdfUrl) => {
+    window.open(pdfUrl, '_blank', 'noopener,noreferrer');
   };
 
   return (
@@ -847,11 +867,10 @@ const generatePDF = async () => {
                 <input name="customerEmail" value={form.customerEmail} onChange={onInputChange} placeholder="Customer Email" type="email" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="customerPhone" value={form.customerPhone} onChange={onInputChange} placeholder="Phone" className="px-4 py-3 border-2 rounded-xl" />
                 <textarea name="customerAddress" value={form.customerAddress} onChange={onInputChange} rows={3} placeholder="Address" className="px-4 py-3 border-2 rounded-xl" />
-
+                <input name="pincode" value={form.pincode} onChange={onInputChange} placeholder="Pincode" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.mobileNo" value={form.asset.mobileNo} onChange={onInputChange} placeholder="Mobile No" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.brandModel" value={form.asset.brandModel} onChange={onInputChange} placeholder="Brand & Model" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="asset.imei" value={form.asset.imei} onChange={onInputChange} placeholder="IMEI" className="px-4 py-3 border-2 rounded-xl" />
-
                 <input name="valueOfEquipment" value={form.valueOfEquipment} onChange={onInputChange} placeholder="Value of Equipment (e.g. 15000)" type="number" className="px-4 py-3 border-2 rounded-xl" />
                 <select name="selectedPeriod" value={form.selectedPeriod} onChange={onInputChange} className="px-4 py-3 border-2 rounded-xl">
                   <option value="">Select Service Tenure</option>
@@ -860,10 +879,8 @@ const generatePDF = async () => {
                   <option value="3">3 Years</option>
                 </select>
                 <input name="insurancePremium" value={form.insurancePremium ? `₹ ${form.insurancePremium}` : "Please select value and period"} readOnly className="px-4 py-3 border-2 rounded-xl bg-gray-100" />
-
                 <input name="membership.productDetail" value={form.membership.productDetail} onChange={onInputChange} placeholder="Product Detail" className="px-4 py-3 border-2 rounded-xl" />
                 <input name="membership.insuranceRefNo" value={form.membership.insuranceRefNo} onChange={onInputChange} placeholder="Insurance Ref No" className="px-4 py-3 border-2 rounded-xl" />
-
                 <select
                   name="membership.insurerName"
                   value={form.membership.insurerName}
@@ -875,7 +892,6 @@ const generatePDF = async () => {
                     <option key={idx} value={ins}>{ins}</option>
                   ))}
                 </select>
-
                 <input
                   name="membership.netAmount"
                   value={form.membership.netAmount}
@@ -884,7 +900,6 @@ const generatePDF = async () => {
                   type="number"
                   className="px-4 py-3 border-2 rounded-xl"
                 />
-
                 <select
                   name="membership.gstPercentage"
                   value={form.membership.gstPercentage}
@@ -895,7 +910,6 @@ const generatePDF = async () => {
                     <option key={g} value={g}>{g}%</option>
                   ))}
                 </select>
-
                 <input
                   name="membership.totalAmount"
                   value={form.membership.totalAmount ? `₹ ${Number(form.membership.totalAmount).toFixed(2)}` : ""}
@@ -903,7 +917,6 @@ const generatePDF = async () => {
                   placeholder="Total (calculated)"
                   className="px-4 py-3 border-2 rounded-xl bg-gray-100"
                 />
-
                 <input
                   name="membership.serviceCharges"
                   value={form.membership.serviceCharges}
@@ -945,7 +958,13 @@ const generatePDF = async () => {
         {success && (
           <div className="text-center bg-green-100 p-6 rounded-2xl mb-6 border-2 border-green-300">
             <h2 className="text-2xl font-bold text-green-800 mb-3">{success}</h2>
-            <a href={pdfUrl} target="_blank" rel="noopener noreferrer" className="inline-block px-8 py-3 bg-green-600 hover:bg-green-700 text-white text-lg font-bold rounded-xl">
+            <button 
+              onClick={() => handleViewPDF(pdfUrl)}
+              className="inline-block px-8 py-3 bg-green-600 hover:bg-green-700 text-white text-lg font-bold rounded-xl mr-4"
+            >
+              View PDF
+            </button>
+            <a href={pdfUrl} download className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white text-lg font-bold rounded-xl">
               Download PDF
             </a>
           </div>
@@ -978,7 +997,7 @@ const generatePDF = async () => {
                         <td className="border p-3">{letter.customerName}</td>
                         <td className="border p-3">{friendlyDate(letter.createdAt)}</td>
                         <td className="border p-3">
-                          <a href={letter.pdfUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline mr-4">View</a>
+                          <button onClick={() => handleViewPDF(letter.pdfUrl)} className="text-blue-600 hover:underline mr-4">View</button>
                           <a href={letter.pdfUrl} download className="text-green-600 hover:underline mr-4">Download</a>
                           <button onClick={() => handleDelete(letter._id)} className="text-red-600 hover:underline">Delete</button>
                         </td>
