@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText 
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -11,10 +11,11 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
   const tabs = [
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
+    { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
-    { name: 'Arshyan Portable Equipments Insurance', icon: FaEnvelopeOpenText, key: 'welcome-letter' }, // ← ADDED
+    { name: 'Arshyan Portable Equipments Insurance', icon: FaEnvelopeOpenText, key: 'welcome-letter' },
     { name: 'Vehicle Admin', icon: FaCarSide, key: 'vehicle-admin' },
     ...(isAdmin ? [
       { name: 'Users', icon: FaUserCog, key: 'users' },
@@ -27,6 +28,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
   const tabPathMap = {
     dashboard: '/admin',
     leads: '/admin/leads',
+    'employee-leads': '/admin/employee-leads', // ← ADDED
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',
@@ -34,7 +36,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     invoice: '/admin/invoice',
     'vehicle-admin': '/admin/vehicle-admin',
     'salary-slip': '/admin/salary-slip',
-    'welcome-letter': '/admin/welcome-letter', // ← ADDED
+    'welcome-letter': '/admin/welcome-letter',
   };
 
   const handleTabClick = useCallback((tabKey) => {

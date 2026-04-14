@@ -18,7 +18,8 @@ import { tasks, activities } from '../../data/mockData';
 import { FiMenu, FiX, FiLogOut } from 'react-icons/fi';
 import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
-import WelcomeLetterGenerator from './WelcomeLetterGenerator'; // ← ADDED ONLY THIS
+import WelcomeLetterGenerator from './WelcomeLetterGenerator';
+import EmployeeLeads from './EmployeeLeads'; // ← ADDED
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ function AdminApp({ handleLogout }) {
     const tabPathMap = {
       dashboard: '/admin',
       leads: '/admin/leads',
+      'employee-leads': '/admin/employee-leads', // ← ADDED
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -39,7 +41,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
       // 'policy-upload': '/admin/policy-upload',
-      'welcome-letter': '/admin/welcome-letter', // ← ADDED
+      'welcome-letter': '/admin/welcome-letter',
     };
     const pathToTab = (pathname) => {
       const entry = Object.entries(tabPathMap).find(([tab, path]) => path === pathname);
@@ -65,6 +67,7 @@ function AdminApp({ handleLogout }) {
     () => ({
       dashboard: '/admin',
       leads: '/admin/leads',
+      'employee-leads': '/admin/employee-leads', // ← ADDED
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -73,7 +76,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': '/admin/vehicle-admin',
       'salary-slip': '/admin/salary-slip',
       // 'policy-upload': '/admin/policy-upload',
-      'welcome-letter': '/admin/welcome-letter', // ← ADDED
+      'welcome-letter': '/admin/welcome-letter',
     }),
     []
   );
@@ -182,6 +185,7 @@ function AdminApp({ handleLogout }) {
     const titles = {
       dashboard: 'Dashboard',
       leads: 'Insurance Policy Punch',
+      'employee-leads': 'Employee Leads', // ← ADDED
       tasks: 'Task Management',
       analytics: 'Analytics & Reports',
       users: 'User Management',
@@ -190,7 +194,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': 'Vehicle Admin',
       'salary-slip': 'Salary Slip Generator',
       // 'policy-upload': 'Policy Upload',
-      'welcome-letter': 'Arshyan Portable Equipments Insurance', // ← ADDED
+      'welcome-letter': 'Arshyan Portable Equipments Insurance',
     };
     return (
       <div className="flex items-center space-x-3">
@@ -206,6 +210,7 @@ function AdminApp({ handleLogout }) {
     const descriptions = {
       dashboard: 'Get an overview of your CRM performance',
       leads: 'Manage and track all your leads in one place',
+      'employee-leads': 'Track and manage all leads created by employees', // ← ADDED
       tasks: 'Keep track of all tasks and deadlines',
       analytics: 'Analyze your business performance with detailed reports',
       users: 'Manage user accounts and permissions',
@@ -214,7 +219,7 @@ function AdminApp({ handleLogout }) {
       'vehicle-admin': 'Manage all vehicle administration tasks',
       'salary-slip': 'Generate detailed employee salary slips',
       // 'policy-upload': 'Upload and manage policy documents',
-      'welcome-letter': 'Generate professional welcome letters for mobile insurance customers', // ← ADDED
+      'welcome-letter': 'Generate professional welcome letters for mobile insurance customers',
     };
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   }, [activeTab]);
@@ -313,6 +318,7 @@ function AdminApp({ handleLogout }) {
                     onAddLead={handleAddLead}
                   />
                 )}
+                {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
                 {activeTab === 'tasks' && (
                   <TaskList
                     tasks={taskList}
@@ -328,7 +334,7 @@ function AdminApp({ handleLogout }) {
                 {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
                 {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
                 {/* {activeTab === 'policy-upload' && <PolicyUpload />} */}
-                {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />} {/* ← ADDED */}
+                {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />}
               </motion.div>
             </AnimatePresence>
           )}

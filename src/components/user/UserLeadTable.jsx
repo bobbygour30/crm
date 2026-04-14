@@ -26,9 +26,30 @@ const insurerOptions = [
   "ICICI Lombard General Insurance Co Ltd",
   "Digit General Insurance Co Ltd",
   "Reliance General Insurance Co Ltd",
+  "SBI General Insurance Co Ltd",
+  "Future General General Insurance Co Ltd",
+  "Magma HDI General Insurance Co Ltd",
+  "Royal Sundram General Insurance Co Ltd",
+  "Kotak Mahindra General Insurance Co Ltd",
+  "Liberty General Insurance Co Ltd",
+  "Shriram General Insurance Co Ltd",
+  "United India General Insurance Co Ltd",
+  "Oriental General Insurance Co Ltd",
+  "National General Insurance Co Ltd",
+  "New India General Insurance Co Ltd",
+  "Chola MS General Insurance Co Ltd",
+  "Universal Sompo General Insurance Co Ltd",
+  "Iffco Tokio General Insurance Co Ltd",
   "ICICI Prudential Life Insurance",
+  "TATA AIA Life Insurance",
   "HDFC Life Insurance",
+  "Reliance Nippon Life Insurance",
+  "Axis Max Life Insurance",
   "Niva Bupa Health Insurance",
+  "Care Health Insurance",
+  "Star Health Insurance",
+  "Aditya Birla Health Insurance",
+  "Bajaj Allianz Life Insurance",
 ];
 
 const agencyOptions = [
@@ -44,6 +65,8 @@ const agencyOptions = [
   "DEEPAK KUMAR",
   "OTHERS",
 ];
+
+const gstOptions = [0, 5, 12, 18];
 
 function UserLeadTable() {
   const [leads, setLeads] = useState([]);
@@ -65,12 +88,12 @@ function UserLeadTable() {
     customLob: "",
     agency: "",
     customAgency: "",
-    sumInsured: 0,
+    sumInsured: "",
     endorsement: "",
-    netPremium: 0,
+    netPremium: "",
     gst: 18,
-    payout: 0,
-    additionalPayout: 0,
+    payout: "",
+    additionalPayout: "",
     payoutStatus: "Pending",
     policyStartDate: "",
     policyExpiryDate: "",
@@ -184,6 +207,11 @@ function UserLeadTable() {
       : "0.00";
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("en-IN");
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-8 mt-20">
       <div className="max-w-7xl mx-auto">
@@ -223,7 +251,7 @@ function UserLeadTable() {
               onSubmit={handleSubmit}
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"
             >
-              {/* Row 1 */}
+              {/* Basic Information */}
               <input
                 placeholder="Customer Name *"
                 required
@@ -251,7 +279,7 @@ function UserLeadTable() {
                 className="p-3 border rounded-lg"
               />
 
-              {/* Row 2 */}
+              {/* Source & Reference */}
               <input
                 placeholder="Source"
                 value={newLead.source}
@@ -346,7 +374,7 @@ function UserLeadTable() {
                 }
                 className="p-3 border rounded-lg"
               >
-                <option value="">-- Insurer --</option>
+                <option value="">-- Select Insurer --</option>
                 {insurerOptions.map((i) => (
                   <option key={i} value={i}>
                     {i}
@@ -354,28 +382,75 @@ function UserLeadTable() {
                 ))}
               </select>
 
+              {/* Sum Insured */}
+              <input
+                type="number"
+                placeholder="Sum Insured"
+                value={newLead.sumInsured}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, sumInsured: parseFloat(e.target.value) || 0 })
+                }
+                className="p-3 border rounded-lg"
+              />
+
+              {/* Endorsement */}
+              <input
+                placeholder="Endorsement"
+                value={newLead.endorsement}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, endorsement: e.target.value })
+                }
+                className="p-3 border rounded-lg"
+              />
+
+              {/* Policy Dates */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Policy Start Date</label>
+                <input
+                  type="date"
+                  value={newLead.policyStartDate}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, policyStartDate: e.target.value })
+                  }
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Policy Expiry Date</label>
+                <input
+                  type="date"
+                  value={newLead.policyExpiryDate}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, policyExpiryDate: e.target.value })
+                  }
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+
               {/* Premium Fields */}
               <input
                 type="number"
                 placeholder="Net Premium"
                 value={newLead.netPremium}
                 onChange={(e) =>
-                  setNewLead({ ...newLead, netPremium: e.target.value })
+                  setNewLead({ ...newLead, netPremium: parseFloat(e.target.value) || 0 })
                 }
                 className="p-3 border rounded-lg"
               />
+              
               <select
                 value={newLead.gst}
                 onChange={(e) =>
-                  setNewLead({ ...newLead, gst: e.target.value })
+                  setNewLead({ ...newLead, gst: parseFloat(e.target.value) })
                 }
                 className="p-3 border rounded-lg"
               >
-                <option value={0}>GST 0%</option>
-                <option value={5}>GST 5%</option>
-                <option value={12}>GST 12%</option>
-                <option value={18}>GST 18%</option>
+                {gstOptions.map((g) => (
+                  <option key={g} value={g}>GST {g}%</option>
+                ))}
               </select>
+              
               <input
                 readOnly
                 value={formatCurrency(gross)}
@@ -383,6 +458,7 @@ function UserLeadTable() {
                 className="p-3 border rounded-lg bg-gray-100"
               />
 
+              {/* Payout Fields */}
               <div className="flex items-center gap-3">
                 <input
                   type="range"
@@ -390,7 +466,7 @@ function UserLeadTable() {
                   max="100"
                   value={newLead.payout}
                   onChange={(e) =>
-                    setNewLead({ ...newLead, payout: e.target.value })
+                    setNewLead({ ...newLead, payout: parseFloat(e.target.value) })
                   }
                   className="flex-1"
                 />
@@ -400,7 +476,7 @@ function UserLeadTable() {
                   max="100"
                   value={newLead.payout}
                   onChange={(e) =>
-                    setNewLead({ ...newLead, payout: e.target.value })
+                    setNewLead({ ...newLead, payout: parseFloat(e.target.value) })
                   }
                   className="w-20 p-2 border rounded"
                 />
@@ -413,12 +489,13 @@ function UserLeadTable() {
                 placeholder="Payout Value"
                 className="p-3 border rounded-lg bg-gray-100"
               />
+              
               <input
                 type="number"
                 placeholder="Additional Payout"
                 value={newLead.additionalPayout}
                 onChange={(e) =>
-                  setNewLead({ ...newLead, additionalPayout: e.target.value })
+                  setNewLead({ ...newLead, additionalPayout: parseFloat(e.target.value) || 0 })
                 }
                 className="p-3 border rounded-lg"
               />
@@ -430,6 +507,18 @@ function UserLeadTable() {
                 className="p-3 border rounded-lg bg-green-50 font-semibold text-green-700"
               />
 
+              {/* Status Fields */}
+              <select
+                value={newLead.payoutStatus}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, payoutStatus: e.target.value })
+                }
+                className="p-3 border rounded-lg"
+              >
+                <option value="Pending">Payout Status: Pending</option>
+                <option value="Received">Payout Status: Received</option>
+              </select>
+
               <select
                 value={newLead.status}
                 onChange={(e) =>
@@ -437,14 +526,25 @@ function UserLeadTable() {
                 }
                 className="p-3 border rounded-lg"
               >
-                <option value="Open">Open</option>
-                <option value="Policy Issued">Policy Issued</option>
-                <option value="Closed Without Issuance">Closed</option>
+                <option value="Open">Status: Open</option>
+                <option value="Policy Issued">Status: Policy Issued</option>
+                <option value="Closed Without Issuance">Status: Closed</option>
               </select>
+
+              {/* Remarks */}
+              <textarea
+                placeholder="Remarks"
+                value={newLead.remarks}
+                onChange={(e) =>
+                  setNewLead({ ...newLead, remarks: e.target.value })
+                }
+                rows="2"
+                className="p-3 border rounded-lg"
+              />
 
               <button
                 type="submit"
-                className="md:col-span-3 lg:col-span-1 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
+                className="md:col-span-2 lg:col-span-3 px-8 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium"
               >
                 Save Lead
               </button>
@@ -461,11 +561,14 @@ function UserLeadTable() {
                   <th className="p-4 text-left">Name</th>
                   <th className="p-4 text-left">Mobile</th>
                   <th className="p-4 text-left">LOB</th>
+                  <th className="p-4 text-left">Sum Insured</th>
                   <th className="p-4 text-left">Net</th>
                   <th className="p-4 text-left">GST</th>
                   <th className="p-4 text-left">Gross</th>
                   <th className="p-4 text-left">Payout %</th>
                   <th className="p-4 text-left">Total Pay</th>
+                  <th className="p-4 text-left">Start Date</th>
+                  <th className="p-4 text-left">Expiry Date</th>
                   <th className="p-4 text-left">Status</th>
                   <th className="p-4 text-left">Action</th>
                 </tr>
@@ -478,15 +581,16 @@ function UserLeadTable() {
                       <td className="p-4 font-medium">{lead.name}</td>
                       <td className="p-4">{lead.mobileNo}</td>
                       <td className="p-4">{lead.lob}</td>
+                      <td className="p-4">{formatCurrency(lead.sumInsured)}</td>
                       <td className="p-4">{formatCurrency(lead.netPremium)}</td>
                       <td className="p-4">{lead.gst}%</td>
-                      <td className="p-4">
-                        {formatCurrency(lead.grossPremium)}
-                      </td>
+                      <td className="p-4">{formatCurrency(lead.grossPremium)}</td>
                       <td className="p-4">{lead.payout}%</td>
                       <td className="p-4 font-semibold text-green-600">
                         {formatCurrency(lead.totalPayment)}
                       </td>
+                      <td className="p-4">{formatDate(lead.policyStartDate)}</td>
+                      <td className="p-4">{formatDate(lead.policyExpiryDate)}</td>
                       <td className="p-4">
                         <span
                           className={`px-3 py-1 rounded-full text-xs font-medium ${
@@ -514,6 +618,61 @@ function UserLeadTable() {
             </table>
           </div>
         </div>
+
+        {/* View Lead Modal */}
+        {selectedLead && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="flex justify-between items-center p-6 border-b">
+                <h2 className="text-xl font-bold">Lead Details</h2>
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  <FaTimes size={20} />
+                </button>
+              </div>
+              <div className="p-6 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><strong>Name:</strong> {selectedLead.name}</div>
+                  <div><strong>Mobile:</strong> {selectedLead.mobileNo}</div>
+                  <div><strong>Email:</strong> {selectedLead.email || "-"}</div>
+                  <div><strong>Source:</strong> {selectedLead.source || "-"}</div>
+                  <div><strong>Reference:</strong> {selectedLead.reference || "-"}</div>
+                  <div><strong>Policy Number:</strong> {selectedLead.policyNumber || "-"}</div>
+                  <div><strong>LOB:</strong> {selectedLead.lob}</div>
+                  <div><strong>Agency:</strong> {selectedLead.agency}</div>
+                  <div><strong>Insurer:</strong> {selectedLead.insurer}</div>
+                  <div><strong>Sum Insured:</strong> {formatCurrency(selectedLead.sumInsured)}</div>
+                  <div><strong>Endorsement:</strong> {selectedLead.endorsement || "-"}</div>
+                  <div><strong>Policy Start:</strong> {formatDate(selectedLead.policyStartDate)}</div>
+                  <div><strong>Policy Expiry:</strong> {formatDate(selectedLead.policyExpiryDate)}</div>
+                  <div><strong>Net Premium:</strong> {formatCurrency(selectedLead.netPremium)}</div>
+                  <div><strong>GST %:</strong> {selectedLead.gst}%</div>
+                  <div><strong>Gross Premium:</strong> {formatCurrency(selectedLead.grossPremium)}</div>
+                  <div><strong>Payout %:</strong> {selectedLead.payout}%</div>
+                  <div><strong>Payout Value:</strong> {formatCurrency(selectedLead.payoutValue)}</div>
+                  <div><strong>Additional Payout:</strong> {formatCurrency(selectedLead.additionalPayout)}</div>
+                  <div><strong>Total Payment:</strong> <span className="text-green-600 font-bold">{formatCurrency(selectedLead.totalPayment)}</span></div>
+                  <div><strong>Payout Status:</strong> {selectedLead.payoutStatus}</div>
+                  <div><strong>Status:</strong> {selectedLead.status}</div>
+                </div>
+                <div>
+                  <strong>Remarks:</strong>
+                  <p className="mt-1 text-gray-600">{selectedLead.remarks || "-"}</p>
+                </div>
+              </div>
+              <div className="p-6 border-t flex justify-end">
+                <button
+                  onClick={() => setSelectedLead(null)}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
