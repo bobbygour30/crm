@@ -223,36 +223,85 @@ const SalarySlipGenerator = () => {
   };
 
   // Replace the selectEmployee function
-  const selectEmployee = (emp) => {
-    setEmployeeForm({
-      empCode: emp.empCode,
-      name: emp.name,
-      department: emp.department || "Sales & Marketing",
-      designation: emp.designation || "Executive-Sales & Marketing",
-      mop: emp.mop || "Bank Transfer",
-      doj: emp.doj || "",
-      bankAcc: emp.bankAcc || "",
-      location: emp.location || "Delhi Office",
-      division: emp.division || "Delhi Region",
-      pan: emp.pan || "",
-      bankName: emp.bankName || "",
-      dob: emp.dob || "",
-      uan: emp.uan || "",
-      basicSalary: emp.basicSalary || "",
-      incentiveAmount: emp.incentiveAmount || 0,
-      hraAmount: emp.hraAmount || 0,
-      medicalAllowance: emp.medicalAllowance || 1500,
-      otherAllowancesAmount: emp.otherAllowancesAmount || 0,
-      pfAmount: emp.pfAmount || 0,
-      tdsAmount: emp.tdsAmount || 0,
-    });
-    // Store the employee ID for update
-    setSelectedEmployeeId(emp._id);
-    setEditingIndex(-1); // Use -1 to indicate we're editing a searched employee
-    setSearchTerm("");
-    setSearchResults([]);
-    setShowSearchDropdown(false);
-  };
+ // Replace the selectEmployee function
+const selectEmployee = async (emp) => {
+  // First, try to find if this employee already exists in Employee model
+  const token = localStorage.getItem("token");
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/salary/employees/check?empCode=${encodeURIComponent(emp.empCode)}`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+    
+    if (res.ok) {
+      const existingEmp = await res.json();
+      if (existingEmp && existingEmp._id) {
+        // Use existing employee data with all salary fields
+        setEmployeeForm({
+          empCode: existingEmp.empCode,
+          name: existingEmp.name,
+          department: existingEmp.department || "Sales & Marketing",
+          designation: existingEmp.designation || "Executive-Sales & Marketing",
+          mop: existingEmp.mop || "Bank Transfer",
+          doj: existingEmp.doj || "",
+          bankAcc: existingEmp.bankAcc || "",
+          location: existingEmp.location || "Delhi Office",
+          division: existingEmp.division || "Delhi Region",
+          pan: existingEmp.pan || "",
+          bankName: existingEmp.bankName || "",
+          dob: existingEmp.dob || "",
+          uan: existingEmp.uan || "",
+          basicSalary: existingEmp.basicSalary || "",
+          incentiveAmount: existingEmp.incentiveAmount || 0,
+          hraAmount: existingEmp.hraAmount || 0,
+          medicalAllowance: existingEmp.medicalAllowance || 1500,
+          otherAllowancesAmount: existingEmp.otherAllowancesAmount || 0,
+          pfAmount: existingEmp.pfAmount || 0,
+          tdsAmount: existingEmp.tdsAmount || 0,
+        });
+        setSelectedEmployeeId(existingEmp._id);
+        setEditingIndex(-1);
+        setSearchTerm("");
+        setSearchResults([]);
+        setShowSearchDropdown(false);
+        return;
+      }
+    }
+  } catch (err) {
+    console.log("No existing employee record found");
+  }
+  
+  // If no existing record, use the search result data
+  setEmployeeForm({
+    empCode: emp.empCode,
+    name: emp.name,
+    department: emp.department || "Sales & Marketing",
+    designation: emp.designation || "Executive-Sales & Marketing",
+    mop: emp.mop || "Bank Transfer",
+    doj: emp.doj || "",
+    bankAcc: emp.bankAcc || "",
+    location: emp.location || "Delhi Office",
+    division: emp.division || "Delhi Region",
+    pan: emp.pan || "",
+    bankName: emp.bankName || "",
+    dob: emp.dob || "",
+    uan: emp.uan || "",
+    basicSalary: emp.basicSalary || "",
+    incentiveAmount: emp.incentiveAmount || 0,
+    hraAmount: emp.hraAmount || 0,
+    medicalAllowance: emp.medicalAllowance || 1500,
+    otherAllowancesAmount: emp.otherAllowancesAmount || 0,
+    pfAmount: emp.pfAmount || 0,
+    tdsAmount: emp.tdsAmount || 0,
+  });
+  setSelectedEmployeeId(emp._id);
+  setEditingIndex(-1);
+  setSearchTerm("");
+  setSearchResults([]);
+  setShowSearchDropdown(false);
+};
 
   // Add this new state
   const onEmployeeChange = (e) => {

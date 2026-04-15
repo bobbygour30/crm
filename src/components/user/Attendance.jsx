@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FaPlus, FaCheckCircle, FaClock } from 'react-icons/fa';
+import { FaPlus, FaCheckCircle, FaClock, FaTrash, FaExclamationTriangle } from 'react-icons/fa';
 import axios from 'axios';
 
 function Attendance() {
@@ -15,6 +15,10 @@ function Attendance() {
     customReason: '' 
   });
   const [showCustomReason, setShowCustomReason] = useState(false);
+  const [showRemoveModal, setShowRemoveModal] = useState(false);
+  const [selectedRecord, setSelectedRecord] = useState(null);
+  const [removeReason, setRemoveReason] = useState('');
+  const [isRemoving, setIsRemoving] = useState(false);
 
   useEffect(() => {
     fetchAttendance();
@@ -83,6 +87,37 @@ function Attendance() {
     }
   };
 
+  const handleRemoveAttendance = async () => {
+    if (!selectedRecord) return;
+    if (!removeReason.trim()) {
+      alert('Please provide a reason for removing attendance.');
+      return;
+    }
+
+    setIsRemoving(true);
+    try {
+      await axios.delete(`${import.meta.env.VITE_BACKEND_URL}/api/attendance/attendance/${selectedRecord._id}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        data: { reason: removeReason }
+      });
+      fetchAttendance();
+      setShowRemoveModal(false);
+      setSelectedRecord(null);
+      setRemoveReason('');
+      alert('Attendance record removed successfully.');
+    } catch (err) {
+      console.error('Remove attendance error:', err);
+      alert('Error removing attendance record.');
+    } finally {
+      setIsRemoving(false);
+    }
+  };
+
+  const openRemoveModal = (record) => {
+    setSelectedRecord(record);
+    setShowRemoveModal(true);
+  };
+
   const handleApplyLeave = async (e) => {
     e.preventDefault();
     if (newLeave.startDate && newLeave.endDate && newLeave.reasonType && newLeave.remarks) {
@@ -119,6 +154,8 @@ function Attendance() {
       <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-gray-900 mb-4 sm:mb-6 md:mb-8 tracking-tight">
         Attendance
       </h1>
+      
+      {/* Mark Attendance Section */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 mb-4">Mark Attendance</h2>
         <motion.button
@@ -130,6 +167,8 @@ function Attendance() {
           <FaCheckCircle className="h-4 w-4 sm:h-5 sm:w-5 inline mr-2" /> Mark Today's Attendance
         </motion.button>
       </div>
+
+      {/* Apply Leave Section */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 mb-4">Apply for Leave</h2>
         <form onSubmit={handleApplyLeave} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -205,57 +244,148 @@ function Attendance() {
           </div>
         </form>
       </div>
+
+      {/* Attendance Records with Remove Option */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 mb-4">Attendance Records</h2>
         <ul className="space-y-3">
-          {attendanceRecords.map((record) => (
-            <motion.li
-              key={record._id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
-            >
-              <div>
-                <p className="font-semibold text-gray-800">Date: {formatDate(record.date)}</p>
-                <p className="text-sm text-gray-600">Status: {record.status}</p>
-              </div>
-              <FaCheckCircle className="text-green-600 h-4 w-4 sm:h-5 sm:w-5 mt-2 sm:mt-0" />
-            </motion.li>
-          ))}
+          {attendanceRecords.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No attendance records found.</p>
+          ) : (
+            attendanceRecords.map((record) => (
+              <motion.li
+                key={record._id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
+              >
+                <div className="flex-1">
+                  <p className="font-semibold text-gray-800">Date: {formatDate(record.date)}</p>
+                  <p className="text-sm text-gray-600">Status: {record.status}</p>
+                </div>
+                <div className="flex items-center gap-3 mt-2 sm:mt-0">
+                  <FaCheckCircle className="text-green-600 h-4 w-4 sm:h-5 sm:w-5" />
+                  <button
+                    onClick={() => openRemoveModal(record)}
+                    className="text-red-500 hover:text-red-700 transition-colors p-1 rounded-full hover:bg-red-50"
+                    title="Remove Attendance"
+                  >
+                    <FaTrash className="h-4 w-4 sm:h-5 sm:w-5" />
+                  </button>
+                </div>
+              </motion.li>
+            ))
+          )}
         </ul>
       </div>
+
+      {/* Leave Requests Section */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100">
         <h2 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 mb-4">Leave Requests</h2>
         <ul className="space-y-3">
-          {leaveRequests.map((leave) => (
-            <motion.li
-              key={leave._id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.3 }}
-              className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
-            >
-              <div>
-                <p className="font-semibold text-gray-800">From: {formatDate(leave.from)} To: {formatDate(leave.to)}</p>
-                <p className="text-sm text-gray-600">Reason: {leave.notes}</p>
-                <p className="text-sm text-gray-600">Applied: {formatDate(leave.createdAt)}</p>
-              </div>
-              <p
-                className={`text-sm font-medium px-2 sm:px-3 py-1 rounded-full mt-2 sm:mt-0 ${
-                  leave.status === 'Pending'
-                    ? 'bg-yellow-100 text-yellow-600'
-                    : leave.status === 'Approved'
-                    ? 'bg-green-100 text-green-600'
-                    : 'bg-red-100 text-red-600'
-                }`}
+          {leaveRequests.length === 0 ? (
+            <p className="text-gray-500 text-center py-4">No leave requests found.</p>
+          ) : (
+            leaveRequests.map((leave) => (
+              <motion.li
+                key={leave._id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ duration: 0.3 }}
+                className="p-3 sm:p-4 border-b border-gray-100 flex flex-col sm:flex-row justify-between items-start sm:items-center text-sm sm:text-base hover:bg-gray-50 rounded-lg"
               >
-                {leave.status}
-              </p>
-            </motion.li>
-          ))}
+                <div>
+                  <p className="font-semibold text-gray-800">From: {formatDate(leave.from)} To: {formatDate(leave.to)}</p>
+                  <p className="text-sm text-gray-600">Reason: {leave.notes}</p>
+                  <p className="text-sm text-gray-600">Applied: {formatDate(leave.createdAt)}</p>
+                </div>
+                <p
+                  className={`text-sm font-medium px-2 sm:px-3 py-1 rounded-full mt-2 sm:mt-0 ${
+                    leave.status === 'Pending'
+                      ? 'bg-yellow-100 text-yellow-600'
+                      : leave.status === 'Approved'
+                      ? 'bg-green-100 text-green-600'
+                      : 'bg-red-100 text-red-600'
+                  }`}
+                >
+                  {leave.status}
+                </p>
+              </motion.li>
+            ))
+          )}
         </ul>
       </div>
+
+      {/* Remove Attendance Confirmation Modal */}
+      {showRemoveModal && selectedRecord && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full shadow-xl"
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="bg-red-100 rounded-full p-2">
+                <FaExclamationTriangle className="h-6 w-6 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900">Remove Attendance</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-4">
+              Are you sure you want to remove attendance for <strong>{formatDate(selectedRecord.date)}</strong>?
+            </p>
+            
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for removal <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={removeReason}
+                onChange={(e) => setRemoveReason(e.target.value)}
+                placeholder="Please provide a reason for removing this attendance record..."
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 transition-all"
+                rows={3}
+                required
+              />
+            </div>
+            
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowRemoveModal(false);
+                  setSelectedRecord(null);
+                  setRemoveReason('');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveAttendance}
+                disabled={isRemoving || !removeReason.trim()}
+                className={`px-4 py-2 rounded-lg text-white transition-colors flex items-center gap-2 ${
+                  isRemoving || !removeReason.trim()
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-red-600 hover:bg-red-700'
+                }`}
+              >
+                {isRemoving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                    Removing...
+                  </>
+                ) : (
+                  <>
+                    <FaTrash className="h-4 w-4" />
+                    Remove
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
