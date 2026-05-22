@@ -74,7 +74,7 @@ const netPremiumData = {
   "200001-250000": { 1: 12117, 2: 22032, 3: 34151 },
 };
 
-// Page Styles (exactly as before)
+// Page Styles
 const pageContainerStyle = {
   background: "#ffffff",
   width: "794px",
@@ -139,63 +139,66 @@ const PageTemplate = ({ children }) => {
   );
 };
 
-// Page Components
+// Page 1 - Customer Service Letter
 const WelcomeLetterPage1 = ({ form }) => {
-  const salut = (name) => {
-    if (!name) return "Customer";
-    const parts = name.trim().split(" ");
-    return parts.length > 1 ? parts[1] : parts[0];
-  };
-
   return (
     <PageTemplate>
       <PageHeader />
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 6, marginBottom: 6 }}>
-        <div style={{ fontSize: 11 }}>
-          <strong>Date: </strong>
-          {formatDisplayDate(form.issueDate)}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 11, marginBottom: 10 }}>
+          <strong>Certificate No.</strong> {form.refNo}
+        </div>
+        <div style={{ fontSize: 16, fontWeight: 700, textAlign: "center", marginBottom: 20 }}>
+          Customer Service Letter
         </div>
       </div>
 
-      <div style={{ display: "flex", marginTop: 8, marginBottom: 18 }}>
-        <div style={{ fontWeight: 700, fontSize: 11 }}>ARSHYAN REF NO :</div>
-        <div style={{ fontWeight: 700, fontSize: 11, color: "#0f3b82" }}>{form.refNo}</div>
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontWeight: 700, marginBottom: 4 }}>{form.customerName}</div>
+        <div>Address: {form.customerAddress}</div>
+        <div>Pin code: {form.pincode}</div>
+        <div>Mobile No: {form.customerPhone}</div>
+        <div>Email id: {form.customerEmail}</div>
       </div>
 
-      <div style={{ marginBottom: 18, fontSize: 12 }}>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>{form.customerName}</div>
-        <div style={{ whiteSpace: "pre-line", marginBottom: 6 }}>{form.customerAddress}</div>
-        <div>{form.customerPhone}</div>
+      <p style={{ marginBottom: 12 }}>
+        Dear Mr/Mrs. {form.customerName},
+      </p>
+
+      <p style={{ marginBottom: 10 }}>
+        Congratulations on purchasing the Arshyan Portable Equipment Insurance Services, and welcome to the Arshyan family!
+      </p>
+
+      <p style={{ marginBottom: 10 }}>
+        We sincerely thank you for choosing Arshyan Insurance Services and hope you enjoy the valuable benefits and support offered under your membership.
+      </p>
+
+      <p style={{ marginBottom: 10 }}>
+        This Welcome Pack contains the following documents explaining all aspects of your Arshyan Portable Equipment Services:
+      </p>
+
+      <div style={{ marginLeft: 18, marginBottom: 12 }}>
+        <div style={{ marginBottom: 4 }}>✓ Benefit Guide – Explains the key benefits of your portable equipment insurance-related services.</div>
+        <div>✓ Terms & Conditions – Details the terms and conditions of your membership, including the terms of the Equipment All Risk Insurance provided by the insurer.</div>
       </div>
 
-      <p style={{ marginBottom: 8 }}>Dear {salut(form.customerName)},</p>
-
-      <p style={{ textAlign: "justify", marginBottom: 8 }}>
-        Congratulations on buying <strong>Arshyan Portable Equipment Insurance Services</strong> and welcome to the Arshyan family! We thank you
-        for choosing Arshyan Insurance Services and hope you will enjoy the benefits of the services.
+      <p style={{ marginBottom: 12 }}>
+        Your membership details, along with the details of the covered asset purchased by you, are mentioned overleaf.
       </p>
 
-      <p style={{ textAlign: "justify", marginBottom: 8 }}>
-        This welcome pack contains the following that explain all aspects of your Arshyan Portable Equipment Services:
+      <p style={{ marginBottom: 12 }}>
+        Should you require any assistance regarding your membership or services, please feel free to contact us using the details provided.
       </p>
 
-      <div style={{ marginLeft: 18, marginBottom: 8 }}>
-        <div style={{ marginBottom: 6 }}>• Benefit Guide: Explains the key benefits of your membership in detail.</div>
-        <div>• Terms and Conditions: Details the terms and conditions of your membership (including terms of your Equipment all risk insurance provided by the insurer).</div>
-      </div>
-
-      <p style={{ textAlign: "justify", marginBottom: 12 }}>
-        Your membership details along with the details of the asset purchased by you are mentioned overleaf. Don't hesitate to get in touch with us on the
-        contact details mentioned for any assistance regarding your membership.
+      <p style={{ marginBottom: 28 }}>
+        Thank you once again for becoming a valued member of Vidhant Associates Subsidiary of Arshyan Insurance Marketing & Services Pvt. Ltd.
       </p>
 
-      <p style={{ marginBottom: 28 }}>Thank you again for becoming an Arshyan Insurance Marketing & Services Pvt Ltd member!</p>
-
-      <div style={{ textAlign: "center", marginTop: 10 }}>
-        <p style={{ marginBottom: 6, fontSize: 11 }}>Yours Sincerely</p>
-        <p style={{ marginBottom: 14, fontSize: 11 }}>For Arshyan Insurance Marketing & Services Pvt Ltd.</p>
+      <div style={{ textAlign: "center", marginTop: 30 }}>
+        <p style={{ marginBottom: 6 }}>For & on behalf of</p>
+        <p style={{ marginBottom: 14, fontWeight: 700 }}>Arshyan Insurance Marketing & Services Private Limited</p>
         <img src={assets.stamp} alt="Stamp" style={{ width: 100, display: "block", margin: "0 auto 8px auto" }} />
-        <div style={{ fontWeight: 700 }}>Authorised Signatory</div>
+        <div style={{ fontWeight: 700 }}>Authorized Signatory</div>
       </div>
 
       <PageFooter />
@@ -203,103 +206,106 @@ const WelcomeLetterPage1 = ({ form }) => {
   );
 };
 
+// Page 2 - Equipment Details & Membership Details
 const WelcomeLetterPage2 = ({ form }) => {
   const periodText = form.selectedPeriod === "1" ? "1 Year" : form.selectedPeriod === "2" ? "2 Years" : "3 Years";
+  
+  const netAmount = parseFloat(form.membership.netAmount) || 0;
+  const gstPercent = parseFloat(form.membership.gstPercentage) || 18;
+  const gstAmount = (netAmount * gstPercent) / 100;
+  const grossAmount = netAmount + gstAmount;
 
   return (
     <PageTemplate>
       <PageHeader />
-      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 8, marginBottom: 12, fontSize: 13 }}>Asset Details</h3>
+      
+      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 8, marginBottom: 16, fontSize: 14 }}>Equipment Details</h3>
 
-      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 18, fontSize: 11 }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", marginBottom: 24, fontSize: 11 }}>
         <tbody>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700, width: "40%" }}>Customer Mobile No.</td>
-            <td style={{ border: "1px solid #000", padding: 8 }}>{form.asset.mobileNo}</td>
-          </tr>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Model Type - Brand/Model</td>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700, width: "35%" }}>Model Type - Brand/Model</td>
             <td style={{ border: "1px solid #000", padding: 8 }}>{form.asset.brandModel}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>IMEI #</td>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Serial / IMEI #</td>
             <td style={{ border: "1px solid #000", padding: 8 }}>{form.asset.imei}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Value of Equipment</td>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Equipment Value (INR)</td>
             <td style={{ border: "1px solid #000", padding: 8 }}>₹ {form.valueOfEquipment}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Pincode</td>
-            <td style={{ border: "1px solid #000", padding: 8 }}>{form.pincode || ""}</td>
+            <td style={{ border: "1px solid #000", padding: 8, fontWeight: 700 }}>Equipment Purchase Date</td>
+            <td style={{ border: "1px solid #000", padding: 8 }}>{formatDisplayDate(form.purchaseDate)}</td>
           </tr>
         </tbody>
       </table>
 
-      <h3 style={{ textAlign: "center", fontWeight: 700, marginBottom: 10, fontSize: 12 }}>Membership Details cum Sales Proforma</h3>
+      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 16, marginBottom: 16, fontSize: 13 }}>Membership Details CUM Sales Proforma</h3>
 
       <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
         <tbody>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Name of Customer</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700, width: "35%" }}>Name of Customer</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerName}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Email of Customer</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Address of Customer</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerAddress}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Mobile No</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerPhone}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Email Id</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.customerEmail}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Address of Customer</td>
-            <td style={{ border: "1px solid #000", padding: 6, whiteSpace: "pre-line" }}>{form.customerAddress}</td>
-          </tr>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Arshyan Ref No</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>{form.refNo}</td>
-          </tr>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Date of Purchase</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>{formatDisplayDate(form.purchaseDate)}</td>
-          </tr>
-          <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Date of Start</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Arshyan Service Start Date</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{formatDisplayDate(form.startDate)}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Date of Expiry</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Arshyan Service Expiry Date</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{formatDisplayDate(form.expiryDate)}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Service Tenure</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Tenure (Years)</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{periodText}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Product Detail</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.productDetail}</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Arshyan Service Charges (Net)</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {netAmount.toFixed(2)}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurance Ref No.</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insuranceRefNo}</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>GST {gstPercent}%</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {gstAmount.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Gross Amount</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {grossAmount.toFixed(2)}</td>
           </tr>
           <tr>
             <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurer Name</td>
             <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insurerName}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Net Services Charges</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>₹ {form.membership.netAmount}</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurer Product</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.productDetail}</td>
           </tr>
           <tr>
-            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Services Charges (Inclusive GST {form.membership.gstPercentage}%)</td>
-            <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.serviceCharges}</td>
+            <td style={{ border: "1px solid #000", padding: 6, fontWeight: 700 }}>Insurer Ref No</td>
+            <td style={{ border: "1px solid #000", padding: 6 }}>{form.membership.insuranceRefNo}</td>
           </tr>
         </tbody>
       </table>
 
-      <div style={{ textAlign: "center", marginTop: 26 }}>
-        <p style={{ marginBottom: 6, fontSize: 11 }}>Yours Sincerely</p>
-        <p style={{ marginBottom: 14, fontSize: 11 }}>For Arshyan Insurance Marketing & Services Pvt Ltd.</p>
+      <div style={{ textAlign: "center", marginTop: 30 }}>
+        <p style={{ marginBottom: 6 }}>For & on behalf of</p>
+        <p style={{ marginBottom: 14, fontWeight: 700 }}>Arshyan Insurance Marketing & Services Private Limited</p>
         <img src={assets.stamp} alt="Stamp" style={{ width: 80, display: "block", margin: "0 auto" }} />
-        <div style={{ fontWeight: 700 }}>Authorised Signatory</div>
+        <div style={{ fontWeight: 700 }}>Authorized Signatory</div>
       </div>
 
       <PageFooter />
@@ -307,51 +313,185 @@ const WelcomeLetterPage2 = ({ form }) => {
   );
 };
 
+// Page 3 - Standard Terms and Conditions (Part 1)
 const WelcomeLetterPage3 = ({ form }) => {
-  const exclusions = [
-    "Mis-representation, Mis-description or Non-Disclosure of any material particulars/information/facts.",
-    "Damages which are Pre-existing in nature. (Applicable to Contents and Building)",
-    "Loss or Damage or Collapse of Building due to structural defects, latent defects, poor maintenance, workmanship, material or design, latent defect, wear and tear, depreciation, moth, vermin, insects or mildew.",
-    "Manufacturing defects in Electrical, Mechanical and Electronic Items for which the manufacturer is responsible.",
-    "Loss of or damage to the property insured under this policy falling under the terms of the maintenance agreement.",
-    "Improper handling, dismantling, fitting adjustment, repair alteration or modification not approved by the makers/manufacturers.",
-    "Breakage, Cracking or Scratching of brittle or fragile articles unless caused by fire or accidental external means.",
-    "Overloading or Strain, Overrunning Excessive Pressure, Short Circuiting and / Self Heating or test requiring imposition of abnormal conditions.",
-    "Over Winding, Denting or Internal Damage of Watches and Clocks.",
-    "Loss or Damage liable to be repaired or made good by a third party under any contract or agreement.",
-    "Loss or damage to Money, Securities, Manuscript, Deeds, Bonds, Bills of Exchange, Promissory Notes, Stock or Share Certificate, Stamp and Travel Ticket or Traveler cheques.",
-    "Loss of insured property from safe inside insured Building, following use of the key or any duplicate thereof or access code to the safe belonging to the Insured.",
-    "Loss Destruction of or Damage to articles of Consumable Nature.",
-    "Jewellery and Valuables, Works of Art, Paintings, Curios unless specifically insured.",
-    "Loss, destruction or damage directly occasioned by pressure wave caused by aircraft and other aerial devices travelling at sonic or supersonic speeds.",
-    "Loss, damage or liability arising directly or indirectly from seepage, pollution or contamination.",
-    "Loss, damage or consequential loss directly or indirectly caused by any functioning or malfunctioning of the internet or similar facility.",
-  ];
-
   const isBajajSelected = form.membership.insurerName === "BAJAJ GENERAL INSURANCE LIMITED";
 
   return (
     <PageTemplate>
       <PageHeader small />
-      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 10, marginBottom: 10 }}>Coverage Details</h3>
+      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 8, marginBottom: 16, fontSize: 14 }}>
+        STANDARD TERMS AND CONDITIONS
+      </h3>
+      
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>1. DEFINITION</h4>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        <strong>Equipment</strong> – Your Mobile Phone or Tablet (including pad) or Laptop purchased & other portable and non-Portable electronics by you.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        <strong>Fee</strong> – Means the amount inclusive of applicable taxes (as shown in table above) that You pay towards: (a) the Incorporation Fee, as the case may be; and (b) the Service Fee, when You purchase Your Membership. Vidhant Associates, being a subsidiary of Arshyan Insurance Marketing & Services Private Limited the right to revise its Fee at any point of time.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        <strong>Member</strong> – The person who has purchased and who has called Vidhant Associates subsidiary of Arshyan to register for the Membership.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        <strong>Membership</strong> - Your right to use the Service for year for which You pay the Fee, subject to these Terms & Conditions or as agreed with You from time to time.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        <strong>Service Fee</strong> – A part of the total Fee, other than Incorporation Fee, that You pay for availing the Services.
+      </p>
 
-      <p style={{ fontWeight: 700, marginBottom: 6 }}>Portable Electronics Equipment - All Risk</p>
-      <div style={{ marginLeft: 18, marginBottom: 10 }}>
-        <div>• Accidental/Impact Damage</div>
-        <div>• Liquid Damage</div>
-        <div>• Theft</div>
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12, marginTop: 16 }}>Cancelling Your Membership</h4>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        1) You have a right to cancel Your Membership at any time during the period of agreement. If You exercise this right to cancel then Your Membership will be cancelled immediately and any payment of Membership Fees made by You will be refunded to You.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 8, marginLeft: 18 }}>
+        The refund of Membership Fee will be as per the following refund grid:
+      </p>
+      <div style={{ marginLeft: 36, fontSize: 10, marginBottom: 12 }}>
+        <div>Within 7 days: Full Membership Amount will be refunded</div>
+        <div>Within 8 to 30 days: Rs. 750 will be deducted and balance membership fees will be refunded</div>
+        <div>After 30 days: NIL refund of membership fees</div>
+      </div>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        No refund of Fee shall be due on cancellation under any circumstances if you have used any of the features of the Service or if the cancellation notice is provided after thirty (30) days from the Start Date.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        2) We will cancel Your Membership on written notice to You if:
+      </p>
+      <div style={{ marginLeft: 36, fontSize: 10, marginBottom: 12 }}>
+        <div>a) We do not receive advance payment of the Fee from You on or before the date it is due; and/or</div>
+        <div>b) You have at any time:</div>
+        <div style={{ marginLeft: 18 }}>i. given Us false or materially incomplete information in relation to Your Membership; or</div>
+        <div style={{ marginLeft: 18 }}>ii. committed a material breach of the terms and conditions of Your Membership.</div>
       </div>
 
-      <p style={{ fontSize: 11, marginBottom: 6 }}><strong>Loss Depreciation:</strong> NIL</p>
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12, marginTop: 16 }}>Governing law and Jurisdiction</h4>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        These terms and conditions are governed by and must be interpreted in line with the laws of the Republic of India. You and We agree that all the disputes/differences arising out of or in relation to this Agreement shall be referred to the exclusive jurisdiction of and settled only by the courts in Delhi. You and We agree that terms and all other communications will be issued in English.
+      </p>
+
+      <PageFooter />
+    </PageTemplate>
+  );
+};
+
+// Page 4 - Terms and Conditions (Part 2) - Complaints, Customer Consent, Indemnity, Declaration
+const WelcomeLetterPage4 = ({ form }) => {
+  return (
+    <PageTemplate>
+      <PageHeader small />
+      
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Complaints</h4>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        If at any time You want to tell Us about a problem with Your Membership please call Us on 011-43592951 (between 11 am – 9pm, Monday – Saturday) or You can write to the Complaints Manager at:
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 8, fontStyle: "italic" }}>
+        Vidhant Associates being a subsidiary of Arshyan Insurance Marketing & Services Private Limited
+        <br />
+        212 1st Floor Block G-3, Sector 16 Rohini New Delhi-110089
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        We will do our best to answer Your query within five (5) working days. If We cannot reply to Your complaint by then, We will send You an acknowledgement letter to keep You informed of progress.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        If any issue which remains unresolved or unanswered for more than five (5) working days, you may escalate the matter to sales.support@arshyaninsurance.com
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        We assure You to revert to Your query within forty eight (48) hours of receipt of Your query.
+      </p>
+
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Customer consent</h4>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        We hereby authorize Arshyan Insurance Marketing & Services Private Limited (Holding of Vidhant Associates), to act as my authorized representative for the purpose of purchasing the Equipment All Risk insurance policy on my behalf, submit required documents, make initial premium payments, and receive the policy copy on my behalf. I confirm that I have understood the terms and conditions of the insurance policy, and I shall be bound by the decisions made by my authorized representative regarding this proposal. Any acts done by my representative in this regard shall be considered validly done by me. Please find attached a self-attested copy of my aadhar card and PAN card.
+      </p>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        The Customer also hereby consents to the Personal Information being disclosed by Vidhant Associates subsidiary of Arshyan Insurance to any third party including any insurer, Service Partner of Vidhant Associates subsidiary of Arshyan Insurance who will be either providing the complimentary insurance or other benefit and/or services on each of the Plan(s) for the purposes of fulfilment of the services or if required by law.
+      </p>
+
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>B: General conditions</h4>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        Please read this section carefully as it contains important information. Eligibility The Service is only available to residents of India who are over the age of eighteen (18) years.
+      </p>
+
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>INDEMNITY</h4>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        The Customer hereby agrees to defend, indemnify and hold Vidhant Associated Subsidiary of Arshyan Insurance and its officers, directors, employees and subcontractors harmless from any and all losses, damages, liabilities, verdicts, settlements, judgments, costs, and expenses (including reasonable attorneys' fees) incurred by Vidhant Associated Subsidiary of Arshyan Insurance or its officers or employees arising out of:
+      </p>
+      <div style={{ marginLeft: 36, fontSize: 10, marginBottom: 12 }}>
+        <div>a) Any wrongful act or omission of the Customer in relation to the usage of the Plan(s);</div>
+        <div>b) Any wilful misconduct, gross negligence or fraud by the Customer;</div>
+        <div>c) Any failure of the Customer to comply with the applicable law;</div>
+        <div>d) Any breach of the representations, warranties, obligations and covenants of the Customer or a default of the Customer's obligations; and</div>
+        <div>e) Any third-party claims arising out of the Customer's use of the Plan(s).</div>
+      </div>
+
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Declaration</h4>
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        This is to clarify that Vidhant Associates, a subsidiary of Arshyan Insurance Marketing & Services Private Limited, is not engaged in the business of selling insurance policies. We are only providing sales support services, customer assistance, and insurance-related query & support for customers regarding their equipment. Additionally, we assist customers during the claim process for their electronic devices by helping them with documentation requirements and claim-related queries. Furthermore, Vidhant Associates does not collect or receive any insurance premium amount from customers. We only charge professional service fees, inclusive of GST, for providing insurance-related support services. It is also clarified that Vidhant Associates, being a subsidiary of Arshyan Insurance Marketing & Services Private Limited, does not issue any insurance policies directly. We only facilitate complimentary insurance coverage/products for customers' equipment, where the coverage details are provided by the authorized insurer.
+      </p>
+
+      <PageFooter />
+    </PageTemplate>
+  );
+};
+
+// Page 5 - Insurance Coverage, Excess, Depreciation, Exclusions (Part 1)
+const WelcomeLetterPage5 = ({ form }) => {
+  const exclusionsPart1 = [
+    "Mis-representation, Mis-description or Non-Disclosure of any material particulars/information/facts.",
+    "Damages which are Pre-existing in nature.",
+    "Loss or damage to Contents due defective workmanship, material or design, latent defect, wear and tear, depreciation, moth, vermin, insects or mildew, process of cleaning, dyeing or bleaching, restoring, repairing, retouching or renovation, inherent vice, warping or shrinkage, the action of light or atmospheric conditions, natural ageing or any other gradually operating cause.",
+    "Manufacturing defects in Electrical, Mechanical and Electronic Items for which the manufacturer is responsible.",
+    "Loss of or damage to the property insured under this policy falling under the terms of the maintenance agreement.",
+    "Dismantling, fitting adjustment, repair alteration or modification not approved by the makers/manufacturers and/or the agents of makers/manufacturers or use of such property contrary to the directives of the makers/manufacturers and/or his agents.",
+    "Breakage, Cracking or Scratching of Crockery, Glass, Cameras, Binoculars, Lenses, Musical Instruments, Sports Gear and similar articles of brittle or fragile nature, unless caused by fire or accidental external means.",
+    "Loss or Damage liable to be repaired or made good by a third party under any contract of agreement.",
+  ];
+
+  const isBajajSelected = form.membership.insurerName === "BAJAJ GENERAL INSURANCE LIMITED";
+  const isTataSelected = form.membership.insurerName === "Tata Aig General Insurance Co Ltd";
+
+  return (
+    <PageTemplate>
+      <PageHeader small />
+      
+      <h3 style={{ textAlign: "center", fontWeight: 700, marginTop: 8, marginBottom: 16, fontSize: 13 }}>
+        Insurance Coverage provided by Insurer
+      </h3>
+
+      <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 11 }}>Coverage Details:</p>
+      <div style={{ marginLeft: 18, marginBottom: 12 }}>
+        <div style={{ marginBottom: 4, fontSize: 10 }}>
+          <strong>Accidental Damage</strong> – damage to the equipment due to unintentional drop or collision of the Insured Product or any object falling on the Insured Product or due to accidental external means.
+        </div>
+        <div style={{ marginBottom: 4, fontSize: 10 }}>
+          <strong>Liquid Damage</strong> – sudden and accidental spillage/entry of any form of liquid in/on the insured device.
+        </div>
+        <div style={{ marginBottom: 4, fontSize: 10 }}>
+          <strong>Theft/Stolen</strong> – the act of stealing equipment unlawfully and it has been taken away.
+        </div>
+      </div>
+
+      <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 11 }}>Excess</p>
+      {isTataSelected && (
+        <p style={{ fontSize: 10, marginBottom: 12, marginLeft: 18 }}>
+          TATA Aig General Insurance Co Ltd, Excess: NIL
+        </p>
+      )}
       {isBajajSelected && (
-        <p style={{ fontSize: 11, marginBottom: 12 }}><strong>Excess:</strong> First 5% of each and every claim minimum Rs.2500/-</p>
+        <p style={{ fontSize: 10, marginBottom: 12, marginLeft: 18 }}>
+          Bajaj General Insurance Ltd, Excess: First 5% of each and every claim minimum INR.2500
+        </p>
       )}
 
-      <h4 style={{ marginBottom: 8, fontSize: 12 }}>General Exclusions:</h4>
+      <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 11 }}>Depreciation:</p>
+      <p style={{ fontSize: 10, marginBottom: 12, marginLeft: 18 }}>NIL for each and Every Claim</p>
 
-      <ol style={{ fontSize: 10, marginLeft: 18, lineHeight: 1.45 }}>
-        {exclusions.map((ex, i) => (
-          <li key={i} style={{ marginBottom: 6 }}>{ex}</li>
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 11 }}>INSURER EXCLUSIONS</h4>
+      <ol style={{ fontSize: 9, marginLeft: 18, lineHeight: 1.45, marginBottom: 12 }}>
+        {exclusionsPart1.map((ex, i) => (
+          <li key={i} style={{ marginBottom: 4 }}>{ex}</li>
         ))}
       </ol>
 
@@ -360,33 +500,79 @@ const WelcomeLetterPage3 = ({ form }) => {
   );
 };
 
-const WelcomeLetterPage4 = ({ form }) => {
-  const exclusions2 = [
-    "Loss or damage due to theft or attempted theft by any employee of the Insured or loss or damage occasioned through the willful act of the Insured or any employee.",
-    "Loss or damage directly or indirectly caused by war, invasion, act of foreign enemy hostilities or war like operations.",
-    "Loss or damage directly or indirectly caused by ionizing radiations contamination by radio activity from any nuclear fuel or from any nuclear waste.",
-    "Loss or damage to Fire arms by Rusting, Bursting or any other cause.",
+// Page 6 - Exclusions (Part 2) and Claim Settlement Process
+const WelcomeLetterPage6 = ({ form }) => {
+  const exclusionsPart2 = [
+    "Loss of insured property from safe inside insured \"Building\", following use of the key or any duplicate thereof or access code to the safe belonging to the Insured, unless this has been obtained by threat or by violence.",
+    "Loss Destruction of or Damage to articles of Consumable Nature.",
+    "Loss, damage or liability arising directly or indirectly from seepage, pollution or contamination, however such seepage, pollution or contamination may have been caused.",
+    "Loss damage or consequential loss directly or indirectly caused by, consisting of, or arising from: (1) Any functioning or malfunctioning of the internet or similar facility or of any intranet or private network or similar facility, (2) Any corruption, destruction, distortion, erasure or other loss or damage to data, software or any kind of programming or instruction set. (3) Loss of use or functionality whether partial or entire of data, coding, program, software, any computer or computer system or other device dependent upon any microchip or embedded logic, and any ensuing liability. This shall not exclude subsequent damage not otherwise excluded which itself results from an insured peril.",
+    "Loss or damage due to theft or attempted theft by any employee of the Insured or loss or damage occasioned through the willful act of the Insured or any employee or the willful act of any other person with a connivance of the Insured or any employee unless a FIR has been lodged against the employee.",
+    "Loss or damage directly or indirectly, proximately or remotely occasioned by or contributed to or traceable to or happening through in consequence of war, invasion, act of foreign enemy hostilities or war like operations (whether war be declared or not) civil war, civil commotion, mutiny, rebellion, revolution, insurrection, conspiracy, military or usurped power.",
+    "Loss or damage directly or indirectly caused by or contributed to by or arising from ionizing radiations contamination by radio activity from any nuclear fuel or from any nuclear waste from the combustion of nuclear from any nuclear waste from the combustion of nuclear fuel or from any nuclear weapons material.",
     "Mysterious disappearance and Unexplained Losses.",
-    "Loss of earnings, loss by delay, loss of market or other consequential or indirect loss.",
-    "Loss or damage to Livestock, Motor Cycles and Vehicles of any description.",
-    "Expenses incurred for maintenance of Electronic and Electrical Equipments and Domestic Appliances.",
-    "Theft and Burglary Claims, if the premise is left unoccupied for more than continuous 45 days.",
-    "Loss, destruction or damage to the contents or items in Refrigerator/Fridge caused by change of temperature.",
-    "Loss or damage arising from detention, confiscation, nationalization, requisition, occupation or willful destruction by or under the order of the government or any public or local authority."
+    "Any loss or damage to the insured property or to the general public and/ or legal liability arising out of immoral or unethical use of insured property.",
+    "Damage to property not belonging to or held in trust by or in the custody or control of the Insured.",
+    "Loss or damage to Contents due to Burglary or Theft where the Insured or any of the Insured's Family member is alleged to be concerned or implicated.",
+    "Loss or damage howsoever caused to Pedal Cycle, Electronic and Electrical Equipments, Domestic Appliances, Clothing older than 10 Years and Portable Equipments older than 5 Years (excluding mobile phones) and Mobile Phones older than 3 years.",
+    "Expenses incurred for maintenance of Electronic and Electrical Equipment and Domestic Appliances.",
   ];
 
   return (
     <PageTemplate>
       <PageHeader small />
-      <ol start={18} style={{ fontSize: 10, marginLeft: 18, lineHeight: 1.45 }}>
-        {exclusions2.map((ex, i) => (
-          <li key={i} style={{ marginBottom: 6 }}>{ex}</li>
+      
+      <ol start={9} style={{ fontSize: 9, marginLeft: 18, lineHeight: 1.45, marginBottom: 16 }}>
+        {exclusionsPart2.map((ex, i) => (
+          <li key={i} style={{ marginBottom: 4 }}>{ex}</li>
         ))}
       </ol>
 
-      <p style={{ marginTop: 12, fontStyle: "italic", fontSize: 10 }}>
-        Moreover, All terms & Condition will be applicable of issued insurance policy by Insurer, sale is attached you welcome email.
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 11, marginTop: 8 }}>CLAIM SETTLEMENT PROCESS</h4>
+      <p style={{ fontSize: 10, marginBottom: 8 }}>
+        1) Upon the happening of any event giving rise to a claim, the insured shall within 24 hours contact the Company and intimate the claim.
       </p>
+      
+      <p style={{ fontWeight: 700, marginBottom: 6, fontSize: 10 }}>Documents required for all claims process:</p>
+      <div style={{ marginLeft: 18, fontSize: 9, marginBottom: 12 }}>
+        <div>✓ 3 photographs of the device, one showing the front, one showing the back and one showing the serial/IMEI number</div>
+        <div>✓ Copy of purchase invoice</div>
+        <div>✓ Details of loss</div>
+        <div>✓ Claim form filled and signed by the customer</div>
+        <div>✓ Repair Estimate & Service Engineer report</div>
+        <div>✓ Final Repair Bill along with Payment receipt</div>
+        <div>✓ Police report (FIR) for Theft and Burglary Claims</div>
+        <div>✓ Copy of PAN Card and Address proof issued by Govt. of India</div>
+        <div>✓ NEFT details & cancelled cheque</div>
+        <div>✓ Documents to be given within 7 days of intimating claims</div>
+      </div>
+
+      <p style={{ fontSize: 10, marginBottom: 12 }}>
+        On receipt of all the required information along with the claim form, the company may/shall appoint a surveyor for assessing the loss/ claim within 72 hours of the receipt of intimation from the Insured. The Insured shall allow the surveyor to inspect the lost/ damaged properties/ goods. The Insured shall assist and not hinder or prevent the surveyor in pursuance of his/ her duties. The Insured shall not abandon the insured property/ items in the premises, nor take any step to rectify/ remedy the damage before the same has been approved by the Company or the Surveyor.
+      </p>
+
+      <PageFooter />
+    </PageTemplate>
+  );
+};
+
+// Page 7 - Fraud and Final Signatory
+const WelcomeLetterPage7 = ({ form }) => {
+  return (
+    <PageTemplate>
+      <PageHeader small />
+      
+      <h4 style={{ fontWeight: 700, marginBottom: 8, fontSize: 12 }}>Fraud</h4>
+      <p style={{ fontSize: 10, marginBottom: 16 }}>
+        If you or any claimant under this Policy shall make or advance any claim knowing the same to be false or Fraudulent as regards amount or otherwise, this Policy shall be void and all claims or payments hereunder shall be forfeited. Respective Insurer can also start legal proceedings against you.
+      </p>
+
+      <div style={{ textAlign: "center", marginTop: 60 }}>
+        <p style={{ marginBottom: 6 }}>For & on behalf of</p>
+        <p style={{ marginBottom: 14, fontWeight: 700 }}>Arshyan Insurance Marketing & Services Private Limited</p>
+        <img src={assets.stamp} alt="Stamp" style={{ width: 100, display: "block", margin: "0 auto 8px auto" }} />
+        <div style={{ fontWeight: 700 }}>Authorized Signatory</div>
+      </div>
 
       <PageFooter />
     </PageTemplate>
@@ -445,6 +631,9 @@ const WelcomeLetterGenerator = () => {
   const page2Ref = useRef();
   const page3Ref = useRef();
   const page4Ref = useRef();
+  const page5Ref = useRef();
+  const page6Ref = useRef();
+  const page7Ref = useRef();
 
   const { toast, show } = useToast();
 
@@ -513,7 +702,6 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // FIXED: Auto-calculate expiry date when start date or selected period changes
   const calculateExpiryDate = (startDate, selectedPeriod) => {
     if (!startDate || !selectedPeriod) return "";
     
@@ -522,10 +710,8 @@ const WelcomeLetterGenerator = () => {
       if (!y || !m || !d) return "";
       
       const dt = new Date(Number(y), Number(m) - 1, Number(d));
-      // Add selectedPeriod years
       const expiryDate = new Date(dt);
       expiryDate.setFullYear(dt.getFullYear() + parseInt(selectedPeriod));
-      // Subtract one day
       expiryDate.setDate(expiryDate.getDate() - 1);
       
       const yyyy = expiryDate.getFullYear();
@@ -538,38 +724,30 @@ const WelcomeLetterGenerator = () => {
     }
   };
 
-  // Replace the existing calculateExpiryDate function and useEffect with this:
-
-// Auto-calculate expiry date when start date or selected period changes
-useEffect(() => {
-  if (!autoCalcExpiry) return;
-  if (!form.startDate || !form.selectedPeriod) return;
-  
-  try {
-    const startDateObj = new Date(form.startDate);
-    if (isNaN(startDateObj.getTime())) return;
+  useEffect(() => {
+    if (!autoCalcExpiry) return;
+    if (!form.startDate || !form.selectedPeriod) return;
     
-    // Add selectedPeriod years
-    const expiryDateObj = new Date(startDateObj);
-    expiryDateObj.setFullYear(startDateObj.getFullYear() + parseInt(form.selectedPeriod));
-    
-    // Subtract one day
-    expiryDateObj.setDate(expiryDateObj.getDate() - 1);
-    
-    // Format to YYYY-MM-DD
-    const yyyy = expiryDateObj.getFullYear();
-    const mm = String(expiryDateObj.getMonth() + 1).padStart(2, "0");
-    const dd = String(expiryDateObj.getDate()).padStart(2, "0");
-    const newExpiryDate = `${yyyy}-${mm}-${dd}`;
-    
-    // Only update if different from current expiry date
-    if (newExpiryDate !== form.expiryDate) {
-      setForm(prev => ({ ...prev, expiryDate: newExpiryDate }));
+    try {
+      const startDateObj = new Date(form.startDate);
+      if (isNaN(startDateObj.getTime())) return;
+      
+      const expiryDateObj = new Date(startDateObj);
+      expiryDateObj.setFullYear(startDateObj.getFullYear() + parseInt(form.selectedPeriod));
+      expiryDateObj.setDate(expiryDateObj.getDate() - 1);
+      
+      const yyyy = expiryDateObj.getFullYear();
+      const mm = String(expiryDateObj.getMonth() + 1).padStart(2, "0");
+      const dd = String(expiryDateObj.getDate()).padStart(2, "0");
+      const newExpiryDate = `${yyyy}-${mm}-${dd}`;
+      
+      if (newExpiryDate !== form.expiryDate) {
+        setForm(prev => ({ ...prev, expiryDate: newExpiryDate }));
+      }
+    } catch (error) {
+      console.error("Error calculating expiry date:", error);
     }
-  } catch (error) {
-    console.error("Error calculating expiry date:", error);
-  }
-}, [form.startDate, form.selectedPeriod, autoCalcExpiry]);
+  }, [form.startDate, form.selectedPeriod, autoCalcExpiry]);
 
   useEffect(() => {
     const net = parseFloat(form.membership.netAmount || 0);
@@ -663,7 +841,7 @@ useEffect(() => {
     setPdfUrl("");
 
     try {
-      const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref];
+      const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref, page5Ref, page6Ref, page7Ref];
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'px',
@@ -827,8 +1005,8 @@ useEffect(() => {
   };
 
   const onDateChange = (field, value) => {
-  setForm(prev => ({ ...prev, [field]: value }));
-};
+    setForm(prev => ({ ...prev, [field]: value }));
+  };
 
   const friendlyDate = (iso) => {
     if (!iso) return "";
@@ -1000,8 +1178,8 @@ useEffect(() => {
                           <button onClick={() => handleViewPDF(letter.pdfUrl)} className="text-blue-600 hover:underline mr-4">View</button>
                           <a href={letter.pdfUrl} download className="text-green-600 hover:underline mr-4">Download</a>
                           <button onClick={() => handleDelete(letter._id)} className="text-red-600 hover:underline">Delete</button>
-                        </td>
-                      </tr>
+                                          </td>
+                          </tr>
                     ))}
                   </tbody>
                 </table>
@@ -1036,6 +1214,15 @@ useEffect(() => {
         </div>
         <div ref={page4Ref} data-page="3" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
           <WelcomeLetterPage4 form={form} />
+        </div>
+        <div ref={page5Ref} data-page="4" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
+          <WelcomeLetterPage5 form={form} />
+        </div>
+        <div ref={page6Ref} data-page="5" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
+          <WelcomeLetterPage6 form={form} />
+        </div>
+        <div ref={page7Ref} data-page="6" style={{ background: "#fff", width: 794, height: 1123, overflow: 'hidden' }}>
+          <WelcomeLetterPage7 form={form} />
         </div>
       </div>
 
