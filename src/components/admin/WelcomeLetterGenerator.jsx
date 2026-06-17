@@ -833,62 +833,237 @@ const WelcomeLetterGenerator = () => {
     return true;
   };
 
-  const generatePDF = async () => {
-    if (!validateFormBeforeGenerate()) return;
 
-    setLoading(true);
-    setSuccess("");
-    setPdfUrl("");
+const generatePDF = async () => {
+  if (!validateFormBeforeGenerate()) return;
 
-    try {
-      const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref, page5Ref, page6Ref, page7Ref];
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'px',
-        format: [794, 1123]
+  setLoading(true);
+  setSuccess("");
+  setPdfUrl("");
+
+  try {
+    const pageRefs = [page1Ref, page2Ref, page3Ref, page4Ref, page5Ref, page6Ref, page7Ref];
+    
+    // Create PDF with compression
+    const pdf = new jsPDF({
+      orientation: 'portrait',
+      unit: 'px',
+      format: [794, 1123],
+      compress: true
+    });
+
+    console.log("Generating PDF pages...");
+    
+    // Generate all pages
+    for (let i = 0; i < pageRefs.length; i++) {
+      console.log(`Processing page ${i + 1} of ${pageRefs.length}`);
+      
+      const element = pageRefs[i].current;
+      if (!element) throw new Error(`Page ${i + 1} ref not found`);
+
+      // Store original styles
+      const originalOverflow = element.style.overflow;
+      const originalPosition = element.style.position;
+      const originalLeft = element.style.left;
+      const originalTop = element.style.top;
+
+      // Set temporary styles for capture
+      element.style.overflow = 'visible';
+      element.style.position = 'relative';
+      element.style.left = '0';
+      element.style.top = '0';
+
+      // Capture with optimized settings
+      const canvas = await html2canvas(element, {
+        scale: 2, // Reduced from 3 to save size
+        useCORS: true,
+        allowTaint: false,
+        backgroundColor: "#ffffff",
+        logging: false,
+        windowWidth: 794,
+        windowHeight: 1123,
       });
 
-      for (let i = 0; i < pageRefs.length; i++) {
-        const element = pageRefs[i].current;
-        if (!element) throw new Error(`Page ${i + 1} ref not found`);
+      // Restore original styles
+      element.style.overflow = originalOverflow;
+      element.style.position = originalPosition;
+      element.style.left = originalLeft;
+      element.style.top = originalTop;
 
-        const originalOverflow = element.style.overflow;
-        const originalPosition = element.style.position;
-        const originalLeft = element.style.left;
-        const originalTop = element.style.top;
-
-        element.style.overflow = 'visible';
-        element.style.position = 'relative';
-        element.style.left = '0';
-        element.style.top = '0';
-
-        const canvas = await html2canvas(element, {
-          scale: 3,
-          useCORS: true,
-          allowTaint: true,
-          backgroundColor: "#ffffff",
-          logging: false,
-          windowWidth: 794,
-          windowHeight: 1123,
-        });
-
-        element.style.overflow = originalOverflow;
-        element.style.position = originalPosition;
-        element.style.left = originalLeft;
-        element.style.top = originalTop;
-
-        const imgData = canvas.toDataURL("image/png", 1.0);
-        
-        if (i > 0) {
-          pdf.addPage([794, 1123]);
-        }
-        
-        pdf.addImage(imgData, 'PNG', 0, 0, 794, 1123, undefined, 'FAST');
+      // Use JPEG compression to reduce size
+      const imgData = canvas.toDataURL("image/jpeg", 0.85);
+      
+      if (i > 0) {
+        pdf.addPage([794, 1123]);
       }
+      
+      pdf.addImage(imgData, 'JPEG', 0, 0, 794, 1123, undefined, 'FAST');
+    }
 
-      const pdfBase64 = pdf.output('datauristring').split(',')[1];
+    // Get PDF as base64
+    const pdfBase64 = pdf.output('datauristring', { compress: true }).split(',')[1];
+    const pdfSizeMB = (pdfBase64.length * 0.75) / (1024 * 1024);
+    console.log(`Total PDF size: ${pdfSizeMB.toFixed(2)} MB`);
+    
+    // Check if chunked upload is needed
+    if (pdfSizeMB > 4.5) {
+      console.log(`PDF size ${pdfSizeMB.toFixed(2)}MB exceeds limit, using chunked upload...`);
+      
+      // Split into chunks (500KB each for safety)
+      const CHUNK_SIZE = 500000; // 500KB chunks
+      const chunks = [];
+      
+      for (let i = 0; i < pdfBase64.length; i += CHUNK_SIZE) {
+        chunks.push(pdfBase64.slice(i, i + CHUNK_SIZE));
+      }
+      
+      console.log(`Splitting into ${chunks.length} chunks of ~500KB each`);
       
       const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Authentication token not found. Please login again.");
+      }
+      
+      // Prepare letter data once
+      const letterData = {
+        refNo: form.refNo,
+        customerName: form.customerName,
+        customerEmail: form.customerEmail,
+        customerAddress: form.customerAddress,
+        customerPhone: form.customerPhone,
+        pincode: form.pincode,
+        valueOfEquipment: form.valueOfEquipment,
+        selectedPeriod: form.selectedPeriod,
+        insurancePremium: form.insurancePremium,
+        asset: {
+          mobileNo: form.asset.mobileNo,
+          brandModel: form.asset.brandModel,
+          imei: form.asset.imei,
+        },
+        membership: {
+          productDetail: form.membership.productDetail,
+          insuranceRefNo: form.membership.insuranceRefNo,
+          insurerName: form.membership.insurerName,
+          serviceCharges: form.membership.serviceCharges,
+          netAmount: form.membership.netAmount,
+          gstPercentage: form.membership.gstPercentage,
+          totalAmount: form.membership.totalAmount,
+        },
+        purchaseDate: form.purchaseDate,
+        startDate: form.startDate,
+        expiryDate: form.expiryDate,
+        issueDate: form.issueDate,
+      };
+      
+      let finalResult = null;
+      
+      // Upload chunks sequentially
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`Uploading chunk ${i + 1} of ${chunks.length}...`);
+        
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout per chunk
+        
+        try {
+          const res = await fetch(`${API_BASE}/api/letter/generate-chunked`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              chunks: chunks[i],
+              totalChunks: chunks.length,
+              chunkIndex: i,
+              fileName: `letter-${Date.now()}.pdf`,
+              letterData: letterData,
+            }),
+            signal: controller.signal
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.msg || `Failed to upload chunk ${i + 1}`);
+          }
+          
+          const data = await res.json();
+          
+          if (data.pdfUrl) {
+            // This is the final response with the PDF URL
+            finalResult = data;
+            break;
+          }
+          
+          if (!data.success && i === chunks.length - 1) {
+            throw new Error(data.msg || "Failed to complete upload");
+          }
+          
+          console.log(`Chunk ${i + 1} uploaded successfully`);
+          
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          if (fetchError.name === 'AbortError') {
+            throw new Error(`Chunk ${i + 1} upload timed out`);
+          }
+          throw fetchError;
+        }
+      }
+      
+      if (finalResult && finalResult.pdfUrl) {
+        setPdfUrl(finalResult.pdfUrl);
+        setSuccess("Welcome Letter Generated & Saved Successfully!");
+        const generatedRef = finalResult.refNo || form.refNo;
+        show(`Letter ${generatedRef} generated successfully!`);
+        await fetchLetters();
+        await fetchNextRef();
+      } else {
+        throw new Error("Failed to get PDF URL from server");
+      }
+      
+    } else {
+      // PDF is small enough for regular upload
+      console.log(`PDF size ${pdfSizeMB.toFixed(2)}MB is within limit, using regular upload...`);
+      
+      const token = localStorage.getItem("token");
+      if (!token) {
+        throw new Error("Authentication token not found. Please login again.");
+      }
+      
+      const letterData = {
+        refNo: form.refNo,
+        customerName: form.customerName,
+        customerEmail: form.customerEmail,
+        customerAddress: form.customerAddress,
+        customerPhone: form.customerPhone,
+        pincode: form.pincode,
+        valueOfEquipment: form.valueOfEquipment,
+        selectedPeriod: form.selectedPeriod,
+        insurancePremium: form.insurancePremium,
+        asset: {
+          mobileNo: form.asset.mobileNo,
+          brandModel: form.asset.brandModel,
+          imei: form.asset.imei,
+        },
+        membership: {
+          productDetail: form.membership.productDetail,
+          insuranceRefNo: form.membership.insuranceRefNo,
+          insurerName: form.membership.insurerName,
+          serviceCharges: form.membership.serviceCharges,
+          netAmount: form.membership.netAmount,
+          gstPercentage: form.membership.gstPercentage,
+          totalAmount: form.membership.totalAmount,
+        },
+        purchaseDate: form.purchaseDate,
+        startDate: form.startDate,
+        expiryDate: form.expiryDate,
+        issueDate: form.issueDate,
+      };
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
+      
       const res = await fetch(`${API_BASE}/api/letter/generate`, {
         method: "POST",
         headers: {
@@ -897,56 +1072,60 @@ const WelcomeLetterGenerator = () => {
         },
         body: JSON.stringify({
           pdfBase64: pdfBase64,
-          letterData: {
-            refNo: form.refNo,
-            customerName: form.customerName,
-            customerEmail: form.customerEmail,
-            customerAddress: form.customerAddress,
-            customerPhone: form.customerPhone,
-            pincode: form.pincode,
-            valueOfEquipment: form.valueOfEquipment,
-            selectedPeriod: form.selectedPeriod,
-            insurancePremium: form.insurancePremium,
-            asset: {
-              mobileNo: form.asset.mobileNo,
-              brandModel: form.asset.brandModel,
-              imei: form.asset.imei,
-            },
-            membership: {
-              productDetail: form.membership.productDetail,
-              insuranceRefNo: form.membership.insuranceRefNo,
-              insurerName: form.membership.insurerName,
-              serviceCharges: form.membership.serviceCharges,
-              netAmount: form.membership.netAmount,
-              gstPercentage: form.membership.gstPercentage,
-              totalAmount: form.membership.totalAmount,
-            },
-            purchaseDate: form.purchaseDate,
-            startDate: form.startDate,
-            expiryDate: form.expiryDate,
-            issueDate: form.issueDate,
-          },
+          letterData: letterData,
         }),
+        signal: controller.signal
       });
-
+      
+      clearTimeout(timeoutId);
+      
+      if (!res.ok) {
+        const errorText = await res.text();
+        if (res.status === 413) {
+          throw new Error("PDF too large for direct upload. Please try again (the system will automatically use chunked upload for large files).");
+        }
+        throw new Error(`Server error: ${res.status} - ${errorText}`);
+      }
+      
       const data = await res.json();
-      if (!res.ok) throw new Error(data.msg || "Failed to generate");
-
+      if (!data.success) {
+        throw new Error(data.msg || "Failed to generate letter");
+      }
+      
       setPdfUrl(data.pdfUrl);
       setSuccess("Welcome Letter Generated & Saved Successfully!");
-
       const generatedRef = data.refNo || form.refNo;
       show(`Letter ${generatedRef} generated successfully!`);
-
       await fetchLetters();
       await fetchNextRef();
-    } catch (err) {
-      console.error("Error generating PDF:", err);
-      alert("Error: " + err.message);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Scroll to success message
+    setTimeout(() => {
+      document.querySelector('.bg-green-100')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 100);
+    
+  } catch (err) {
+    console.error("Error generating PDF:", err);
+    
+    // User-friendly error messages
+    let errorMessage = err.message;
+    if (err.message.includes("413") || err.message.includes("payload") || err.message.includes("too large")) {
+      errorMessage = "The PDF is too large. Please try reducing image quality or contact support.";
+    } else if (err.message.includes("timeout")) {
+      errorMessage = "The request timed out. Please check your internet connection and try again.";
+    } else if (err.message.includes("token")) {
+      errorMessage = "Your session has expired. Please login again.";
+    } else if (err.message.includes("network")) {
+      errorMessage = "Network error. Please check your internet connection.";
+    }
+    
+    alert("Error: " + errorMessage);
+    show(`Failed to generate letter: ${errorMessage}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this welcome letter? This action cannot be undone.")) return;
