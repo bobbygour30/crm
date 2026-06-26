@@ -2,35 +2,46 @@ import { motion } from "framer-motion";
 import {
   FaEye,
   FaEdit,
-  FaSave,
   FaTimes,
   FaTrash,
-  FaFilePdf,
   FaDownload,
-  FaCalendarAlt,
   FaSearch,
   FaUpload,
   FaFilter,
   FaFileExcel,
-  FaUser,
-  FaUsers,
+  FaBell,
+  FaHeartbeat,
   FaCar,
   FaMobileAlt,
-  FaHeartbeat,
-  FaFileAlt,
+  FaUser,
+  FaUsers,
+  FaCalendarAlt,
   FaLink,
   FaMoneyBillWave,
   FaCheckCircle,
   FaClock,
   FaExclamationTriangle,
-  FaBell,
+  FaFilePdf,
+  FaFileImage,
+  FaUserPlus,
+  FaUsers as FaFloater,
+  FaChild,
+  FaUserMd,
+  FaIdCard,
+  FaFileAlt,
+  FaArrowUp,
+  FaCheck,
+  FaPlus,
+  FaMinus,
 } from "react-icons/fa";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 
-function LeadTable({ filter, setFilter, setSelectedLead }) {
-  // ========== CONSTANTS ==========
-  const lobOptions = [
+function LeadTable() {
+  // ============================================================
+  // CONSTANTS
+  // ============================================================
+  const LOB_OPTIONS = [
     "Health Insurance",
     "Motor Insurance",
     "Mobile/Electronic Equipment Insurance",
@@ -66,7 +77,61 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "Other Insurance",
   ];
 
-  const insurerOptions = [
+  const SOURCE_OPTIONS = [
+    "Employee",
+    "Channel Partner",
+    "Direct Client",
+    "Social Media",
+    "Store",
+    "Other",
+  ];
+
+  const GENDER_OPTIONS = ["Male", "Female", "Other"];
+  
+  const STATUS_OPTIONS = [
+    "Open",
+    "Quotation Generated",
+    "Payment Link Generated",
+    "Payment Done",
+    "Policy Issued",
+  ];
+
+  const PAYMENT_STATUS_OPTIONS = [
+    "Quote Under Discussion",
+    "URL Shared",
+    "Payment Done",
+    "e-Mandate Status Pending",
+    "e-Mandate Status Done",
+    "Policy Issued",
+  ];
+
+  const POLICY_TYPE_OPTIONS = ["Individual", "Floater"];
+  
+  const QUALIFICATION_OPTIONS = [
+    "10th", "12th", "Graduate", "Post Graduate", "Professional", "Other"
+  ];
+  
+  const OCCUPATION_OPTIONS = [
+    "Salaried", "Business", "Professional", "Student", "Retired", "Housewife", "Other"
+  ];
+  
+  const RELATIONSHIP_OPTIONS = [
+    "Self", "Spouse", "Child", "Parent", "Sibling", "Other"
+  ];
+  
+  const YES_NO_OPTIONS = ["Yes", "No"];
+  
+  const NCB_OPTIONS = ["0%", "20%", "25%", "35%", "45%", "50%"];
+  
+  const VEHICLE_TYPE_OPTIONS = [
+    "Two Wheeler", "Private Car", "Taxi", "Commercial Vehicle"
+  ];
+  
+  const INSURANCE_TYPE_OPTIONS = ["Comprehensive", "TP", "SAOD"];
+  
+  const DEVICE_TYPE_OPTIONS = ["Mobile", "Tablet", "Laptop", "Other"];
+
+  const INSURER_OPTIONS = [
     "Bajaj Allianz General Insurance Co Ltd",
     "Tata Aig General Insurance Co Ltd",
     "HDFC Ergo General Insurance Co Ltd",
@@ -99,58 +164,35 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     "Bajaj Allianz Life Insurance",
   ];
 
-  const agencyOptions = [
-    "EKRAMUL HAQUE",
-    "ARSHYAN INSURANCE",
-    "RUHI",
-    "NARGISH TARANNUM",
-    "NEHA KHATOON",
-    "MOINA KHATOON",
-    "SHARMEEN KHATOON",
-    "NEYAZ AHMED",
-    "PIYUSH KUMAR",
-    "DEEPAK KUMAR",
-    "OTHERS",
-  ];
+  // ============================================================
+  // VALIDATION HELPERS
+  // ============================================================
+  const toUpperCase = (value) => value ? value.toUpperCase() : value;
+  const validateMobile = (mobile) => /^[0-9]{10}$/.test(mobile);
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validateAadhaar = (aadhaar) => /^[0-9]{12}$/.test(aadhaar);
+  const validatePAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+  const validatePIN = (pin) => /^[0-9]{6}$/.test(pin);
 
-  const gstOptions = [0, 5, 12, 18];
-  
-  const sourceOptions = [
-    "Employee",
-    "Channel Partner",
-    "Direct Client",
-    "Social Media",
-    "Store",
-    "Other",
-  ];
+  const generateLeadCode = (leads) => {
+    const lastLead = leads[0];
+    let lastNumber = 0;
+    if (lastLead && lastLead.leadCode) {
+      const match = lastLead.leadCode.match(/LEAD-(\d+)/);
+      if (match) lastNumber = parseInt(match[1]);
+    }
+    const newNumber = lastNumber + 1;
+    return `LEAD-${String(newNumber).padStart(5, "0")}`;
+  };
 
-  const genderOptions = ["Male", "Female", "Other"];
-  const statusOptions = ["Open", "Quotation Generated", "Payment Link Generated", "Payment Done", "Policy Issued"];
-  const paymentStatusOptions = ["Quote Under Discussion", "URL Shared", "Payment Done", "e-Mandate Status Pending", "e-Mandate Status Done", "Policy Issued"];
-  const policyTypeOptions = ["Individual", "Floater"];
-  const qualificationOptions = ["10th", "12th", "Graduate", "Post Graduate", "Professional", "Other"];
-  const occupationOptions = ["Salaried", "Business", "Professional", "Student", "Retired", "Housewife", "Other"];
-  const relationshipOptions = ["Self", "Spouse", "Child", "Parent", "Sibling", "Other"];
-  const yesNoOptions = ["Yes", "No"];
-  const ncbOptions = ["0%", "20%", "25%", "35%", "45%", "50%"];
-  const vehicleTypeOptions = [
-    "Two Wheeler",
-    "Private Car",
-    "Taxi",
-    "Commercial Vehicle",
-  ];
-  const insuranceTypeOptions = ["Comprehensive", "TP", "SAOD"];
-  const previousPolicyStatusOptions = ["Active", "Expired"];
-  const deviceTypeOptions = ["Mobile", "Tablet", "Laptop", "Other"];
-
-  // ========== STATE ==========
+  // ============================================================
+  // STATE
+  // ============================================================
   const [leads, setLeads] = useState([]);
-  const [users, setUsers] = useState([]);
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showLeadDropdowns, setShowLeadDropdowns] = useState({});
-  const [showCustomAgency, setShowCustomAgency] = useState(false);
-  const [selectedUsers, setSelectedUsers] = useState([]);
-  const [showFormDropdown, setShowFormDropdown] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editLead, setEditLead] = useState(null);
+  const [selectedLead, setSelectedLead] = useState(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [sourceFilters, setSourceFilters] = useState({
     employees: false,
@@ -159,18 +201,28 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     socialMedia: false,
     directSource: false,
   });
-  const [activeFilters, setActiveFilters] = useState([]);
-  const [filteredLeadsData, setFilteredLeadsData] = useState([]);
+  const [filteredLeads, setFilteredLeads] = useState([]);
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [uploadStatus, setUploadStatus] = useState({ show: false, message: "", type: "" });
   const [isUploading, setIsUploading] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editLead, setEditLead] = useState(null);
-  const [editSelectedUsers, setEditSelectedUsers] = useState([]);
-  const [showEditCustomAgency, setShowEditCustomAgency] = useState(false);
-  const [showEditFormDropdown, setShowEditFormDropdown] = useState(false);
-  
-  // Health Insurance Specific States
+  const [renewalAlerts, setRenewalAlerts] = useState([]);
+
+  // Form States
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    mobileNo: "",
+    gender: "",
+    source: "",
+    remarks: "",
+    lob: "",
+    pinCode: "",
+    state: "",
+    city: "",
+    sourceDependentValue: "",
+  });
+
+  // Health Insurance
   const [healthDetails, setHealthDetails] = useState({
     policyType: "",
     numberOfAdults: 0,
@@ -198,7 +250,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     members: [],
   });
 
-  // Motor Insurance Specific States
+  // Motor Insurance
   const [motorDetails, setMotorDetails] = useState({
     vehicleType: "",
     insuranceType: "",
@@ -212,13 +264,12 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     ncb: "",
     addOnRequired: "",
     quoteRequired: "",
-    selectedInsurers: [],
     pypFile: null,
     rcFrontFile: null,
     rcBackFile: null,
   });
 
-  // Mobile/Electronic Insurance Specific States
+  // Electronic Insurance
   const [electronicDetails, setElectronicDetails] = useState({
     deviceType: "",
     otherDeviceType: "",
@@ -234,7 +285,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     purchaseInvoice: null,
   });
 
-  // Workflow Management States
+  // Workflow (for edit modal)
   const [workflowDetails, setWorkflowDetails] = useState({
     status: "Open",
     quoteNumber: "",
@@ -252,146 +303,79 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     remarks: "",
   });
 
-  // Edit Modal States
-  const [editData, setEditData] = useState({
-    name: "",
-    email: "",
-    mobileNo: "",
-    gender: "",
-    source: "",
-    reference: "",
-    status: "Open",
-    openStatus: "",
-    policyNumber: "",
-    lobOption: "",
-    lobCustom: "",
-    sumInsured: 0,
-    endorsement: "",
-    payoutPercent: 0,
-    payoutStatus: "",
-    additionalPayout: 0,
-    netPremium: 0,
-    gstPercent: 0,
-    policyStartDate: "",
-    policyExpiryDate: "",
-    insurer: "",
-    remarks: "",
-    assignedTo: [],
-    agency: "",
-    customAgency: "",
-    policyPdf: null,
-    newPolicyPdf: null,
-    imageUrl: "",
-    healthDetails: {},
-    motorDetails: {},
-    electronicDetails: {},
-    workflowDetails: {},
-  });
-
-  // Lead Form States
-  const [newLead, setNewLead] = useState({
-    name: "",
-    email: "",
-    mobileNo: "",
-    gender: "",
-    source: "",
-    reference: "",
-    status: "Open",
-    openStatus: "",
-    policyNumber: "",
-    lobOption: "",
-    lobCustom: "",
-    sumInsured: 0,
-    endorsement: "",
-    payoutPercent: 0,
-    payoutStatus: "",
-    additionalPayout: 0,
-    netPremium: 0,
-    gstPercent: 0,
-    policyStartDate: "",
-    policyExpiryDate: "",
-    insurer: "",
-    remarks: "",
-    assignedTo: [],
-    agency: "",
-    customAgency: "",
-    policyPdf: null,
-    imageUrl: "",
-    healthDetails: {},
-    motorDetails: {},
-    electronicDetails: {},
-  });
-
-  const [formStep, setFormStep] = useState(1);
+  // UI States
   const [showHealthSection, setShowHealthSection] = useState(false);
   const [showMotorSection, setShowMotorSection] = useState(false);
   const [showElectronicSection, setShowElectronicSection] = useState(false);
   const [showFloaterMembers, setShowFloaterMembers] = useState(false);
-  const [showWorkflowSection, setShowWorkflowSection] = useState(false);
   const [showInsurerQuotes, setShowInsurerQuotes] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [sourceDependentField, setSourceDependentField] = useState("");
 
-  const formDropdownRef = useRef(null);
-  const editFormDropdownRef = useRef(null);
-  const leadDropdownRefs = useRef({});
+  const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
-  // ========== REFS ==========
-  const filterDropdownRef = useRef(null);
-
-  // ========== EFFECTS ==========
+  // ============================================================
+  // EFFECTS
+  // ============================================================
   useEffect(() => {
     fetchLeads();
-    fetchAllUsers();
   }, []);
 
   useEffect(() => {
-    let filtered = [...leads];
-    if (globalSearch.trim()) {
-      const searchTerm = globalSearch.toLowerCase();
-      filtered = filtered.filter(
-        (lead) =>
-          (lead.policyNumber && lead.policyNumber.toLowerCase().includes(searchTerm)) ||
-          (lead.leadCode && lead.leadCode.toLowerCase().includes(searchTerm)) ||
-          (lead.mobileNo && lead.mobileNo.includes(searchTerm)) ||
-          (lead.email && lead.email.toLowerCase().includes(searchTerm)) ||
-          (lead.quoteNumber && lead.quoteNumber.toLowerCase().includes(searchTerm))
-      );
-    }
-    const sourceFiltersActive = [];
-    if (sourceFilters.employees) sourceFiltersActive.push("Employee");
-    if (sourceFilters.stores) sourceFiltersActive.push("Store");
-    if (sourceFilters.channelPartners) sourceFiltersActive.push("Channel Partner");
-    if (sourceFilters.socialMedia) sourceFiltersActive.push("Social Media");
-    if (sourceFilters.directSource) sourceFiltersActive.push("Direct Source");
-    if (sourceFiltersActive.length > 0) {
-      filtered = filtered.filter((lead) => sourceFiltersActive.includes(lead.source));
-    }
-    setFilteredLeadsData(filtered);
+    filterLeads();
   }, [leads, globalSearch, sourceFilters]);
 
   useEffect(() => {
+    if (formData.pinCode && validatePIN(formData.pinCode)) {
+      fetchCityState(formData.pinCode);
+    }
+  }, [formData.pinCode]);
+
+  useEffect(() => {
+    detectLOB(formData.lob);
+  }, [formData.lob]);
+
+  useEffect(() => {
+    checkRenewalAlerts();
+  }, [leads]);
+
+  useEffect(() => {
+    switch (formData.source) {
+      case "Employee":
+        setSourceDependentField("Employee Name");
+        break;
+      case "Channel Partner":
+        setSourceDependentField("Channel Partner Name");
+        break;
+      case "Store":
+        setSourceDependentField("Store Name");
+        break;
+      case "Social Media":
+        setSourceDependentField("Social Media Source");
+        break;
+      case "Other":
+        setSourceDependentField("Other Static List");
+        break;
+      default:
+        setSourceDependentField("");
+    }
+  }, [formData.source]);
+
+  useEffect(() => {
     const handleClickOutside = (event) => {
-      if (formDropdownRef.current && !formDropdownRef.current.contains(event.target)) {
-        setShowFormDropdown(false);
-      }
-      if (editFormDropdownRef.current && !editFormDropdownRef.current.contains(event.target)) {
-        setShowEditFormDropdown(false);
-      }
       if (filterDropdownRef.current && !filterDropdownRef.current.contains(event.target)) {
         setFilterDropdownOpen(false);
       }
-      Object.entries(leadDropdownRefs.current).forEach(([leadId, ref]) => {
-        if (ref && !ref.contains(event.target)) {
-          setShowLeadDropdowns((prev) => ({ ...prev, [leadId]: false }));
-        }
-      });
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // ========== API CALLS ==========
+  // ============================================================
+  // API CALLS
+  // ============================================================
   const fetchLeads = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -402,117 +386,197 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       if (res.ok) {
         const data = await res.json();
         setLeads(data);
-        setFilteredLeadsData(data);
+        setFilteredLeads(data);
       }
     } catch (err) {
       console.error("Fetch leads error:", err);
     }
   };
 
-  const fetchAllUsers = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/users`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setUsers(data);
+  // ============================================================
+  // RENEWAL ALERTS
+  // ============================================================
+  const checkRenewalAlerts = () => {
+    const today = new Date();
+    const alerts = [];
+    
+    leads.forEach(lead => {
+      if (lead.policyExpiryDate) {
+        const expiryDate = new Date(lead.policyExpiryDate);
+        const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilExpiry <= 30 && daysUntilExpiry > 0) {
+          let priority = "Normal";
+          if (daysUntilExpiry <= 7) priority = "Urgent";
+          else if (daysUntilExpiry <= 15) priority = "Priority";
+          
+          alerts.push({
+            leadId: lead._id,
+            customerName: lead.name,
+            policyNumber: lead.policyNumber,
+            expiryDate: lead.policyExpiryDate,
+            daysLeft: daysUntilExpiry,
+            priority,
+          });
+        } else if (daysUntilExpiry <= 0) {
+          alerts.push({
+            leadId: lead._id,
+            customerName: lead.name,
+            policyNumber: lead.policyNumber,
+            expiryDate: lead.policyExpiryDate,
+            daysLeft: daysUntilExpiry,
+            priority: "Expired",
+          });
+        }
       }
-    } catch (err) {
-      console.error("Fetch users error:", err);
-    }
-  };
-
-  // ========== HELPERS ==========
-  const generateLeadCode = () => {
-    const lastLead = leads[0];
-    let lastNumber = 0;
-    if (lastLead && lastLead.leadCode) {
-      const match = lastLead.leadCode.match(/LEAD-(\d+)/);
-      if (match) lastNumber = parseInt(match[1]);
-    }
-    const newNumber = lastNumber + 1;
-    return `LEAD-${String(newNumber).padStart(5, "0")}`;
-  };
-
-  const normalizeAssignedTo = (assignedTo) => {
-    if (Array.isArray(assignedTo)) return assignedTo.map((id) => (typeof id === "object" ? id._id : id));
-    if (!assignedTo) return [];
-    return [typeof assignedTo === "object" ? assignedTo._id : assignedTo];
-  };
-
-  const clampPercent = (val) => {
-    let n = parseFloat(val);
-    if (isNaN(n)) return 0;
-    if (n < 0) n = 0;
-    if (n > 100) n = 100;
-    return Math.round(n);
-  };
-
-  const formatCurrency = (value) => {
-    const v = parseFloat(value) || 0;
-    return v.toLocaleString("en-IN", {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
     });
+    
+    setRenewalAlerts(alerts);
   };
 
-  const computePayoutValue = (netPremium, payoutPercent) => {
-    const net = parseFloat(netPremium) || 0;
-    const pct = parseFloat(payoutPercent) || 0;
-    return (net * pct) / 100;
+  // ============================================================
+  // PIN CODE AUTO-FETCH
+  // ============================================================
+  const fetchCityState = async (pinCode) => {
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pinCode}`);
+      const data = await response.json();
+      if (data[0]?.Status === "Success") {
+        const postOffice = data[0].PostOffice[0];
+        setFormData(prev => ({
+          ...prev,
+          state: postOffice.State,
+          city: postOffice.District,
+        }));
+      }
+    } catch (error) {
+      console.error("Error fetching city/state:", error);
+    }
   };
 
-  const computeGSTAmount = (amount, gstPercent) => {
-    const a = parseFloat(amount) || 0;
-    const g = parseFloat(gstPercent) || 0;
-    return (a * g) / 100;
+  // ============================================================
+  // LOB DETECTION
+  // ============================================================
+  const detectLOB = (lob) => {
+    if (!lob) {
+      setShowHealthSection(false);
+      setShowMotorSection(false);
+      setShowElectronicSection(false);
+      return;
+    }
+
+    const isHealth = lob.toLowerCase().includes("health") || 
+                     lob === "Mediclaim Health Insurance" || 
+                     lob === "Group Health Insurance";
+    const isMotor = lob.toLowerCase().includes("motor") || 
+                    lob.includes("Car") || 
+                    lob.includes("Two-Wheeler") || 
+                    lob.includes("Taxi") ||
+                    lob.includes("Commercial Vehicle") ||
+                    lob.includes("E-Rikshaw");
+    const isElectronic = lob.toLowerCase().includes("mobile") || 
+                         lob.toLowerCase().includes("electronic") || 
+                         lob.toLowerCase().includes("equipment") ||
+                         lob.toLowerCase().includes("tablet") ||
+                         lob.toLowerCase().includes("laptop");
+
+    setShowHealthSection(isHealth);
+    setShowMotorSection(isMotor);
+    setShowElectronicSection(isElectronic);
   };
 
-  const computeGrossPremium = (netPremium, gstPercent) => {
-    const net = parseFloat(netPremium) || 0;
-    const gstAmt = computeGSTAmount(net, gstPercent);
-    return net + gstAmt;
+  // ============================================================
+  // FLOATER MEMBERS
+  // ============================================================
+  const generateFloaterMembers = () => {
+    const adults = parseInt(healthDetails.numberOfAdults) || 0;
+    const children = parseInt(healthDetails.numberOfChildren) || 0;
+    const members = [];
+    
+    for (let i = 1; i <= adults; i++) {
+      members.push({
+        id: `adult-${i}`,
+        type: 'adult',
+        name: '',
+        dob: '',
+        monthlyIncome: '',
+        height: '',
+        weight: '',
+        qualification: '',
+        occupation: '',
+        relationship: '',
+        aadhaarNumber: '',
+        aadhaarFile: null,
+        epicFile: null,
+        birthCertificate: null,
+        ped: '',
+        treatmentHistory: '',
+        medicalRemarks: '',
+      });
+    }
+    
+    for (let i = 1; i <= children; i++) {
+      members.push({
+        id: `child-${i}`,
+        type: 'child',
+        name: '',
+        dob: '',
+        monthlyIncome: '',
+        height: '',
+        weight: '',
+        qualification: '',
+        occupation: '',
+        relationship: '',
+        aadhaarNumber: '',
+        aadhaarFile: null,
+        epicFile: null,
+        birthCertificate: null,
+        ped: '',
+        treatmentHistory: '',
+        medicalRemarks: '',
+      });
+    }
+    
+    setHealthDetails(prev => ({ ...prev, members }));
   };
 
-  const computeTotalPayment = (payoutValue, additionalPayout) => {
-    const payout = parseFloat(payoutValue) || 0;
-    const additional = parseFloat(additionalPayout) || 0;
-    return payout + additional;
+  // ============================================================
+  // FILTER LEADS
+  // ============================================================
+  const filterLeads = () => {
+    let filtered = [...leads];
+    
+    // Universal Search
+    if (globalSearch.trim()) {
+      const searchTerm = globalSearch.toLowerCase().trim();
+      filtered = filtered.filter(
+        (lead) =>
+          (lead.policyNumber && lead.policyNumber.toLowerCase().includes(searchTerm)) ||
+          (lead.leadCode && lead.leadCode.toLowerCase().includes(searchTerm)) ||
+          (lead.mobileNo && lead.mobileNo.includes(searchTerm)) ||
+          (lead.email && lead.email.toLowerCase().includes(searchTerm)) ||
+          (lead.quoteNumber && lead.quoteNumber && lead.quoteNumber.toLowerCase().includes(searchTerm))
+      );
+    }
+    
+    // Source Filters
+    const activeSourceFilters = [];
+    if (sourceFilters.employees) activeSourceFilters.push("Employee");
+    if (sourceFilters.stores) activeSourceFilters.push("Store");
+    if (sourceFilters.channelPartners) activeSourceFilters.push("Channel Partner");
+    if (sourceFilters.socialMedia) activeSourceFilters.push("Social Media");
+    if (sourceFilters.directSource) activeSourceFilters.push("Direct Client");
+    
+    if (activeSourceFilters.length > 0) {
+      filtered = filtered.filter((lead) => activeSourceFilters.includes(lead.source));
+    }
+    
+    setFilteredLeads(filtered);
   };
 
-  const getUserName = (userId) => {
-    const user = users.find((u) => u._id === userId);
-    return user ? user.username || user.name || "Unknown" : "Unknown";
-  };
-
-  const toUpperCase = (value) => {
-    return value ? value.toUpperCase() : value;
-  };
-
-  const validateMobile = (mobile) => {
-    return /^[0-9]{10}$/.test(mobile);
-  };
-
-  const validateAadhaar = (aadhaar) => {
-    return /^[0-9]{12}$/.test(aadhaar);
-  };
-
-  const validatePAN = (pan) => {
-    return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
-  };
-
-  const validatePIN = (pin) => {
-    return /^[0-9]{6}$/.test(pin);
-  };
-
-  const validateEmail = (email) => {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  };
-
-  // ========== BULK UPLOAD ==========
+  // ============================================================
+  // BULK UPLOAD
+  // ============================================================
   const downloadTemplate = () => {
     const templateData = [{
       name: "JOHN DOE",
@@ -520,20 +584,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       mobileNo: "9876543210",
       gender: "Male",
       source: "Employee",
-      reference: "Referral",
-      status: "Open",
-      policyNumber: "POL123456",
+      remarks: "Customer remarks",
       lob: "Health Insurance",
-      sumInsured: 500000,
-      netPremium: 15000,
-      gst: 18,
-      payout: 10,
-      additionalPayout: 500,
-      insurer: "Bajaj Allianz General Insurance Co Ltd",
-      agency: "EKRAMUL HAQUE",
-      policyStartDate: "2025-01-01",
-      policyExpiryDate: "2026-01-01",
-      remarks: "Test lead",
     }];
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
@@ -542,95 +594,36 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
   };
 
   const downloadExcel = () => {
-    if (filteredLeadsData.length === 0) {
+    if (filteredLeads.length === 0) {
       alert("No leads data to export!");
       return;
     }
-    const exportData = filteredLeadsData.map((lead) => ({
+    const exportData = filteredLeads.map((lead) => ({
       "Lead Code": lead.leadCode || "",
       Name: lead.name || "",
       Email: lead.email || "",
       "Mobile No": lead.mobileNo || "",
       Gender: lead.gender || "",
       Source: lead.source || "",
-      Reference: lead.reference || "",
       Status: lead.status || "",
       "Policy Number": lead.policyNumber || "",
       LOB: lead.lob || "",
-      "Sum Insured": lead.sumInsured || 0,
-      "Net Premium": lead.netPremium || 0,
-      "GST %": lead.gst || 0,
-      "Gross Premium": lead.grossPremium || 0,
-      "Payout %": lead.payout || 0,
-      "Payout Value": lead.payoutValue || 0,
-      "Additional Payout": lead.additionalPayout || 0,
-      "Total Payment": lead.totalPayment || 0,
-      "Payout Status": lead.payoutStatus || "",
+      Insurer: lead.insurer || "",
+      Remarks: lead.remarks || "",
       "Policy Start Date": lead.policyStartDate || "",
       "Policy Expiry Date": lead.policyExpiryDate || "",
-      Insurer: lead.insurer || "",
-      Agency: lead.agency || "",
-      Remarks: lead.remarks || "",
-      "Assigned To": Array.isArray(lead.assignedTo) ? lead.assignedTo.map(id => getUserName(id)).join(", ") : "",
       "Created At": lead.createdAt ? new Date(lead.createdAt).toLocaleDateString() : "",
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
-    const colWidths = [];
-    const headers = Object.keys(exportData[0]);
-    headers.forEach((header, index) => {
-      let maxWidth = header.length;
-      exportData.forEach((row) => {
-        const value = String(row[header] || "");
-        maxWidth = Math.max(maxWidth, value.length);
-      });
-      colWidths[index] = { wch: Math.min(Math.max(maxWidth + 2, 12), 50) };
-    });
-    ws['!cols'] = colWidths;
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "LeadsData");
     XLSX.writeFile(wb, `leads_export_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
-  const validateExcelData = (data) => {
-    const errors = [];
-    const requiredFields = ["name", "mobileNo"];
-    const seenMobiles = new Set();
-    const seenEmails = new Set();
-    data.forEach((row, index) => {
-      const rowErrors = [];
-      requiredFields.forEach((field) => {
-        if (!row[field] || row[field].toString().trim() === "") {
-          rowErrors.push(`Missing ${field}`);
-        }
-      });
-      if (row.mobileNo) {
-        if (!validateMobile(row.mobileNo.toString())) {
-          rowErrors.push("Invalid mobile number (10 digits required)");
-        }
-        if (seenMobiles.has(row.mobileNo)) {
-          rowErrors.push(`Duplicate mobile number: ${row.mobileNo}`);
-        }
-        seenMobiles.add(row.mobileNo);
-      }
-      if (row.email) {
-        if (!validateEmail(row.email)) {
-          rowErrors.push("Invalid email format");
-        }
-        if (seenEmails.has(row.email)) {
-          rowErrors.push(`Duplicate email: ${row.email}`);
-        }
-        seenEmails.add(row.email);
-      }
-      if (rowErrors.length > 0) {
-        errors.push({ row: index + 2, errors: rowErrors });
-      }
-    });
-    return errors;
-  };
-
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+    
     if (!file.name.match(/\.(xlsx|xls)$/)) {
       setUploadStatus({
         show: true,
@@ -641,6 +634,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       e.target.value = "";
       return;
     }
+    
     setIsUploading(true);
     const reader = new FileReader();
     reader.onload = async (event) => {
@@ -650,23 +644,32 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        
         if (jsonData.length === 0) {
           setUploadStatus({ show: true, message: "The uploaded file contains no data.", type: "error" });
           setIsUploading(false);
           e.target.value = "";
           return;
         }
-        const validationErrors = validateExcelData(jsonData);
-        if (validationErrors.length > 0) {
-          let errorMessage = "Validation Errors:\n";
-          validationErrors.forEach((err) => {
-            errorMessage += `Row ${err.row}: ${err.errors.join(", ")}\n`;
-          });
-          setUploadStatus({ show: true, message: errorMessage, type: "error" });
+        
+        // Validate data
+        const errors = [];
+        jsonData.forEach((row, index) => {
+          if (!row.name || !row.mobileNo) {
+            errors.push(`Row ${index + 2}: Missing name or mobile number`);
+          }
+          if (row.mobileNo && !validateMobile(row.mobileNo.toString())) {
+            errors.push(`Row ${index + 2}: Invalid mobile number`);
+          }
+        });
+        
+        if (errors.length > 0) {
+          setUploadStatus({ show: true, message: errors.join("\n"), type: "error" });
           setIsUploading(false);
           e.target.value = "";
           return;
         }
+        
         const formData = new FormData();
         formData.append("file", file);
         const token = localStorage.getItem("token");
@@ -675,6 +678,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           headers: { Authorization: `Bearer ${token}` },
           body: formData,
         });
+        
         if (res.ok) {
           const result = await res.json();
           fetchLeads();
@@ -702,204 +706,77 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     reader.readAsArrayBuffer(file);
   };
 
-  // ========== LOB DETECTION ==========
-  const detectLOB = (lob) => {
-    if (!lob) return;
-    const isHealth = lob.toLowerCase().includes("health") || lob === "Mediclaim Health Insurance" || lob === "Group Health Insurance";
-    const isMotor = lob.toLowerCase().includes("motor") || 
-                    lob.includes("Car") || 
-                    lob.includes("Two-Wheeler") || 
-                    lob.includes("Taxi") || 
-                    lob.includes("Commercial Vehicle") ||
-                    lob.includes("E-Rikshaw");
-    const isElectronic = lob.toLowerCase().includes("mobile") || 
-                         lob.toLowerCase().includes("electronic") || 
-                         lob.toLowerCase().includes("equipment");
-    
-    setShowHealthSection(isHealth);
-    setShowMotorSection(isMotor);
-    setShowElectronicSection(isElectronic);
-    
-    if (isHealth) {
-      setFormStep(2);
-    } else if (isMotor) {
-      setFormStep(3);
-    } else if (isElectronic) {
-      setFormStep(4);
-    }
-  };
-
-  // ========== HEALTH INSURANCE HANDLERS ==========
-  const handleHealthChange = (field, value) => {
-    setHealthDetails(prev => ({ ...prev, [field]: value }));
-    if (field === "policyType" && value === "Floater") {
-      setShowFloaterMembers(true);
-    } else if (field === "policyType" && value === "Individual") {
-      setShowFloaterMembers(false);
-    }
-  };
-
-  const generateFloaterMembers = () => {
-    const adults = parseInt(healthDetails.numberOfAdults) || 0;
-    const children = parseInt(healthDetails.numberOfChildren) || 0;
-    const members = [];
-    for (let i = 1; i <= adults; i++) {
-      members.push({
-        id: `adult-${i}`,
-        type: 'adult',
-        name: '',
-        dob: '',
-        monthlyIncome: '',
-        height: '',
-        weight: '',
-        qualification: '',
-        occupation: '',
-        relationship: '',
-        aadhaarNumber: '',
-        aadhaarFile: null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-      });
-    }
-    for (let i = 1; i <= children; i++) {
-      members.push({
-        id: `child-${i}`,
-        type: 'child',
-        name: '',
-        dob: '',
-        monthlyIncome: '',
-        height: '',
-        weight: '',
-        qualification: '',
-        occupation: '',
-        relationship: '',
-        aadhaarNumber: '',
-        aadhaarFile: null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-      });
-    }
-    setHealthDetails(prev => ({ ...prev, members }));
-  };
-
-  // ========== MOTOR INSURANCE HANDLERS ==========
-  const handleMotorChange = (field, value) => {
-    setMotorDetails(prev => ({ ...prev, [field]: value }));
-    if (field === "claimTaken" && value === "No") {
-      // Show NCB dropdown
-    } else if (field === "claimTaken" && value === "Yes") {
-      setMotorDetails(prev => ({ ...prev, ncb: "NIL" }));
-    }
-  };
-
-  // ========== ELECTRONIC INSURANCE HANDLERS ==========
-  const handleElectronicChange = (field, value) => {
-    setElectronicDetails(prev => ({ ...prev, [field]: value }));
-  };
-
-  // ========== WORKFLOW HANDLERS ==========
-  const handleWorkflowChange = (field, value) => {
-    setWorkflowDetails(prev => ({ ...prev, [field]: value }));
-    if (field === "status") {
-      if (value === "Quotation Generated") {
-        setShowInsurerQuotes(true);
-      } else {
-        setShowInsurerQuotes(false);
-      }
-    }
-    if (field === "paymentStatus") {
-      if (value === "URL Shared") {
-        // Show URL field
-      } else if (value === "Payment Done") {
-        // Show UTR and snapshot fields
-      } else if (value === "Policy Issued") {
-        // Show policy details fields
-      }
-    }
-  };
-
-  // ========== LEAD CRUD OPERATIONS ==========
-  const handleAddLead = async (e) => {
+  // ============================================================
+  // CREATE LEAD
+  // ============================================================
+  const handleCreateLead = async (e) => {
     e.preventDefault();
-    // Validate mobile
-    if (!validateMobile(newLead.mobileNo)) {
+    setIsSubmitting(true);
+
+    // Validate
+    if (!validateMobile(formData.mobileNo)) {
       alert("Please enter a valid 10-digit mobile number");
-      return;
-    }
-    
-    // Validate name is uppercase
-    if (newLead.name !== newLead.name.toUpperCase()) {
-      alert("Name must be in UPPERCASE");
+      setIsSubmitting(false);
       return;
     }
 
-    const leadCode = generateLeadCode();
-    const payoutValue = computePayoutValue(newLead.netPremium, newLead.payoutPercent);
-    const grossPremium = computeGrossPremium(newLead.netPremium, newLead.gstPercent);
-    const totalPayment = computeTotalPayment(payoutValue, newLead.additionalPayout);
-    const finalLOB = newLead.lobOption === "Other Insurance" ? newLead.lobCustom || "" : newLead.lobOption;
-    const finalAgency = newLead.agency === "OTHERS" ? newLead.customAgency || "" : newLead.agency;
-    
-    const formData = new FormData();
-    formData.append("name", newLead.name);
-    formData.append("email", newLead.email);
-    formData.append("mobileNo", newLead.mobileNo);
-    formData.append("gender", newLead.gender);
-    formData.append("source", newLead.source);
-    formData.append("reference", newLead.reference);
-    formData.append("status", newLead.status);
-    formData.append("openStatus", newLead.openStatus);
-    formData.append("policyNumber", newLead.policyNumber);
-    formData.append("lob", finalLOB);
-    formData.append("sumInsured", newLead.sumInsured);
-    formData.append("endorsement", newLead.endorsement);
-    formData.append("payout", newLead.payoutPercent);
-    formData.append("payoutValue", payoutValue);
-    formData.append("netPremium", newLead.netPremium);
-    formData.append("gst", newLead.gstPercent);
-    formData.append("grossPremium", grossPremium);
-    formData.append("additionalPayout", newLead.additionalPayout);
-    formData.append("totalPayment", totalPayment);
-    formData.append("payoutStatus", newLead.payoutStatus);
-    formData.append("policyStartDate", newLead.policyStartDate);
-    formData.append("policyExpiryDate", newLead.policyExpiryDate);
-    formData.append("insurer", newLead.insurer);
-    formData.append("remarks", newLead.remarks);
-    formData.append("agency", finalAgency);
-    formData.append("imageUrl", newLead.imageUrl);
-    formData.append("leadCode", leadCode);
-    
-    // Health Insurance Details
+    if (formData.name !== formData.name.toUpperCase()) {
+      alert("Name must be in UPPERCASE");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.email && !validateEmail(formData.email)) {
+      alert("Please enter a valid email address");
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (formData.pinCode && !validatePIN(formData.pinCode)) {
+      alert("Please enter a valid 6-digit PIN code");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const leadCode = generateLeadCode(leads);
+    const submitData = new FormData();
+    submitData.append("name", formData.name);
+    submitData.append("email", formData.email);
+    submitData.append("mobileNo", formData.mobileNo);
+    submitData.append("gender", formData.gender);
+    submitData.append("source", formData.source);
+    submitData.append("remarks", formData.remarks);
+    submitData.append("lob", formData.lob);
+    submitData.append("pinCode", formData.pinCode);
+    submitData.append("state", formData.state);
+    submitData.append("city", formData.city);
+    submitData.append("leadCode", leadCode);
+    submitData.append("sourceDependentValue", formData.sourceDependentValue);
+    submitData.append("status", "Open");
+
+    // Health details
     if (showHealthSection) {
-      formData.append("healthDetails", JSON.stringify(healthDetails));
+      submitData.append("healthDetails", JSON.stringify(healthDetails));
     }
-    // Motor Insurance Details
+
+    // Motor details
     if (showMotorSection) {
-      formData.append("motorDetails", JSON.stringify(motorDetails));
+      submitData.append("motorDetails", JSON.stringify(motorDetails));
     }
-    // Electronic Insurance Details
+
+    // Electronic details
     if (showElectronicSection) {
-      formData.append("electronicDetails", JSON.stringify(electronicDetails));
+      submitData.append("electronicDetails", JSON.stringify(electronicDetails));
     }
-    
-    selectedUsers.forEach((userId) => formData.append("assignedTo", userId));
-    if (newLead.policyPdf) {
-      formData.append("policyPdf", newLead.policyPdf);
-    }
-    
+
     const token = localStorage.getItem("token");
     try {
       const res = await fetch(`${API_BASE}/api/leads`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
-        body: formData,
+        body: submitData,
       });
+
       if (res.ok) {
         const savedLead = await res.json();
         setLeads((prev) => [savedLead, ...prev]);
@@ -907,51 +784,93 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         setShowLeadForm(false);
         alert("Lead created successfully!");
       } else {
-        const errorData = await res.json();
-        alert(`Failed to save lead: ${errorData.error || "Unknown error"}`);
+        const error = await res.json();
+        alert(`Failed to create lead: ${error.error || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Create error:", err);
       alert("Error: " + err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
+  // ============================================================
+  // UPDATE LEAD (Workflow)
+  // ============================================================
+  const handleUpdateLead = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+
+    const submitData = new FormData();
+    submitData.append("status", workflowDetails.status);
+    submitData.append("workflowDetails", JSON.stringify(workflowDetails));
+
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: submitData,
+      });
+
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+        setShowEditModal(false);
+        setEditLead(null);
+        alert("Lead updated successfully!");
+      } else {
+        const error = await res.json();
+        alert(`Failed to update lead: ${error.error || "Unknown error"}`);
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+      alert("Error: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============================================================
+  // DELETE LEAD
+  // ============================================================
+  const deleteLead = async (leadId) => {
+    if (!confirm("Are you sure you want to delete this lead?")) return;
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        setLeads((prev) => prev.filter((l) => l._id !== leadId));
+      } else {
+        alert("Failed to delete lead");
+      }
+    } catch (err) {
+      console.error("Delete error:", err);
+      alert("Error deleting lead");
+    }
+  };
+
+  // ============================================================
+  // FORM RESET
+  // ============================================================
   const resetForm = () => {
-    setNewLead({
+    setFormData({
       name: "",
       email: "",
       mobileNo: "",
       gender: "",
       source: "",
-      reference: "",
-      status: "Open",
-      openStatus: "",
-      policyNumber: "",
-      lobOption: "",
-      lobCustom: "",
-      sumInsured: 0,
-      endorsement: "",
-      payoutPercent: 0,
-      payoutStatus: "",
-      additionalPayout: 0,
-      netPremium: 0,
-      gstPercent: 0,
-      policyStartDate: "",
-      policyExpiryDate: "",
-      insurer: "",
       remarks: "",
-      assignedTo: [],
-      agency: "",
-      customAgency: "",
-      policyPdf: null,
-      imageUrl: "",
-      healthDetails: {},
-      motorDetails: {},
-      electronicDetails: {},
+      lob: "",
+      pinCode: "",
+      state: "",
+      city: "",
+      sourceDependentValue: "",
     });
-    setSelectedUsers([]);
-    setShowCustomAgency(false);
-    setShowFormDropdown(false);
     setHealthDetails({
       policyType: "",
       numberOfAdults: 0,
@@ -991,7 +910,6 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       ncb: "",
       addOnRequired: "",
       quoteRequired: "",
-      selectedInsurers: [],
       pypFile: null,
       rcFrontFile: null,
       rcBackFile: null,
@@ -1014,160 +932,15 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     setShowMotorSection(false);
     setShowElectronicSection(false);
     setShowFloaterMembers(false);
-    setFormStep(1);
   };
 
-  const deleteLead = async (leadId) => {
-    if (!confirm("Are you sure you want to delete this lead?")) return;
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        setLeads((prev) => prev.filter((l) => l._id !== leadId));
-      } else {
-        alert("Failed to delete lead");
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Error deleting lead");
-    }
+  // ============================================================
+  // TOGGLE FILTERS
+  // ============================================================
+  const toggleSourceFilter = (key) => {
+    setSourceFilters((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  const assignLead = async (leadId, assignedTo) => {
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/${leadId}/assign`, {
-        method: "PATCH",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ assignedTo }),
-      });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => (l._id === leadId ? updatedLead : l)));
-      }
-    } catch (err) {
-      console.error("Assign error:", err);
-    }
-  };
-
-  const toggleUserSelection = (leadId, userId, isForm = false, isEditForm = false) => {
-    if (isForm) {
-      setSelectedUsers((prev) => (prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]));
-    } else if (isEditForm) {
-      setEditSelectedUsers((prev) =>
-        prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
-      );
-    } else {
-      const lead = leads.find((l) => l._id === leadId);
-      const current = normalizeAssignedTo(lead.assignedTo);
-      const updated = current.includes(userId) ? current.filter((id) => id !== userId) : [...current, userId];
-      assignLead(leadId, updated);
-    }
-  };
-
-  // ========== EDIT MODAL ==========
-  const openEditModal = (lead) => {
-    const assignedTo = normalizeAssignedTo(lead.assignedTo);
-    setEditLead(lead._id);
-    setEditData({
-      ...lead,
-      payoutPercent: lead.payout || 0,
-      gstPercent: lead.gst || 0,
-      lobOption: lead.lob === "Other Insurance" ? "Other Insurance" : lead.lob,
-      lobCustom: lead.lob === "Other Insurance" ? lead.lob : "",
-      agency: lead.agency === "OTHERS" ? "OTHERS" : lead.agency,
-      customAgency: lead.agency === "OTHERS" ? lead.agency : "",
-      policyPdf: lead.policyPdf || null,
-      newPolicyPdf: null,
-      imageUrl: lead.imageUrl || "",
-      healthDetails: lead.healthDetails || {},
-      motorDetails: lead.motorDetails || {},
-      electronicDetails: lead.electronicDetails || {},
-      workflowDetails: lead.workflowDetails || {},
-    });
-    setEditSelectedUsers(assignedTo);
-    setShowEditCustomAgency(lead.agency === "OTHERS");
-    setShowEditModal(true);
-  };
-
-  const closeEditModal = () => {
-    setShowEditModal(false);
-    setEditLead(null);
-  };
-
-  const saveEdit = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    const finalLOB = editData.lobOption === "Other Insurance" ? editData.lobCustom || "" : editData.lobOption || editData.lob;
-    const finalAgency = editData.agency === "OTHERS" ? editData.customAgency || "" : editData.agency || editData.agency;
-    const payoutValue = computePayoutValue(editData.netPremium, editData.payoutPercent);
-    const grossPremium = computeGrossPremium(editData.netPremium, editData.gstPercent);
-    const totalPayment = computeTotalPayment(payoutValue, editData.additionalPayout);
-    
-    const formData = new FormData();
-    formData.append("name", editData.name);
-    formData.append("email", editData.email);
-    formData.append("mobileNo", editData.mobileNo);
-    formData.append("gender", editData.gender);
-    formData.append("source", editData.source);
-    formData.append("reference", editData.reference);
-    formData.append("status", editData.status);
-    formData.append("openStatus", editData.openStatus);
-    formData.append("policyNumber", editData.policyNumber);
-    formData.append("lob", finalLOB);
-    formData.append("sumInsured", editData.sumInsured);
-    formData.append("endorsement", editData.endorsement);
-    formData.append("payout", editData.payoutPercent);
-    formData.append("payoutValue", payoutValue);
-    formData.append("netPremium", editData.netPremium);
-    formData.append("gst", editData.gstPercent);
-    formData.append("grossPremium", grossPremium);
-    formData.append("additionalPayout", editData.additionalPayout);
-    formData.append("totalPayment", totalPayment);
-    formData.append("payoutStatus", editData.payoutStatus);
-    formData.append("policyStartDate", editData.policyStartDate);
-    formData.append("policyExpiryDate", editData.policyExpiryDate);
-    formData.append("insurer", editData.insurer);
-    formData.append("remarks", editData.remarks);
-    formData.append("agency", finalAgency);
-    formData.append("imageUrl", editData.imageUrl);
-    formData.append("healthDetails", JSON.stringify(editData.healthDetails || {}));
-    formData.append("motorDetails", JSON.stringify(editData.motorDetails || {}));
-    formData.append("electronicDetails", JSON.stringify(editData.electronicDetails || {}));
-    formData.append("workflowDetails", JSON.stringify(editData.workflowDetails || {}));
-    editSelectedUsers.forEach((userId) => formData.append("assignedTo", userId));
-    if (editData.newPolicyPdf) {
-      formData.append("policyPdf", editData.newPolicyPdf);
-    }
-    
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/${editLead}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => (l._id === editLead ? updatedLead : l)));
-        closeEditModal();
-        alert("Lead updated successfully!");
-      } else {
-        const errorData = await res.json();
-        alert(`Failed to update lead: ${errorData.error || "Unknown error"}`);
-      }
-    } catch (err) {
-      console.error("Update error:", err);
-      alert("Error updating lead: " + err.message);
-    }
-  };
-
-  // ========== FILTERS ==========
   const clearFilters = () => {
     setGlobalSearch("");
     setSourceFilters({
@@ -1177,43 +950,181 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
       socialMedia: false,
       directSource: false,
     });
-    setActiveFilters([]);
   };
 
-  const toggleSourceFilter = (key) => {
-    setSourceFilters((prev) => {
-      const newState = { ...prev, [key]: !prev[key] };
-      const active = [];
-      if (newState.employees) active.push("Employees");
-      if (newState.stores) active.push("Stores");
-      if (newState.channelPartners) active.push("Channel Partners");
-      if (newState.socialMedia) active.push("Social Media");
-      if (newState.directSource) active.push("Direct Source");
-      setActiveFilters(active);
-      return newState;
+  // ============================================================
+  // OPEN EDIT MODAL
+  // ============================================================
+  const openEditModal = (lead) => {
+    setEditLead(lead);
+    setWorkflowDetails({
+      status: lead.status || "Open",
+      quoteNumber: lead.quoteNumber || "",
+      selectedInsurers: lead.selectedInsurers || [],
+      insurerQuotes: lead.insurerQuotes || [],
+      paymentStatus: lead.paymentStatus || "",
+      paymentUrl: lead.paymentUrl || "",
+      utrNumber: lead.utrNumber || "",
+      paymentSnapshot: lead.paymentSnapshot || null,
+      policyNumber: lead.policyNumber || "",
+      policyIssuedOn: lead.policyIssuedOn || "",
+      policyStartDate: lead.policyStartDate || "",
+      policyExpiryDate: lead.policyExpiryDate || "",
+      policyCopy: lead.policyCopy || null,
+      remarks: lead.remarks || "",
     });
+    setShowInsurerQuotes(lead.status === "Quotation Generated");
+    setShowEditModal(true);
   };
 
-  // ========== RENDER HEALTH FORM ==========
+  // ============================================================
+  // RENDER: RENEWAL ALERTS
+  // ============================================================
+  const renderRenewalAlerts = () => {
+    if (renewalAlerts.length === 0) return null;
+
+    const groupedAlerts = {
+      expired: renewalAlerts.filter(a => a.priority === "Expired"),
+      urgent: renewalAlerts.filter(a => a.priority === "Urgent"),
+      priority: renewalAlerts.filter(a => a.priority === "Priority"),
+      normal: renewalAlerts.filter(a => a.priority === "Normal"),
+    };
+
+    const getPriorityColor = (priority) => {
+      switch (priority) {
+        case "Expired": return "bg-red-100 border-red-500 text-red-800";
+        case "Urgent": return "bg-orange-100 border-orange-500 text-orange-800";
+        case "Priority": return "bg-yellow-100 border-yellow-500 text-yellow-800";
+        default: return "bg-blue-100 border-blue-500 text-blue-800";
+      }
+    };
+
+    const getIcon = (priority) => {
+      switch (priority) {
+        case "Expired": return <FaExclamationTriangle className="text-red-500" />;
+        case "Urgent": return <FaClock className="text-orange-500" />;
+        case "Priority": return <FaClock className="text-yellow-500" />;
+        default: return <FaBell className="text-blue-500" />;
+      }
+    };
+
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white rounded-2xl shadow-lg border border-gray-100 p-4 mb-4"
+      >
+        <div className="flex items-center gap-2 mb-4">
+          <FaBell className="text-indigo-600 h-5 w-5" />
+          <h3 className="text-lg font-semibold text-gray-800">Renewal Alerts</h3>
+          <span className="ml-auto bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full text-xs">
+            {renewalAlerts.length} pending
+          </span>
+        </div>
+
+        <div className="space-y-3 max-h-60 overflow-y-auto">
+          {groupedAlerts.expired.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-red-600">⚠️ Expired Policies</h4>
+              {groupedAlerts.expired.map((alert, idx) => (
+                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{alert.customerName}</p>
+                      <p className="text-sm">Policy: {alert.policyNumber}</p>
+                      <p className="text-sm">Expired {Math.abs(alert.daysLeft)} days ago</p>
+                    </div>
+                    {getIcon(alert.priority)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {groupedAlerts.urgent.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-orange-600">🔴 Urgent (Due in 7 days)</h4>
+              {groupedAlerts.urgent.map((alert, idx) => (
+                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{alert.customerName}</p>
+                      <p className="text-sm">Policy: {alert.policyNumber}</p>
+                      <p className="text-sm">Due in {alert.daysLeft} days</p>
+                    </div>
+                    {getIcon(alert.priority)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {groupedAlerts.priority.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-yellow-600">🟡 Priority (Due in 15 days)</h4>
+              {groupedAlerts.priority.map((alert, idx) => (
+                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{alert.customerName}</p>
+                      <p className="text-sm">Policy: {alert.policyNumber}</p>
+                      <p className="text-sm">Due in {alert.daysLeft} days</p>
+                    </div>
+                    {getIcon(alert.priority)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {groupedAlerts.normal.length > 0 && (
+            <div className="space-y-2">
+              <h4 className="text-sm font-medium text-blue-600">🔵 Upcoming (Due in 30 days)</h4>
+              {groupedAlerts.normal.map((alert, idx) => (
+                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium">{alert.customerName}</p>
+                      <p className="text-sm">Policy: {alert.policyNumber}</p>
+                      <p className="text-sm">Due in {alert.daysLeft} days</p>
+                    </div>
+                    {getIcon(alert.priority)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    );
+  };
+
+  // ============================================================
+  // RENDER: HEALTH FORM
+  // ============================================================
   const renderHealthForm = () => (
     <div className="border-t-2 border-indigo-200 pt-4 mt-4">
       <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
         <FaHeartbeat /> Health Insurance Details
       </h3>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="text-sm font-medium text-gray-700">Policy Type</label>
           <select
             value={healthDetails.policyType}
-            onChange={(e) => handleHealthChange("policyType", e.target.value)}
+            onChange={(e) => {
+              setHealthDetails(prev => ({ ...prev, policyType: e.target.value }));
+              setShowFloaterMembers(e.target.value === "Floater");
+              if (e.target.value === "Floater") generateFloaterMembers();
+            }}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {policyTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {POLICY_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         {healthDetails.policyType === "Floater" && (
           <>
             <div>
@@ -1223,7 +1134,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 min="0"
                 value={healthDetails.numberOfAdults}
                 onChange={(e) => {
-                  handleHealthChange("numberOfAdults", e.target.value);
+                  setHealthDetails(prev => ({ ...prev, numberOfAdults: e.target.value }));
                   generateFloaterMembers();
                 }}
                 className="w-full p-2 border border-gray-300 rounded-lg"
@@ -1236,7 +1147,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 min="0"
                 value={healthDetails.numberOfChildren}
                 onChange={(e) => {
-                  handleHealthChange("numberOfChildren", e.target.value);
+                  setHealthDetails(prev => ({ ...prev, numberOfChildren: e.target.value }));
                   generateFloaterMembers();
                 }}
                 className="w-full p-2 border border-gray-300 rounded-lg"
@@ -1244,79 +1155,79 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             </div>
           </>
         )}
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Proposer Name</label>
           <input
             type="text"
             value={healthDetails.proposerName}
-            onChange={(e) => handleHealthChange("proposerName", toUpperCase(e.target.value))}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerName: toUpperCase(e.target.value) }))}
             className="w-full p-2 border border-gray-300 rounded-lg uppercase"
           />
         </div>
-        
+
         <div>
-          <label className="text-sm font-medium text-gray-700">Date of Birth</label>
+          <label className="text-sm font-medium text-gray-700">DOB</label>
           <input
             type="date"
             value={healthDetails.proposerDOB}
-            onChange={(e) => handleHealthChange("proposerDOB", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerDOB: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Family Income</label>
           <input
             type="number"
             value={healthDetails.familyIncome}
-            onChange={(e) => handleHealthChange("familyIncome", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, familyIncome: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Height (ft/in)</label>
           <input
             type="text"
             value={healthDetails.height}
-            onChange={(e) => handleHealthChange("height", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, height: e.target.value }))}
             placeholder="e.g., 5'8\"
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Weight (kg)</label>
           <input
             type="number"
             value={healthDetails.weight}
-            onChange={(e) => handleHealthChange("weight", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, weight: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Qualification</label>
           <select
             value={healthDetails.qualification}
-            onChange={(e) => handleHealthChange("qualification", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, qualification: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {qualificationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Occupation</label>
           <select
             value={healthDetails.occupation}
-            onChange={(e) => handleHealthChange("occupation", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, occupation: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {occupationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
 
@@ -1327,7 +1238,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="text"
                 value={healthDetails.nomineeName}
-                onChange={(e) => handleHealthChange("nomineeName", toUpperCase(e.target.value))}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: toUpperCase(e.target.value) }))}
                 className="w-full p-2 border border-gray-300 rounded-lg uppercase"
               />
             </div>
@@ -1336,7 +1247,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="date"
                 value={healthDetails.nomineeDOB}
-                onChange={(e) => handleHealthChange("nomineeDOB", e.target.value)}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeDOB: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -1344,16 +1255,16 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">Relationship</label>
               <select
                 value={healthDetails.nomineeRelationship}
-                onChange={(e) => handleHealthChange("nomineeRelationship", e.target.value)}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeRelationship: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {relationshipOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
           </>
         )}
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
           <input
@@ -1361,26 +1272,26 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             value={healthDetails.aadhaarNumber}
             onChange={(e) => {
               const val = e.target.value.replace(/\D/g, '');
-              if (val.length <= 12) handleHealthChange("aadhaarNumber", val);
+              if (val.length <= 12) setHealthDetails(prev => ({ ...prev, aadhaarNumber: val }));
             }}
             maxLength="12"
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
           {healthDetails.aadhaarNumber && !validateAadhaar(healthDetails.aadhaarNumber) && (
-            <p className="text-red-500 text-xs mt-1">Please enter 12 digits</p>
+            <p className="text-red-500 text-xs mt-1">Enter 12 digits</p>
           )}
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
           <input
             type="file"
             accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleHealthChange("aadhaarFile", e.target.files[0])}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">PAN Number</label>
           <input
@@ -1388,7 +1299,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             value={healthDetails.panNumber}
             onChange={(e) => {
               const val = e.target.value.toUpperCase();
-              if (val.length <= 10) handleHealthChange("panNumber", val);
+              if (val.length <= 10) setHealthDetails(prev => ({ ...prev, panNumber: val }));
             }}
             maxLength="10"
             className="w-full p-2 border border-gray-300 rounded-lg uppercase"
@@ -1397,29 +1308,29 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F</p>
           )}
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Upload PAN</label>
           <input
             type="file"
             accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleHealthChange("panFile", e.target.files[0])}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
-          <label className="text-sm font-medium text-gray-700">Previous Policy Active?</label>
+          <label className="text-sm font-medium text-gray-700">Active Previous Policy?</label>
           <select
             value={healthDetails.hasPreviousPolicy}
-            onChange={(e) => handleHealthChange("hasPreviousPolicy", e.target.value)}
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, hasPreviousPolicy: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {yesNoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         {healthDetails.hasPreviousPolicy === "Yes" && (
           <>
             <div>
@@ -1427,16 +1338,16 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="text"
                 value={healthDetails.previousInsurer}
-                onChange={(e) => handleHealthChange("previousInsurer", e.target.value)}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousInsurer: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Previous Policy Number</label>
+              <label className="text-sm font-medium text-gray-700">Policy Number</label>
               <input
                 type="text"
                 value={healthDetails.previousPolicyNumber}
-                onChange={(e) => handleHealthChange("previousPolicyNumber", e.target.value)}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyNumber: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -1452,7 +1363,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                   tomorrow.setDate(tomorrow.getDate() + 1);
                   if (selected.toDateString() === today.toDateString() || 
                       selected.toDateString() === tomorrow.toDateString()) {
-                    handleHealthChange("previousPolicyDueDate", e.target.value);
+                    setHealthDetails(prev => ({ ...prev, previousPolicyDueDate: e.target.value }));
                   } else {
                     alert("Due date must be Today or Tomorrow only");
                   }
@@ -1461,37 +1372,42 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Upload Previous Policy</label>
+              <label className="text-sm font-medium text-gray-700">Upload PYP</label>
               <input
                 type="file"
                 accept=".pdf"
-                onChange={(e) => handleHealthChange("previousPolicyFile", e.target.files[0])}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyFile: e.target.files[0] }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
           </>
         )}
-        
+
         <div className="lg:col-span-3">
           <label className="text-sm font-medium text-gray-700">Medical Remarks</label>
           <textarea
             value={healthDetails.medicalRemarks}
-            onChange={(e) => handleHealthChange("medicalRemarks", e.target.value)}
-            placeholder="Pre-existing diseases, treatment history, etc."
+            onChange={(e) => setHealthDetails(prev => ({ ...prev, medicalRemarks: e.target.value }))}
+            placeholder="Pre-existing diseases, treatment history, other medical remarks"
             className="w-full p-2 border border-gray-300 rounded-lg"
             rows="3"
-          ></textarea>
+          />
         </div>
       </div>
 
-      {/* Floater Members Section */}
+      {/* Floater Members */}
       {showFloaterMembers && healthDetails.members.length > 0 && (
         <div className="mt-4 border-t-2 border-indigo-200 pt-4">
-          <h4 className="text-md font-semibold text-indigo-600 mb-4">Floater Members</h4>
+          <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
+            <FaFloater /> Floater Members
+          </h4>
           {healthDetails.members.map((member, index) => (
             <div key={member.id} className="border rounded-lg p-4 mb-4 bg-gray-50">
-              <h5 className="font-medium text-gray-700 mb-3">
-                {member.type === 'adult' ? `Adult ${Math.floor(index + 1)}` : `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0)}`}
+              <h5 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                {member.type === 'adult' ? <FaUser /> : <FaChild />}
+                {member.type === 'adult' 
+                  ? `Adult ${Math.floor(index + 1)}` 
+                  : `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0) + 1}`}
               </h5>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 <div>
@@ -1571,7 +1487,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="">Select</option>
-                    {qualificationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1586,11 +1502,11 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="">Select</option>
-                    {occupationOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-medium text-gray-700">Relationship with Proposer</label>
+                  <label className="text-xs font-medium text-gray-700">Relationship</label>
                   <select
                     value={member.relationship}
                     onChange={(e) => {
@@ -1601,7 +1517,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value="">Select</option>
-                    {relationshipOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                   </select>
                 </div>
                 <div>
@@ -1645,7 +1561,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                     }}
                     className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     rows="2"
-                  ></textarea>
+                  />
                 </div>
               </div>
             </div>
@@ -1655,82 +1571,85 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     </div>
   );
 
-  // ========== RENDER MOTOR FORM ==========
+  // ============================================================
+  // RENDER: MOTOR FORM
+  // ============================================================
   const renderMotorForm = () => (
     <div className="border-t-2 border-indigo-200 pt-4 mt-4">
       <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
         <FaCar /> Motor Insurance Details
       </h3>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
           <select
             value={motorDetails.vehicleType}
-            onChange={(e) => handleMotorChange("vehicleType", e.target.value)}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, vehicleType: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {vehicleTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {VEHICLE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Insurance Type</label>
           <select
             value={motorDetails.insuranceType}
-            onChange={(e) => handleMotorChange("insuranceType", e.target.value)}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, insuranceType: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {insuranceTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {INSURANCE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Registration Number</label>
           <input
             type="text"
             value={motorDetails.registrationNumber}
-            onChange={(e) => handleMotorChange("registrationNumber", e.target.value.toUpperCase())}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, registrationNumber: e.target.value.toUpperCase() }))}
             className="w-full p-2 border border-gray-300 rounded-lg uppercase"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">RTO Code</label>
           <input
             type="text"
             value={motorDetails.rtoCode}
-            onChange={(e) => handleMotorChange("rtoCode", e.target.value.toUpperCase())}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, rtoCode: e.target.value.toUpperCase() }))}
             placeholder="e.g., BR01"
             className="w-full p-2 border border-gray-300 rounded-lg uppercase"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Previous Policy Status</label>
           <select
             value={motorDetails.previousPolicyStatus}
-            onChange={(e) => handleMotorChange("previousPolicyStatus", e.target.value)}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, previousPolicyStatus: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {previousPolicyStatusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            <option value="Active">Active</option>
+            <option value="Expired">Expired</option>
           </select>
         </div>
-        
+
         {motorDetails.previousPolicyStatus === "Active" && (
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">Previous Insurer</label>
               <select
                 value={motorDetails.previousInsurer}
-                onChange={(e) => handleMotorChange("previousInsurer", e.target.value)}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsurer: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {insurerOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
             <div>
@@ -1738,7 +1657,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="date"
                 value={motorDetails.pypDueDate}
-                onChange={(e) => handleMotorChange("pypDueDate", e.target.value)}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, pypDueDate: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -1747,7 +1666,7 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="number"
                 value={motorDetails.idvAsPerPYP}
-                onChange={(e) => handleMotorChange("idvAsPerPYP", e.target.value)}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, idvAsPerPYP: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -1755,115 +1674,90 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">Claim Taken?</label>
               <select
                 value={motorDetails.claimTaken}
-                onChange={(e) => handleMotorChange("claimTaken", e.target.value)}
+                onChange={(e) => {
+                  setMotorDetails(prev => ({ ...prev, claimTaken: e.target.value }));
+                  if (e.target.value === "Yes") {
+                    setMotorDetails(prev => ({ ...prev, ncb: "NIL" }));
+                  }
+                }}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {yesNoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
-            
             {motorDetails.claimTaken === "No" && (
               <div>
                 <label className="text-sm font-medium text-gray-700">NCB</label>
                 <select
                   value={motorDetails.ncb}
-                  onChange={(e) => handleMotorChange("ncb", e.target.value)}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, ncb: e.target.value }))}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 >
                   <option value="">Select</option>
-                  {ncbOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
               </div>
             )}
             {motorDetails.claimTaken === "Yes" && (
               <div>
                 <label className="text-sm font-medium text-gray-700">NCB</label>
-                <input
-                  type="text"
-                  value="NIL"
-                  disabled
-                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
-                />
+                <input type="text" value="NIL" disabled className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" />
               </div>
             )}
           </>
         )}
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Add-On Required?</label>
           <select
             value={motorDetails.addOnRequired}
-            onChange={(e) => handleMotorChange("addOnRequired", e.target.value)}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, addOnRequired: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {yesNoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Quote Required?</label>
           <select
             value={motorDetails.quoteRequired}
-            onChange={(e) => handleMotorChange("quoteRequired", e.target.value)}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, quoteRequired: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {yesNoOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
-        {motorDetails.quoteRequired === "Yes" && (
-          <div className="lg:col-span-3">
-            <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg">
-              {insurerOptions.slice(0, 10).map(ins => (
-                <label key={ins} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={motorDetails.selectedInsurers.includes(ins)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        handleMotorChange("selectedInsurers", [...motorDetails.selectedInsurers, ins]);
-                      } else {
-                        handleMotorChange("selectedInsurers", motorDetails.selectedInsurers.filter(i => i !== ins));
-                      }
-                    }}
-                  />
-                  {ins}
-                </label>
-              ))}
-            </div>
-          </div>
-        )}
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Upload PYP</label>
           <input
             type="file"
             accept=".pdf"
-            onChange={(e) => handleMotorChange("pypFile", e.target.files[0])}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">RC Front</label>
           <input
             type="file"
             accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleMotorChange("rcFrontFile", e.target.files[0])}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">RC Back</label>
           <input
             type="file"
             accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleMotorChange("rcBackFile", e.target.files[0])}
+            onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           />
         </div>
@@ -1871,229 +1765,235 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     </div>
   );
 
-  // ========== RENDER ELECTRONIC FORM ==========
-  const renderElectronicForm = () => (
-    <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-      <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaMobileAlt /> Mobile/Electronic Equipment Details
-      </h3>
-      
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm font-medium text-gray-700">Device Type</label>
-          <select
-            value={electronicDetails.deviceType}
-            onChange={(e) => handleElectronicChange("deviceType", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="">Select</option>
-            {deviceTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </div>
-        
-        {electronicDetails.deviceType === "Other" && (
+  // ============================================================
+  // RENDER: ELECTRONIC FORM
+  // ============================================================
+  const renderElectronicForm = () => {
+    const isDeviceOlderThan15Days = () => {
+      if (!electronicDetails.dateOfPurchase) return false;
+      const purchaseDate = new Date(electronicDetails.dateOfPurchase);
+      const today = new Date();
+      const diffDays = Math.floor((today - purchaseDate) / (1000 * 60 * 60 * 24));
+      return diffDays > 15;
+    };
+
+    return (
+      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+          <FaMobileAlt /> Mobile/Electronic Equipment Details
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
-            <label className="text-sm font-medium text-gray-700">Specify Device Type</label>
+            <label className="text-sm font-medium text-gray-700">Device Type</label>
+            <select
+              value={electronicDetails.deviceType}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, deviceType: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {DEVICE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {electronicDetails.deviceType === "Other" && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">Specify Device Type</label>
+              <input
+                type="text"
+                value={electronicDetails.otherDeviceType}
+                onChange={(e) => setElectronicDetails(prev => ({ ...prev, otherDeviceType: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+            </div>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Date of Purchase</label>
             <input
-              type="text"
-              value={electronicDetails.otherDeviceType}
-              onChange={(e) => handleElectronicChange("otherDeviceType", e.target.value)}
+              type="date"
+              value={electronicDetails.dateOfPurchase}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, dateOfPurchase: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+            {isDeviceOlderThan15Days() && (
+              <p className="text-orange-500 text-xs mt-1">⚠️ Device is older than 15 days</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Purchase Value (incl. Tax)</label>
+            <input
+              type="number"
+              value={electronicDetails.purchaseValue}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseValue: e.target.value }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
-        )}
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Date of Purchase</label>
-          <input
-            type="date"
-            value={electronicDetails.dateOfPurchase}
-            onChange={(e) => handleElectronicChange("dateOfPurchase", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Purchase Value (incl. Tax)</label>
-          <input
-            type="number"
-            value={electronicDetails.purchaseValue}
-            onChange={(e) => handleElectronicChange("purchaseValue", e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
-          <input
-            type="text"
-            value={electronicDetails.aadhaarNumber}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '');
-              if (val.length <= 12) handleElectronicChange("aadhaarNumber", val);
-            }}
-            maxLength="12"
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleElectronicChange("aadhaarFile", e.target.files[0])}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">PAN Number</label>
-          <input
-            type="text"
-            value={electronicDetails.panNumber}
-            onChange={(e) => {
-              const val = e.target.value.toUpperCase();
-              if (val.length <= 10) handleElectronicChange("panNumber", val);
-            }}
-            maxLength="10"
-            className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload PAN</label>
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleElectronicChange("panFile", e.target.files[0])}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">IMEI Number</label>
-          <input
-            type="text"
-            value={electronicDetails.imeiNumber}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '');
-              if (val.length <= 15) handleElectronicChange("imeiNumber", val);
-            }}
-            maxLength="15"
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-          {electronicDetails.dateOfPurchase && (() => {
-            const purchaseDate = new Date(electronicDetails.dateOfPurchase);
-            const today = new Date();
-            const diffDays = Math.floor((today - purchaseDate) / (1000 * 60 * 60 * 24));
-            if (diffDays > 15) {
-              return <p className="text-orange-500 text-xs mt-1">⚠️ Device is older than 15 days</p>;
-            }
-          })()}
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
-          <input
-            type="file"
-            accept=".jpg,.jpeg"
-            onChange={(e) => handleElectronicChange("imeiImage", e.target.files[0])}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-        
-        <div className="lg:col-span-3">
-          <label className="text-sm font-medium text-gray-700">Device Photos (with IMEI visible)</label>
-          <input
-            type="file"
-            accept=".jpg,.jpeg"
-            multiple
-            onChange={(e) => handleElectronicChange("devicePhotos", Array.from(e.target.files))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-          {electronicDetails.devicePhotos.length > 0 && (
-            <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.length} photos selected</p>
-          )}
-        </div>
-        
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => handleElectronicChange("purchaseInvoice", e.target.files[0])}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
+            <input
+              type="text"
+              value={electronicDetails.aadhaarNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 12) setElectronicDetails(prev => ({ ...prev, aadhaarNumber: val }));
+              }}
+              maxLength="12"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+            {electronicDetails.aadhaarNumber && !validateAadhaar(electronicDetails.aadhaarNumber) && (
+              <p className="text-red-500 text-xs mt-1">Enter 12 digits</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg"
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">PAN Number</label>
+            <input
+              type="text"
+              value={electronicDetails.panNumber}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                if (val.length <= 10) setElectronicDetails(prev => ({ ...prev, panNumber: val }));
+              }}
+              maxLength="10"
+              className="w-full p-2 border border-gray-300 rounded-lg uppercase"
+            />
+            {electronicDetails.panNumber && !validatePAN(electronicDetails.panNumber) && (
+              <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg"
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">IMEI Number</label>
+            <input
+              type="text"
+              value={electronicDetails.imeiNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 15) setElectronicDetails(prev => ({ ...prev, imeiNumber: val }));
+              }}
+              maxLength="15"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+            {isDeviceOlderThan15Days() && (
+              <p className="text-red-500 text-xs mt-1">IMEI required for devices older than 15 days</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg"
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div className="lg:col-span-3">
+            <label className="text-sm font-medium text-gray-700">
+              Device Photos (3-4 photos from different angles showing IMEI)
+            </label>
+            <input
+              type="file"
+              accept=".jpg,.jpeg"
+              multiple
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, devicePhotos: Array.from(e.target.files) }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+            {electronicDetails.devicePhotos.length > 0 && (
+              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.length} photos selected</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg"
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  // ========== RENDER WORKFLOW FORM (for Edit Modal) ==========
+  // ============================================================
+  // RENDER: WORKFLOW FORM (Edit Modal)
+  // ============================================================
   const renderWorkflowForm = () => (
     <div className="border-t-2 border-indigo-200 pt-4 mt-4">
       <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaEdit /> Workflow Management
+        <FaEdit /> Workflow Management (Admin Only)
       </h3>
-      
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
           <label className="text-sm font-medium text-gray-700">Status</label>
           <select
-            value={editData.workflowDetails?.status || editData.status}
+            value={workflowDetails.status}
             onChange={(e) => {
-              const val = e.target.value;
-              setEditData(prev => ({
-                ...prev,
-                workflowDetails: { ...prev.workflowDetails, status: val }
-              }));
-              if (val === "Quotation Generated") {
-                setShowInsurerQuotes(true);
-              } else {
-                setShowInsurerQuotes(false);
-              }
+              setWorkflowDetails(prev => ({ ...prev, status: e.target.value }));
+              setShowInsurerQuotes(e.target.value === "Quotation Generated");
             }}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
-            {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
-        {(editData.workflowDetails?.status === "Quotation Generated" || showInsurerQuotes) && (
+
+        {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">Quote Number</label>
               <input
                 type="text"
-                value={editData.workflowDetails?.quoteNumber || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, quoteNumber: e.target.value }
-                }))}
+                value={workflowDetails.quoteNumber}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, quoteNumber: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
             <div className="lg:col-span-3">
               <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg">
-                {insurerOptions.slice(0, 10).map(ins => (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto">
+                {INSURER_OPTIONS.slice(0, 10).map(ins => (
                   <label key={ins} className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      checked={editData.workflowDetails?.selectedInsurers?.includes(ins) || false}
+                      checked={workflowDetails.selectedInsurers?.includes(ins) || false}
                       onChange={(e) => {
-                        const current = editData.workflowDetails?.selectedInsurers || [];
+                        const current = workflowDetails.selectedInsurers || [];
                         let updated;
                         if (e.target.checked) {
                           updated = [...current, ins];
                         } else {
                           updated = current.filter(i => i !== ins);
                         }
-                        setEditData(prev => ({
-                          ...prev,
-                          workflowDetails: { ...prev.workflowDetails, selectedInsurers: updated }
-                        }));
+                        setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
                       }}
                     />
                     {ins}
@@ -2101,63 +2001,88 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 ))}
               </div>
             </div>
+            {workflowDetails.selectedInsurers?.length > 0 && (
+              <div className="lg:col-span-3">
+                <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
+                {workflowDetails.selectedInsurers.map((insurer, idx) => (
+                  <div key={idx} className="border rounded-lg p-3 mb-3 bg-gray-50">
+                    <h6 className="font-medium text-indigo-600">{insurer}</h6>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                        <input type="file" accept=".pdf,.jpg,.jpeg" className="w-full p-1 border rounded text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Premium Amount</label>
+                        <input type="number" className="w-full p-1 border rounded text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                        <select className="w-full p-1 border rounded text-sm">
+                          <option value="">Select</option>
+                          <option value="Monthly">Monthly</option>
+                          <option value="Quarterly">Quarterly</option>
+                          <option value="Half Yearly">Half Yearly</option>
+                          <option value="Yearly">Yearly</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                        <input type="number" className="w-full p-1 border rounded text-sm" />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Payable Amount</label>
+                        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </>
         )}
-        
+
         <div>
           <label className="text-sm font-medium text-gray-700">Payment Status</label>
           <select
-            value={editData.workflowDetails?.paymentStatus || ""}
-            onChange={(e) => setEditData(prev => ({
-              ...prev,
-              workflowDetails: { ...prev.workflowDetails, paymentStatus: e.target.value }
-            }))}
+            value={workflowDetails.paymentStatus}
+            onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
           >
             <option value="">Select</option>
-            {paymentStatusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            {PAYMENT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
         </div>
-        
-        {editData.workflowDetails?.paymentStatus === "URL Shared" && (
+
+        {workflowDetails.paymentStatus === "URL Shared" && (
           <div className="lg:col-span-3">
             <label className="text-sm font-medium text-gray-700">Payment URL</label>
             <div className="flex gap-2">
               <input
                 type="url"
-                value={editData.workflowDetails?.paymentUrl || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, paymentUrl: e.target.value }
-                }))}
+                value={workflowDetails.paymentUrl}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentUrl: e.target.value }))}
                 className="flex-1 p-2 border border-gray-300 rounded-lg"
                 placeholder="https://payment.link/..."
               />
-              {editData.workflowDetails?.paymentUrl && (
-                <a
-                  href={editData.workflowDetails.paymentUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-                >
+              {workflowDetails.paymentUrl && (
+                <a href={workflowDetails.paymentUrl} target="_blank" rel="noopener noreferrer" 
+                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
                   <FaLink /> Open
                 </a>
               )}
             </div>
           </div>
         )}
-        
-        {editData.workflowDetails?.paymentStatus === "Payment Done" && (
+
+        {workflowDetails.paymentStatus === "Payment Done" && (
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">UTR Number</label>
               <input
                 type="text"
-                value={editData.workflowDetails?.utrNumber || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, utrNumber: e.target.value }
-                }))}
+                value={workflowDetails.utrNumber}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, utrNumber: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -2166,27 +2091,21 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="file"
                 accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, paymentSnapshot: e.target.files[0] }
-                }))}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
           </>
         )}
-        
-        {editData.workflowDetails?.paymentStatus === "Policy Issued" && (
+
+        {workflowDetails.paymentStatus === "Policy Issued" && (
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Number</label>
               <input
                 type="text"
-                value={editData.workflowDetails?.policyNumber || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, policyNumber: e.target.value }
-                }))}
+                value={workflowDetails.policyNumber}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -2194,11 +2113,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">Policy Issued On</label>
               <input
                 type="date"
-                value={editData.workflowDetails?.policyIssuedOn || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, policyIssuedOn: e.target.value }
-                }))}
+                value={workflowDetails.policyIssuedOn}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -2206,11 +2122,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
               <input
                 type="date"
-                value={editData.workflowDetails?.policyStartDate || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, policyStartDate: e.target.value }
-                }))}
+                value={workflowDetails.policyStartDate}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -2218,11 +2131,8 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
               <input
                 type="date"
-                value={editData.workflowDetails?.policyExpiryDate || ""}
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, policyExpiryDate: e.target.value }
-                }))}
+                value={workflowDetails.policyExpiryDate}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
@@ -2231,34 +2141,30 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
               <input
                 type="file"
                 accept=".pdf"
-                onChange={(e) => setEditData(prev => ({
-                  ...prev,
-                  workflowDetails: { ...prev.workflowDetails, policyCopy: e.target.files[0] }
-                }))}
+                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
           </>
         )}
-        
+
         <div className="lg:col-span-3">
           <label className="text-sm font-medium text-gray-700">Remarks</label>
           <textarea
-            value={editData.workflowDetails?.remarks || ""}
-            onChange={(e) => setEditData(prev => ({
-              ...prev,
-              workflowDetails: { ...prev.workflowDetails, remarks: e.target.value }
-            }))}
+            value={workflowDetails.remarks}
+            onChange={(e) => setWorkflowDetails(prev => ({ ...prev, remarks: e.target.value }))}
             className="w-full p-2 border border-gray-300 rounded-lg"
             rows="3"
-          ></textarea>
+          />
         </div>
       </div>
     </div>
   );
 
-  // ========== RENDER LEAD FORM ==========
-  const renderLeadForm = () => (
+  // ============================================================
+  // RENDER: LEAD FORM MODAL
+  // ============================================================
+  const renderLeadFormModal = () => (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
@@ -2272,406 +2178,145 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
-          <h2 className="text-xl font-bold">Add New Lead</h2>
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <FaUserPlus className="text-indigo-600" /> Add New Lead
+          </h2>
           <button onClick={() => setShowLeadForm(false)} className="text-gray-500 hover:text-gray-700">
             <FaTimes className="h-5 w-5" />
           </button>
         </div>
-        
-        <form onSubmit={handleAddLead}>
-          {/* Step 1: Basic Information */}
+
+        <form onSubmit={handleCreateLead}>
+          {/* Basic Information */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Name *</label>
+              <label className="text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
               <input
                 type="text"
-                value={newLead.name}
-                onChange={(e) => setNewLead({ ...newLead, name: toUpperCase(e.target.value) })}
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: toUpperCase(e.target.value) })}
                 className="w-full p-2 border border-gray-300 rounded-lg uppercase"
                 required
                 placeholder="Enter name in UPPERCASE"
               />
             </div>
-            
+
             <div>
               <label className="text-sm font-medium text-gray-700">Gender</label>
               <select
-                value={newLead.gender}
-                onChange={(e) => setNewLead({ ...newLead, gender: e.target.value })}
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {genderOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {GENDER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
-            
+
             <div>
-              <label className="text-sm font-medium text-gray-700">Mobile No *</label>
+              <label className="text-sm font-medium text-gray-700">Mobile Number <span className="text-red-500">*</span></label>
               <input
                 type="text"
-                value={newLead.mobileNo}
+                value={formData.mobileNo}
                 onChange={(e) => {
                   const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= 10) setNewLead({ ...newLead, mobileNo: val });
+                  if (val.length <= 10) setFormData({ ...formData, mobileNo: val });
                 }}
                 maxLength="10"
                 className="w-full p-2 border border-gray-300 rounded-lg"
                 required
               />
-              {newLead.mobileNo && !validateMobile(newLead.mobileNo) && (
+              {formData.mobileNo && !validateMobile(formData.mobileNo) && (
                 <p className="text-red-500 text-xs mt-1">Enter 10 digits</p>
               )}
             </div>
-            
+
             <div>
-              <label className="text-sm font-medium text-gray-700">Email</label>
+              <label className="text-sm font-medium text-gray-700">Email ID</label>
               <input
                 type="email"
-                value={newLead.email}
-                onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
+              {formData.email && !validateEmail(formData.email) && (
+                <p className="text-red-500 text-xs mt-1">Invalid email format</p>
+              )}
             </div>
-            
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">Pin/Zip Code</label>
+              <input
+                type="text"
+                value={formData.pinCode}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 6) setFormData({ ...formData, pinCode: val });
+                }}
+                maxLength="6"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {formData.pinCode && !validatePIN(formData.pinCode) && (
+                <p className="text-red-500 text-xs mt-1">Enter 6 digits</p>
+              )}
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">State</label>
+              <input type="text" value={formData.state} readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-gray-700">City</label>
+              <input type="text" value={formData.city} readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
+            </div>
+
             <div>
               <label className="text-sm font-medium text-gray-700">Source</label>
               <select
-                value={newLead.source}
-                onChange={(e) => setNewLead({ ...newLead, source: e.target.value })}
+                value={formData.source}
+                onChange={(e) => setFormData({ ...formData, source: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {sourceOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {SOURCE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Reference</label>
-              <input
-                type="text"
-                value={newLead.reference}
-                onChange={(e) => setNewLead({ ...newLead, reference: e.target.value })}
-                placeholder="e.g., Facebook, Agent Name, Walk-in"
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Status</label>
-              <select
-                value={newLead.status}
-                onChange={(e) => setNewLead({ ...newLead, status: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="Open">Open</option>
-                <option value="Policy Issued">Policy Issued</option>
-                <option value="Closed Without Issuance">Closed Without Issuance</option>
-              </select>
-            </div>
-            
-            {newLead.status === "Open" && (
+
+            {sourceDependentField && (
               <div>
-                <label className="text-sm font-medium text-gray-700">Next Step</label>
-                <select
-                  value={newLead.openStatus}
-                  onChange={(e) => setNewLead({ ...newLead, openStatus: e.target.value })}
+                <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+                <input
+                  type="text"
+                  value={formData.sourceDependentValue}
+                  onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
                   className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  <option value="Closed">Closed</option>
-                  <option value="Policy Issued">Policy Issued</option>
-                </select>
+                />
               </div>
             )}
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Number</label>
-              <input
-                type="text"
-                value={newLead.policyNumber}
-                onChange={(e) => setNewLead({ ...newLead, policyNumber: e.target.value })}
+
+            <div className="lg:col-span-3">
+              <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
+              <textarea
+                value={formData.remarks}
+                onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
+                rows="2"
+                placeholder="Enter customer remarks..."
               />
             </div>
-            
+
             <div>
-              <label className="text-sm font-medium text-gray-700">LOB</label>
+              <label className="text-sm font-medium text-gray-700">LOB <span className="text-red-500">*</span></label>
               <select
-                value={newLead.lobOption}
-                onChange={(e) => {
-                  setNewLead({ ...newLead, lobOption: e.target.value, lobCustom: "" });
-                  detectLOB(e.target.value);
-                }}
+                value={formData.lob}
+                onChange={(e) => setFormData({ ...formData, lob: e.target.value })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
+                required
               >
                 <option value="">-- Select LOB --</option>
-                {lobOptions.map((lob) => (
-                  <option key={lob} value={lob}>
-                    {lob}
-                  </option>
-                ))}
+                {LOB_OPTIONS.map(lob => <option key={lob} value={lob}>{lob}</option>)}
               </select>
-              {newLead.lobOption === "Other Insurance" && (
-                <input
-                  type="text"
-                  placeholder="Enter Custom LOB"
-                  value={newLead.lobCustom}
-                  onChange={(e) => setNewLead({ ...newLead, lobCustom: e.target.value })}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
-                />
-              )}
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Agency</label>
-              <select
-                value={newLead.agency}
-                onChange={(e) => {
-                  setNewLead({ ...newLead, agency: e.target.value });
-                  setShowCustomAgency(e.target.value === "OTHERS");
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select Agency --</option>
-                {agencyOptions.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-              {showCustomAgency && (
-                <input
-                  type="text"
-                  placeholder="Enter Custom Agency"
-                  value={newLead.customAgency}
-                  onChange={(e) => setNewLead({ ...newLead, customAgency: e.target.value })}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
-                />
-              )}
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Sum Insured</label>
-              <input
-                type="number"
-                value={newLead.sumInsured}
-                onChange={(e) => setNewLead({ ...newLead, sumInsured: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Endorsement</label>
-              <input
-                type="text"
-                value={newLead.endorsement}
-                onChange={(e) => setNewLead({ ...newLead, endorsement: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Net Premium</label>
-              <input
-                type="number"
-                value={newLead.netPremium}
-                onChange={(e) => setNewLead({ ...newLead, netPremium: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">GST %</label>
-              <select
-                value={newLead.gstPercent}
-                onChange={(e) => setNewLead({ ...newLead, gstPercent: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                {gstOptions.map((g) => (
-                  <option key={g} value={g}>
-                    {g}%
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Gross Premium</label>
-              <input
-                type="text"
-                readOnly
-                value={formatCurrency(computeGrossPremium(newLead.netPremium, newLead.gstPercent))}
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout (%)</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={newLead.payoutPercent}
-                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={newLead.payoutPercent}
-                  onChange={(e) => setNewLead({ ...newLead, payoutPercent: clampPercent(e.target.value) })}
-                  className="w-20 p-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout (calc)</label>
-              <input
-                type="text"
-                readOnly
-                value={formatCurrency(computePayoutValue(newLead.netPremium, newLead.payoutPercent))}
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Additional Payout</label>
-              <input
-                type="number"
-                value={newLead.additionalPayout}
-                onChange={(e) => setNewLead({ ...newLead, additionalPayout: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Total Payment</label>
-              <input
-                type="text"
-                readOnly
-                value={formatCurrency(
-                  computeTotalPayment(
-                    computePayoutValue(newLead.netPremium, newLead.payoutPercent),
-                    newLead.additionalPayout
-                  )
-                )}
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout Status</label>
-              <select
-                value={newLead.payoutStatus}
-                onChange={(e) => setNewLead({ ...newLead, payoutStatus: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select --</option>
-                <option value="Pending">Pending</option>
-                <option value="Received">Received</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Start</label>
-              <input
-                type="date"
-                value={newLead.policyStartDate}
-                onChange={(e) => setNewLead({ ...newLead, policyStartDate: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Expiry</label>
-              <input
-                type="date"
-                value={newLead.policyExpiryDate}
-                onChange={(e) => setNewLead({ ...newLead, policyExpiryDate: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Insurer</label>
-              <select
-                value={newLead.insurer}
-                onChange={(e) => setNewLead({ ...newLead, insurer: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select --</option>
-                {insurerOptions.map((ins) => (
-                  <option key={ins} value={ins}>
-                    {ins}
-                  </option>
-                ))}
-              </select>
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Upload</label>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setNewLead({ ...newLead, policyPdf: e.target.files[0] })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-              {newLead.policyPdf && <p className="text-sm text-gray-500 mt-1">{newLead.policyPdf.name}</p>}
-            </div>
-            
-            <div>
-              <label className="text-sm font-medium text-gray-700">Image URL</label>
-              <input
-                type="url"
-                value={newLead.imageUrl}
-                onChange={(e) => setNewLead({ ...newLead, imageUrl: e.target.value })}
-                placeholder="Enter image URL"
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            
-            <div className="relative" ref={formDropdownRef}>
-              <label className="text-sm font-medium text-gray-700">Assign To</label>
-              <button
-                type="button"
-                onClick={() => setShowFormDropdown(!showFormDropdown)}
-                className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
-              >
-                {selectedUsers.length > 0 ? selectedUsers.map(getUserName).join(", ") : "-- Select Users --"}
-              </button>
-              {showFormDropdown && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {users.length === 0 ? (
-                    <div className="p-3 text-gray-500">Loading users...</div>
-                  ) : (
-                    users.map((user) => (
-                      <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={selectedUsers.includes(user._id)}
-                          onChange={() => toggleUserSelection(null, user._id, true)}
-                          className="mr-3"
-                        />
-                        <span className="text-sm">{user.username || user.name || user.email}</span>
-                      </label>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-            
-            <div className="lg:col-span-3">
-              <label className="text-sm font-medium text-gray-700">Remarks</label>
-              <textarea
-                value={newLead.remarks}
-                onChange={(e) => setNewLead({ ...newLead, remarks: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-                rows="3"
-                placeholder="Customer remarks, discussion notes, etc."
-              ></textarea>
             </div>
           </div>
 
@@ -2680,17 +2325,13 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
           {showMotorSection && renderMotorForm()}
           {showElectronicSection && renderElectronicForm()}
 
-          {/* Form Actions */}
-          <div className="lg:col-span-3 flex gap-4 justify-end mt-6 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => setShowLeadForm(false)}
-              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-            >
+          {/* Actions */}
+          <div className="flex gap-4 justify-end mt-6 pt-4 border-t">
+            <button type="button" onClick={() => setShowLeadForm(false)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
               Cancel
             </button>
-            <button type="submit" className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              Create Lead
+            <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
+              {isSubmitting ? "Creating..." : <><FaCheck /> Create Lead</>}
             </button>
           </div>
         </form>
@@ -2698,324 +2339,51 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     </motion.div>
   );
 
-  // ========== RENDER EDIT MODAL ==========
+  // ============================================================
+  // RENDER: EDIT MODAL
+  // ============================================================
   const renderEditModal = () => (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+      onClick={() => setShowEditModal(false)}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         className="bg-white rounded-2xl p-6 max-w-6xl max-h-[90vh] overflow-y-auto w-full"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
-          <h2 className="text-xl font-bold">Edit Lead</h2>
-          <button onClick={closeEditModal} className="text-gray-500 hover:text-gray-700">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <FaEdit className="text-indigo-600" /> Update Lead Workflow
+            <span className="text-sm font-normal text-gray-500 ml-2">(Admin Only)</span>
+          </h2>
+          <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
             <FaTimes className="h-5 w-5" />
           </button>
         </div>
-        
-        <form>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">Name</label>
-              <input
-                type="text"
-                value={editData.name}
-                onChange={(e) => setEditData({ ...editData, name: toUpperCase(e.target.value) })}
-                className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Gender</label>
-              <select
-                value={editData.gender || ""}
-                onChange={(e) => setEditData({ ...editData, gender: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">Select</option>
-                {genderOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Mobile No</label>
-              <input
-                type="text"
-                value={editData.mobileNo}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= 10) setEditData({ ...editData, mobileNo: val });
-                }}
-                maxLength="10"
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Email</label>
-              <input
-                type="email"
-                value={editData.email}
-                onChange={(e) => setEditData({ ...editData, email: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Source</label>
-              <select
-                value={editData.source || ""}
-                onChange={(e) => setEditData({ ...editData, source: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">Select</option>
-                {sourceOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Reference</label>
-              <input
-                type="text"
-                value={editData.reference}
-                onChange={(e) => setEditData({ ...editData, reference: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Status</label>
-              <select
-                value={editData.status}
-                onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                {statusOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Number</label>
-              <input
-                type="text"
-                value={editData.policyNumber}
-                onChange={(e) => setEditData({ ...editData, policyNumber: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">LOB</label>
-              <select
-                value={editData.lobOption}
-                onChange={(e) => setEditData({ ...editData, lobOption: e.target.value, lobCustom: "" })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select LOB --</option>
-                {lobOptions.map((lob) => (
-                  <option key={lob} value={lob}>
-                    {lob}
-                  </option>
-                ))}
-              </select>
-              {editData.lobOption === "Other Insurance" && (
-                <input
-                  type="text"
-                  placeholder="Enter Custom LOB"
-                  value={editData.lobCustom}
-                  onChange={(e) => setEditData({ ...editData, lobCustom: e.target.value })}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
-                />
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Agency</label>
-              <select
-                value={editData.agency}
-                onChange={(e) => {
-                  setEditData({ ...editData, agency: e.target.value });
-                  setShowEditCustomAgency(e.target.value === "OTHERS");
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select Agency --</option>
-                {agencyOptions.map((a) => (
-                  <option key={a} value={a}>
-                    {a}
-                  </option>
-                ))}
-              </select>
-              {showEditCustomAgency && (
-                <input
-                  type="text"
-                  placeholder="Enter Custom Agency"
-                  value={editData.customAgency}
-                  onChange={(e) => setEditData({ ...editData, customAgency: e.target.value })}
-                  className="mt-2 w-full p-2 border border-gray-300 rounded-lg"
-                />
-              )}
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Sum Insured</label>
-              <input
-                type="number"
-                value={editData.sumInsured}
-                onChange={(e) => setEditData({ ...editData, sumInsured: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Net Premium</label>
-              <input
-                type="number"
-                value={editData.netPremium}
-                onChange={(e) => setEditData({ ...editData, netPremium: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">GST %</label>
-              <select
-                value={editData.gstPercent}
-                onChange={(e) => setEditData({ ...editData, gstPercent: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                {gstOptions.map((g) => (
-                  <option key={g} value={g}>
-                    {g}%
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Payout (%)</label>
-              <div className="flex items-center gap-3">
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={editData.payoutPercent}
-                  onChange={(e) => setEditData({ ...editData, payoutPercent: clampPercent(e.target.value) })}
-                  className="w-full"
-                />
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={editData.payoutPercent}
-                  onChange={(e) => setEditData({ ...editData, payoutPercent: clampPercent(e.target.value) })}
-                  className="w-20 p-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Additional Payout</label>
-              <input
-                type="number"
-                value={editData.additionalPayout}
-                onChange={(e) => setEditData({ ...editData, additionalPayout: parseFloat(e.target.value) || 0 })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Start</label>
-              <input
-                type="date"
-                value={editData.policyStartDate}
-                onChange={(e) => setEditData({ ...editData, policyStartDate: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Expiry</label>
-              <input
-                type="date"
-                value={editData.policyExpiryDate}
-                onChange={(e) => setEditData({ ...editData, policyExpiryDate: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Insurer</label>
-              <select
-                value={editData.insurer}
-                onChange={(e) => setEditData({ ...editData, insurer: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              >
-                <option value="">-- Select --</option>
-                {insurerOptions.map((ins) => (
-                  <option key={ins} value={ins}>
-                    {ins}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Upload</label>
-              {editData.policyPdf?.url && (
-                <div className="mb-2">
-                  <a href={editData.policyPdf.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 text-sm flex items-center gap-1">
-                    <FaFilePdf className="h-4 w-4" /> Current PDF
-                  </a>
-                </div>
-              )}
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setEditData({ ...editData, newPolicyPdf: e.target.files[0] })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Image URL</label>
-              <input
-                type="url"
-                value={editData.imageUrl}
-                onChange={(e) => setEditData({ ...editData, imageUrl: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div className="relative" ref={editFormDropdownRef}>
-              <label className="text-sm font-medium text-gray-700">Assign To</label>
-              <button
-                type="button"
-                onClick={() => setShowEditFormDropdown(!showEditFormDropdown)}
-                className="w-full p-2 border border-gray-300 rounded-lg text-left bg-white hover:bg-gray-50"
-              >
-                {editSelectedUsers.length > 0 ? editSelectedUsers.map(getUserName).join(", ") : "-- Select Users --"}
-              </button>
-              {showEditFormDropdown && (
-                <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {users.map((user) => (
-                    <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editSelectedUsers.includes(user._id)}
-                        onChange={() => toggleUserSelection(null, user._id, false, true)}
-                        className="mr-3"
-                      />
-                      <span className="text-sm">{user.username || user.name || user.email}</span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="lg:col-span-3">
-              <label className="text-sm font-medium text-gray-700">Remarks</label>
-              <textarea
-                value={editData.remarks}
-                onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-                rows="3"
-              ></textarea>
-            </div>
+
+        <form onSubmit={handleUpdateLead}>
+          {/* Lead Info */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-lg mb-4">
+            <div><span className="font-medium">Lead Code:</span> {editLead?.leadCode}</div>
+            <div><span className="font-medium">Name:</span> {editLead?.name}</div>
+            <div><span className="font-medium">Mobile:</span> {editLead?.mobileNo}</div>
+            <div><span className="font-medium">LOB:</span> {editLead?.lob}</div>
           </div>
 
-          {/* Workflow Section */}
+          {/* Workflow Form */}
           {renderWorkflowForm()}
 
-          <div className="lg:col-span-3 flex gap-4 justify-end mt-6 pt-4 border-t">
-            <button type="button" onClick={closeEditModal} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+          {/* Actions */}
+          <div className="flex gap-4 justify-end mt-6 pt-4 border-t">
+            <button type="button" onClick={() => setShowEditModal(false)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
               Cancel
             </button>
-            <button type="button" onClick={saveEdit} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
-              Update Lead
+            <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
+              {isSubmitting ? "Updating..." : <><FaSave /> Update Lead</>}
             </button>
           </div>
         </form>
@@ -3023,38 +2391,156 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
     </motion.div>
   );
 
-  // ========== MAIN RENDER ==========
+  // ============================================================
+  // RENDER: LEAD DETAILS VIEW
+  // ============================================================
+  const renderLeadDetails = () => {
+    if (!selectedLead) return null;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+        onClick={() => setSelectedLead(null)}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white rounded-2xl p-6 max-w-4xl max-h-[90vh] overflow-y-auto w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
+            <h2 className="text-xl font-bold">Lead Details</h2>
+            <button onClick={() => setSelectedLead(null)} className="text-gray-500 hover:text-gray-700">
+              <FaTimes className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><span className="font-medium">Lead Code:</span> {selectedLead.leadCode}</div>
+            <div><span className="font-medium">Name:</span> {selectedLead.name}</div>
+            <div><span className="font-medium">Mobile:</span> {selectedLead.mobileNo}</div>
+            <div><span className="font-medium">Email:</span> {selectedLead.email || "-"}</div>
+            <div><span className="font-medium">Gender:</span> {selectedLead.gender || "-"}</div>
+            <div><span className="font-medium">Source:</span> {selectedLead.source || "-"}</div>
+            <div><span className="font-medium">LOB:</span> {selectedLead.lob || "-"}</div>
+            <div><span className="font-medium">Status:</span> 
+              <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                selectedLead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
+                selectedLead.status === "Policy Issued" ? "bg-emerald-100 text-emerald-800" :
+                "bg-blue-100 text-blue-800"
+              }`}>{selectedLead.status}</span>
+            </div>
+            <div><span className="font-medium">Policy Number:</span> {selectedLead.policyNumber || "-"}</div>
+            <div><span className="font-medium">Insurer:</span> {selectedLead.insurer || "-"}</div>
+            <div><span className="font-medium">Policy Start:</span> {selectedLead.policyStartDate || "-"}</div>
+            <div><span className="font-medium">Policy Expiry:</span> {selectedLead.policyExpiryDate || "-"}</div>
+            <div className="sm:col-span-2">
+              <span className="font-medium">Remarks:</span> {selectedLead.remarks || "-"}
+            </div>
+            {selectedLead.healthDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Health Insurance Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Policy Type: {selectedLead.healthDetails.policyType || "-"}</div>
+                  <div>Proposer: {selectedLead.healthDetails.proposerName || "-"}</div>
+                  <div>DOB: {selectedLead.healthDetails.proposerDOB || "-"}</div>
+                  <div>Family Income: {selectedLead.healthDetails.familyIncome || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.motorDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Motor Insurance Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Vehicle Type: {selectedLead.motorDetails.vehicleType || "-"}</div>
+                  <div>Registration: {selectedLead.motorDetails.registrationNumber || "-"}</div>
+                  <div>RTO: {selectedLead.motorDetails.rtoCode || "-"}</div>
+                  <div>NCB: {selectedLead.motorDetails.ncb || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.electronicDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Electronic Equipment Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Device: {selectedLead.electronicDetails.deviceType || "-"}</div>
+                  <div>Purchase Date: {selectedLead.electronicDetails.dateOfPurchase || "-"}</div>
+                  <div>IMEI: {selectedLead.electronicDetails.imeiNumber || "-"}</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end mt-6 pt-4 border-t">
+            <button onClick={() => setSelectedLead(null)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
+              Close
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  // ============================================================
+  // MAIN RENDER
+  // ============================================================
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="space-y-4">
+    <div className="space-y-4 p-4">
       {/* Upload Status */}
       {uploadStatus.show && (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className={`p-4 rounded-lg ${uploadStatus.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className={`p-4 rounded-lg ${uploadStatus.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}
+        >
           {uploadStatus.type === "success" ? "✓ " : "✗ "}{uploadStatus.message}
         </motion.div>
       )}
 
+      {/* Renewal Alerts */}
+      {renderRenewalAlerts()}
+
       {/* Controls */}
-      <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }} className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto flex-wrap">
-          <button onClick={() => setShowLeadForm(true)} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2">
-            + Add New Lead
+      <motion.div
+        initial={{ opacity: 0, x: -20 }}
+        animate={{ opacity: 1, x: 0 }}
+        className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100"
+      >
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-wrap">
+          <button
+            onClick={() => setShowLeadForm(true)}
+            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2"
+          >
+            <FaUserPlus /> Add New Lead
           </button>
-          <button onClick={downloadTemplate} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2">
-            <FaDownload className="h-4 w-4" /> Download Template
+          <button
+            onClick={downloadTemplate}
+            className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-all flex items-center gap-2"
+          >
+            <FaDownload /> Download Template
           </button>
-          <button onClick={downloadExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2">
-            <FaFileExcel className="h-4 w-4" /> Download Excel
+          <button
+            onClick={downloadExcel}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all flex items-center gap-2"
+          >
+            <FaFileExcel /> Export Excel
           </button>
           <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all cursor-pointer flex items-center gap-2">
             <FaUpload className="h-4 w-4" />
             {isUploading ? "Uploading..." : "Upload Excel"}
-            <input type="file" accept=".xlsx, .xls" onChange={handleFileUpload} className="hidden" ref={fileInputRef} disabled={isUploading} />
+            <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" ref={fileInputRef} disabled={isUploading} />
           </label>
         </div>
       </motion.div>
 
-      {/* Filters */}
-      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="bg-white p-4 rounded-2xl shadow-lg border border-gray-100 mb-4">
+      {/* Search and Filters */}
+      <motion.div
+        initial={{ opacity: 0, y: -10 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="bg-white p-4 rounded-2xl shadow-lg border border-gray-100"
+      >
         <div className="mb-4">
           <div className="relative">
             <FaSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
@@ -3067,36 +2553,39 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             />
           </div>
         </div>
+
         <div className="relative" ref={filterDropdownRef}>
-          <button onClick={() => setFilterDropdownOpen(!filterDropdownOpen)} className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all flex items-center gap-2">
-            <FaFilter className="h-4 w-4" /> Advanced Filters {activeFilters.length > 0 && `(${activeFilters.length})`}
+          <button
+            onClick={() => setFilterDropdownOpen(!filterDropdownOpen)}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-all flex items-center gap-2"
+          >
+            <FaFilter /> Advanced Filters
+            {Object.values(sourceFilters).some(v => v) && " (Active)"}
           </button>
+
           {filterDropdownOpen && (
             <div className="absolute z-50 mt-2 w-64 bg-white border border-gray-200 rounded-xl shadow-lg p-4">
               <h4 className="font-medium text-gray-800 mb-3">Filter by Source</h4>
               <div className="space-y-2">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={sourceFilters.employees} onChange={() => toggleSourceFilter("employees")} className="rounded text-indigo-600" />
-                  <span className="text-sm">Employees</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={sourceFilters.stores} onChange={() => toggleSourceFilter("stores")} className="rounded text-indigo-600" />
-                  <span className="text-sm">Stores</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={sourceFilters.channelPartners} onChange={() => toggleSourceFilter("channelPartners")} className="rounded text-indigo-600" />
-                  <span className="text-sm">Channel Partners</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={sourceFilters.socialMedia} onChange={() => toggleSourceFilter("socialMedia")} className="rounded text-indigo-600" />
-                  <span className="text-sm">Social Media</span>
-                </label>
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={sourceFilters.directSource} onChange={() => toggleSourceFilter("directSource")} className="rounded text-indigo-600" />
-                  <span className="text-sm">Direct Source</span>
-                </label>
+                {[
+                  { key: "employees", label: "Employees" },
+                  { key: "stores", label: "Stores" },
+                  { key: "channelPartners", label: "Channel Partners" },
+                  { key: "socialMedia", label: "Social Media" },
+                  { key: "directSource", label: "Direct Source" },
+                ].map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={sourceFilters[key]}
+                      onChange={() => toggleSourceFilter(key)}
+                      className="rounded text-indigo-600"
+                    />
+                    <span className="text-sm">{label}</span>
+                  </label>
+                ))}
               </div>
-              {activeFilters.length > 0 && (
+              {Object.values(sourceFilters).some(v => v) && (
                 <button onClick={clearFilters} className="mt-4 text-xs text-red-600 hover:text-red-800 w-full text-center">
                   Clear all filters
                 </button>
@@ -3104,33 +2593,14 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
             </div>
           )}
         </div>
-        {activeFilters.length > 0 && (
-          <div className="flex flex-wrap gap-2 mt-3">
-            {activeFilters.map((filter) => (
-              <span key={filter} className="px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs flex items-center gap-1">
-                {filter}
-                <button onClick={() => toggleSourceFilter(filter.toLowerCase().replace(" ", ""))}>
-                  <FaTimes className="h-3 w-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
       </motion.div>
 
-      {/* Lead Form Modal */}
-      {showLeadForm && renderLeadForm()}
-
-      {/* Edit Modal */}
-      {showEditModal && renderEditModal()}
-
-      {/* Table */}
+      {/* Leads Table */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-        <div className="p-4 bg-gray-50 border-b">
+        <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
           <p className="text-sm text-gray-600">
-            Showing {filteredLeadsData.length} of {leads.length} leads
+            Showing {filteredLeads.length} of {leads.length} leads
             {globalSearch && ` | Search: "${globalSearch}"`}
-            {activeFilters.length > 0 && ` | Source: ${activeFilters.join(", ")}`}
           </p>
         </div>
 
@@ -3147,126 +2617,91 @@ function LeadTable({ filter, setFilter, setSelectedLead }) {
                 <th className="p-3">LOB</th>
                 <th className="p-3">Source</th>
                 <th className="p-3">Status</th>
-                <th className="p-3">Assigned To</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredLeadsData.map((lead) => {
-                const assignedTo = normalizeAssignedTo(lead.assignedTo);
-                const currentShowDropdown = showLeadDropdowns[lead._id] || false;
-                return (
-                  <motion.tr key={lead._id} className="border-b hover:bg-gray-50 text-xs" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                    <td className="p-3 font-mono text-indigo-600">{lead.leadCode || "N/A"}</td>
-                    <td className="p-3 font-medium">{lead.name}</td>
-                    <td className="p-3">{lead.mobileNo}</td>
-                    <td className="p-3">{lead.email || "-"}</td>
-                    <td className="p-3">{lead.policyNumber || "-"}</td>
-                    <td className="p-3">{lead.lob || "-"}</td>
-                    <td className="p-3">{lead.source || "-"}</td>
-                    <td className="p-3">
-                      <span className={`px-2 py-1 rounded-full text-xs ${
-                        lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
-                        lead.status === "Quotation Generated" ? "bg-blue-100 text-blue-800" :
-                        lead.status === "Payment Link Generated" ? "bg-purple-100 text-purple-800" :
-                        lead.status === "Payment Done" ? "bg-green-100 text-green-800" :
-                        lead.status === "Policy Issued" ? "bg-emerald-100 text-emerald-800" :
-                        "bg-red-100 text-red-800"
-                      }`}>
-                        {lead.status}
-                      </span>
-                    </td>
-                    <td className="p-3">{assignedTo.map(getUserName).join(", ") || "Unassigned"}</td>
-                    <td className="p-3 flex gap-2 items-center">
-                      <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
-                        <FaEye className="h-5 w-5" />
-                      </button>
-                      <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
-                        <FaEdit className="h-5 w-5" />
-                      </button>
-                      <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
-                        <button
-                          onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))}
-                          className="px-3 py-1 text-xs border rounded bg-gray-50 hover:bg-gray-100"
-                        >
-                          Assign
-                        </button>
-                        {currentShowDropdown && (
-                          <div className="absolute z-50 mt-1 w-56 bg-white border rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                            {users.map((user) => (
-                              <label key={user._id} className="flex items-center p-2 hover:bg-gray-100 cursor-pointer text-xs">
-                                <input
-                                  type="checkbox"
-                                  checked={assignedTo.includes(user._id)}
-                                  onChange={() => toggleUserSelection(lead._id, user._id)}
-                                  className="mr-2"
-                                />
-                                {getUserName(user._id)}
-                              </label>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      <button onClick={() => deleteLead(lead._id)} className="text-red-600 hover:text-red-800">
-                        <FaTrash className="h-5 w-5" />
-                      </button>
-                    </td>
-                  </motion.tr>
-                );
-              })}
+              {filteredLeads.map((lead) => (
+                <tr key={lead._id} className="border-b hover:bg-gray-50 text-xs">
+                  <td className="p-3 font-mono text-indigo-600">{lead.leadCode || "N/A"}</td>
+                  <td className="p-3 font-medium">{lead.name}</td>
+                  <td className="p-3">{lead.mobileNo}</td>
+                  <td className="p-3">{lead.email || "-"}</td>
+                  <td className="p-3">{lead.policyNumber || "-"}</td>
+                  <td className="p-3">{lead.lob || "-"}</td>
+                  <td className="p-3">{lead.source || "-"}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
+                      lead.status === "Quotation Generated" ? "bg-blue-100 text-blue-800" :
+                      lead.status === "Payment Link Generated" ? "bg-purple-100 text-purple-800" :
+                      lead.status === "Payment Done" ? "bg-green-100 text-green-800" :
+                      lead.status === "Policy Issued" ? "bg-emerald-100 text-emerald-800" :
+                      "bg-red-100 text-red-800"
+                    }`}>
+                      {lead.status}
+                    </span>
+                  </td>
+                  <td className="p-3 flex gap-2 items-center">
+                    <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
+                      <FaEye className="h-5 w-5" />
+                    </button>
+                    <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
+                      <FaEdit className="h-5 w-5" />
+                    </button>
+                    <button onClick={() => deleteLead(lead._id)} className="text-red-600 hover:text-red-800">
+                      <FaTrash className="h-5 w-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
 
         {/* Mobile Cards */}
         <div className="block lg:hidden p-4 space-y-4">
-          {filteredLeadsData.map((lead) => {
-            const assignedTo = normalizeAssignedTo(lead.assignedTo);
-            const currentShowDropdown = showLeadDropdowns[lead._id] || false;
-            return (
-              <div key={lead._id} className="border rounded-lg p-4 bg-gray-50 shadow-sm">
-                <div className="space-y-2 text-sm">
-                  <div><strong>Lead Code:</strong> <span className="font-mono text-indigo-600">{lead.leadCode || "N/A"}</span></div>
-                  <div><strong>Name:</strong> {lead.name}</div>
-                  <div><strong>Mobile:</strong> {lead.mobileNo}</div>
-                  <div><strong>Email:</strong> {lead.email || "-"}</div>
-                  <div><strong>Policy #:</strong> {lead.policyNumber || "-"}</div>
-                  <div><strong>LOB:</strong> {lead.lob || "-"}</div>
-                  <div><strong>Source:</strong> {lead.source || "-"}</div>
-                  <div><strong>Status:</strong> <span className={`px-2 py-1 rounded text-xs ${
+          {filteredLeads.map((lead) => (
+            <div key={lead._id} className="border rounded-lg p-4 bg-gray-50 shadow-sm">
+              <div className="space-y-2 text-sm">
+                <div><strong>Lead Code:</strong> <span className="font-mono text-indigo-600">{lead.leadCode || "N/A"}</span></div>
+                <div><strong>Name:</strong> {lead.name}</div>
+                <div><strong>Mobile:</strong> {lead.mobileNo}</div>
+                <div><strong>Email:</strong> {lead.email || "-"}</div>
+                <div><strong>Policy #:</strong> {lead.policyNumber || "-"}</div>
+                <div><strong>LOB:</strong> {lead.lob || "-"}</div>
+                <div><strong>Source:</strong> {lead.source || "-"}</div>
+                <div><strong>Status:</strong> 
+                  <span className={`ml-1 px-2 py-1 rounded text-xs ${
                     lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
-                    lead.status === "Quotation Generated" ? "bg-blue-100 text-blue-800" :
-                    lead.status === "Payment Link Generated" ? "bg-purple-100 text-purple-800" :
-                    lead.status === "Payment Done" ? "bg-green-100 text-green-800" :
                     lead.status === "Policy Issued" ? "bg-emerald-100 text-emerald-800" :
-                    "bg-red-100 text-red-800"
-                  }`}>{lead.status}</span></div>
-                  <div><strong>Assigned:</strong> {assignedTo.map(getUserName).join(", ") || "Unassigned"}</div>
-                  <div className="pt-2 flex gap-3">
-                    <button onClick={() => setSelectedLead(lead)} className="text-indigo-600"><FaEye className="h-5 w-5" /></button>
-                    <button onClick={() => openEditModal(lead)} className="text-blue-600"><FaEdit className="h-5 w-5" /></button>
-                    <div className="relative" ref={(el) => (leadDropdownRefs.current[lead._id] = el)}>
-                      <button onClick={() => setShowLeadDropdowns((prev) => ({ ...prev, [lead._id]: !currentShowDropdown }))} className="text-xs px-3 py-1 border rounded bg-white">Assign</button>
-                      {currentShowDropdown && (
-                        <div className="absolute z-50 mt-2 w-full bg-white border rounded p-2 max-h-40 overflow-y-auto">
-                          {users.map((user) => (
-                            <label key={user._id} className="flex items-center gap-2 text-xs block py-1">
-                              <input type="checkbox" checked={assignedTo.includes(user._id)} onChange={() => toggleUserSelection(lead._id, user._id)} />
-                              {getUserName(user._id)}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={() => deleteLead(lead._id)} className="text-red-600"><FaTrash className="h-5 w-5" /></button>
-                  </div>
+                    "bg-blue-100 text-blue-800"
+                  }`}>{lead.status}</span>
+                </div>
+                <div className="pt-2 flex gap-3">
+                  <button onClick={() => setSelectedLead(lead)} className="text-indigo-600"><FaEye className="h-5 w-5" /></button>
+                  <button onClick={() => openEditModal(lead)} className="text-blue-600"><FaEdit className="h-5 w-5" /></button>
+                  <button onClick={() => deleteLead(lead._id)} className="text-red-600"><FaTrash className="h-5 w-5" /></button>
                 </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
+
+        {filteredLeads.length === 0 && (
+          <div className="p-8 text-center text-gray-500">
+            <FaSearch className="h-12 w-12 mx-auto text-gray-300 mb-3" />
+            <p>No leads found</p>
+            <p className="text-sm">Try adjusting your search or filters</p>
+          </div>
+        )}
       </div>
-    </motion.div>
+
+      {/* Modals */}
+      {showLeadForm && renderLeadFormModal()}
+      {showEditModal && renderEditModal()}
+      {selectedLead && renderLeadDetails()}
+    </div>
   );
 }
 
