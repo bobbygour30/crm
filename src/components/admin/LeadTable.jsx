@@ -33,11 +33,17 @@ import {
   FaCheck,
   FaPlus,
   FaMinus,
+  FaDollarSign,
+  FaShieldAlt,
+  FaHeart,
+  FaLungs,
+  FaBrain,
+  FaTint,
 } from "react-icons/fa";
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 
-function LeadTable() {
+function InsuranceLeadManagement() {
   // ============================================================
   // CONSTANTS
   // ============================================================
@@ -164,6 +170,47 @@ function LeadTable() {
     "Bajaj Allianz Life Insurance",
   ];
 
+  const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
+  
+  const PAYMENT_TERM_OPTIONS = [
+    "Monthly",
+    "Quarterly",
+    "Half Quarterly",
+    "Half Yearly",
+    "Yearly"
+  ];
+
+  const SUM_INSURED_OPTIONS = [
+    "3 Lakh",
+    "4 Lakh",
+    "5 Lakh",
+    "7.5 Lakh",
+    "10 Lakh",
+    "15 Lakh",
+    "20 Lakh",
+    "25 Lakh",
+    "30 Lakh",
+    "35 Lakh",
+    "40 Lakh",
+    "45 Lakh",
+    "50 Lakh",
+    "75 Lakh",
+    "1 Crore",
+    "2 Crore",
+    "3 Crore",
+    "4 Crore",
+    "5 Crore"
+  ];
+
+  const RIDER_OPTIONS = [
+    "Insta Shield",
+    "Fetal Flourish",
+    "NRInsure",
+    "Loss of Income (Any Illness excluding Infection)",
+    "Major Illness and Accident Multiplier",
+    "International Cover-Emergency Care"
+  ];
+
   // ============================================================
   // VALIDATION HELPERS
   // ============================================================
@@ -220,6 +267,9 @@ function LeadTable() {
     state: "",
     city: "",
     sourceDependentValue: "",
+    policyTenure: "",
+    paymentTerm: "",
+    sumInsured: "",
   });
 
   // Health Insurance
@@ -248,6 +298,8 @@ function LeadTable() {
     previousPolicyFile: null,
     medicalRemarks: "",
     members: [],
+    proposerIsMember: "",
+    seniorOneDOB: "",
   });
 
   // Motor Insurance
@@ -311,6 +363,7 @@ function LeadTable() {
   const [showInsurerQuotes, setShowInsurerQuotes] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sourceDependentField, setSourceDependentField] = useState("");
+  const [showSeniorOneDOB, setShowSeniorOneDOB] = useState(false);
 
   const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -362,6 +415,11 @@ function LeadTable() {
         setSourceDependentField("");
     }
   }, [formData.source]);
+
+  useEffect(() => {
+    // Show Senior One DOB when Floater is selected
+    setShowSeniorOneDOB(healthDetails.policyType === "Floater");
+  }, [healthDetails.policyType]);
 
   useEffect(() => {
     const handleClickOutside = (event) => {
@@ -489,32 +547,129 @@ function LeadTable() {
   // FLOATER MEMBERS
   // ============================================================
   const generateFloaterMembers = () => {
-    const adults = parseInt(healthDetails.numberOfAdults) || 0;
-    const children = parseInt(healthDetails.numberOfChildren) || 0;
+    let adults = parseInt(healthDetails.numberOfAdults) || 0;
+    let children = parseInt(healthDetails.numberOfChildren) || 0;
+    
+    // If Proposer is a Member, then 2+1 = 3 members total
+    if (healthDetails.proposerIsMember === "Yes") {
+      // Keep the counts as entered by user (2 adults, 1 child)
+      // But ensure the proposer is included as the first adult
+    }
+    
     const members = [];
     
-    for (let i = 1; i <= adults; i++) {
+    // If Proposer is a Member, first member is the Proposer
+    if (healthDetails.proposerIsMember === "Yes") {
       members.push({
-        id: `adult-${i}`,
-        type: 'adult',
-        name: '',
-        dob: '',
-        monthlyIncome: '',
-        height: '',
-        weight: '',
-        qualification: '',
-        occupation: '',
-        relationship: '',
-        aadhaarNumber: '',
+        id: `proposer`,
+        type: 'proposer',
+        name: healthDetails.proposerName || '',
+        dob: healthDetails.proposerDOB || '',
+        monthlyIncome: healthDetails.familyIncome || '',
+        height: healthDetails.height || '',
+        weight: healthDetails.weight || '',
+        qualification: healthDetails.qualification || '',
+        occupation: healthDetails.occupation || '',
+        relationship: 'Self',
+        aadhaarNumber: healthDetails.aadhaarNumber || '',
         aadhaarFile: null,
         epicFile: null,
         birthCertificate: null,
         ped: '',
         treatmentHistory: '',
         medicalRemarks: '',
+        wantRider: '',
+        selectedRider: '',
+        riderDetails: {
+          instaShield: '',
+          asthma: '',
+          diabetes: '',
+          hypertension: '',
+          hyperlipidaemia: '',
+        },
+        fetalFlourish: '',
+        nrInsure: '',
+        lossOfIncome: '',
+        majorIllness: '',
+        internationalCover: '',
       });
+      
+      // Add remaining adults (excluding proposer)
+      for (let i = 1; i < adults; i++) {
+        members.push({
+          id: `adult-${i}`,
+          type: 'adult',
+          name: '',
+          dob: '',
+          monthlyIncome: '',
+          height: '',
+          weight: '',
+          qualification: '',
+          occupation: '',
+          relationship: '',
+          aadhaarNumber: '',
+          aadhaarFile: null,
+          epicFile: null,
+          birthCertificate: null,
+          ped: '',
+          treatmentHistory: '',
+          medicalRemarks: '',
+          wantRider: '',
+          selectedRider: '',
+          riderDetails: {
+            instaShield: '',
+            asthma: '',
+            diabetes: '',
+            hypertension: '',
+            hyperlipidaemia: '',
+          },
+          fetalFlourish: '',
+          nrInsure: '',
+          lossOfIncome: '',
+          majorIllness: '',
+          internationalCover: '',
+        });
+      }
+    } else {
+      // All adults (proposer is separate)
+      for (let i = 1; i <= adults; i++) {
+        members.push({
+          id: `adult-${i}`,
+          type: 'adult',
+          name: '',
+          dob: '',
+          monthlyIncome: '',
+          height: '',
+          weight: '',
+          qualification: '',
+          occupation: '',
+          relationship: '',
+          aadhaarNumber: '',
+          aadhaarFile: null,
+          epicFile: null,
+          birthCertificate: null,
+          ped: '',
+          treatmentHistory: '',
+          medicalRemarks: '',
+          wantRider: '',
+          selectedRider: '',
+          riderDetails: {
+            instaShield: '',
+            asthma: '',
+            diabetes: '',
+            hypertension: '',
+            hyperlipidaemia: '',
+          },
+          fetalFlourish: '',
+          nrInsure: '',
+          lossOfIncome: '',
+          majorIllness: '',
+          internationalCover: '',
+        });
+      }
     }
     
+    // Add children
     for (let i = 1; i <= children; i++) {
       members.push({
         id: `child-${i}`,
@@ -534,6 +689,20 @@ function LeadTable() {
         ped: '',
         treatmentHistory: '',
         medicalRemarks: '',
+        wantRider: '',
+        selectedRider: '',
+        riderDetails: {
+          instaShield: '',
+          asthma: '',
+          diabetes: '',
+          hypertension: '',
+          hyperlipidaemia: '',
+        },
+        fetalFlourish: '',
+        nrInsure: '',
+        lossOfIncome: '',
+        majorIllness: '',
+        internationalCover: '',
       });
     }
     
@@ -586,6 +755,9 @@ function LeadTable() {
       source: "Employee",
       remarks: "Customer remarks",
       lob: "Health Insurance",
+      policyTenure: "1 Year",
+      paymentTerm: "Yearly",
+      sumInsured: "10 Lakh",
     }];
     const ws = XLSX.utils.json_to_sheet(templateData);
     const wb = XLSX.utils.book_new();
@@ -608,6 +780,9 @@ function LeadTable() {
       Status: lead.status || "",
       "Policy Number": lead.policyNumber || "",
       LOB: lead.lob || "",
+      "Policy Tenure": lead.policyTenure || "",
+      "Payment Term": lead.paymentTerm || "",
+      "Sum Insured": lead.sumInsured || "",
       Insurer: lead.insurer || "",
       Remarks: lead.remarks || "",
       "Policy Start Date": lead.policyStartDate || "",
@@ -753,6 +928,9 @@ function LeadTable() {
     submitData.append("leadCode", leadCode);
     submitData.append("sourceDependentValue", formData.sourceDependentValue);
     submitData.append("status", "Open");
+    submitData.append("policyTenure", formData.policyTenure);
+    submitData.append("paymentTerm", formData.paymentTerm);
+    submitData.append("sumInsured", formData.sumInsured);
 
     // Health details
     if (showHealthSection) {
@@ -870,6 +1048,9 @@ function LeadTable() {
       state: "",
       city: "",
       sourceDependentValue: "",
+      policyTenure: "",
+      paymentTerm: "",
+      sumInsured: "",
     });
     setHealthDetails({
       policyType: "",
@@ -896,6 +1077,8 @@ function LeadTable() {
       previousPolicyFile: null,
       medicalRemarks: "",
       members: [],
+      proposerIsMember: "",
+      seniorOneDOB: "",
     });
     setMotorDetails({
       vehicleType: "",
@@ -932,6 +1115,7 @@ function LeadTable() {
     setShowMotorSection(false);
     setShowElectronicSection(false);
     setShowFloaterMembers(false);
+    setShowSeniorOneDOB(false);
   };
 
   // ============================================================
@@ -1102,474 +1286,757 @@ function LeadTable() {
   // ============================================================
   // RENDER: HEALTH FORM
   // ============================================================
-  const renderHealthForm = () => (
-    <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-      <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaHeartbeat /> Health Insurance Details
-      </h3>
+  const renderHealthForm = () => {
+    // Handle member rider changes
+    const handleMemberRiderChange = (index, field, value) => {
+      const newMembers = [...healthDetails.members];
+      newMembers[index][field] = value;
+      
+      // If selecting Insta Shield, show dependent dropdowns
+      if (field === 'selectedRider' && value === 'Insta Shield') {
+        // Keep the rider details section visible
+      }
+      
+      setHealthDetails(prev => ({ ...prev, members: newMembers }));
+    };
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm font-medium text-gray-700">Policy Type</label>
-          <select
-            value={healthDetails.policyType}
-            onChange={(e) => {
-              setHealthDetails(prev => ({ ...prev, policyType: e.target.value }));
-              setShowFloaterMembers(e.target.value === "Floater");
-              if (e.target.value === "Floater") generateFloaterMembers();
-            }}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="">Select</option>
-            {POLICY_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </div>
+    const handleMemberRiderDetailChange = (index, field, value) => {
+      const newMembers = [...healthDetails.members];
+      newMembers[index].riderDetails[field] = value;
+      setHealthDetails(prev => ({ ...prev, members: newMembers }));
+    };
 
-        {healthDetails.policyType === "Floater" && (
-          <>
+    return (
+      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+          <FaHeartbeat /> Health Insurance Details
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Policy Type */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Policy Type</label>
+            <select
+              value={healthDetails.policyType}
+              onChange={(e) => {
+                setHealthDetails(prev => ({ ...prev, policyType: e.target.value }));
+                setShowFloaterMembers(e.target.value === "Floater");
+                setShowSeniorOneDOB(e.target.value === "Floater");
+                if (e.target.value === "Floater") generateFloaterMembers();
+              }}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {POLICY_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {/* Policy Tenure */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
+            <select
+              value={formData.policyTenure}
+              onChange={(e) => setFormData({ ...formData, policyTenure: e.target.value })}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {POLICY_TENURE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {/* Payment Term */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Paying Term</label>
+            <select
+              value={formData.paymentTerm}
+              onChange={(e) => setFormData({ ...formData, paymentTerm: e.target.value })}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {PAYMENT_TERM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {/* Sum Insured */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Sum Insured</label>
+            <select
+              value={formData.sumInsured}
+              onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {healthDetails.policyType === "Floater" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Number of Adults</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={healthDetails.numberOfAdults}
+                  onChange={(e) => {
+                    setHealthDetails(prev => ({ ...prev, numberOfAdults: e.target.value }));
+                    generateFloaterMembers();
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Number of Children</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={healthDetails.numberOfChildren}
+                  onChange={(e) => {
+                    setHealthDetails(prev => ({ ...prev, numberOfChildren: e.target.value }));
+                    generateFloaterMembers();
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Senior One DOB - Only for Floater */}
+          {showSeniorOneDOB && (
             <div>
-              <label className="text-sm font-medium text-gray-700">Number of Adults</label>
-              <input
-                type="number"
-                min="0"
-                value={healthDetails.numberOfAdults}
-                onChange={(e) => {
-                  setHealthDetails(prev => ({ ...prev, numberOfAdults: e.target.value }));
-                  generateFloaterMembers();
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Number of Children</label>
-              <input
-                type="number"
-                min="0"
-                value={healthDetails.numberOfChildren}
-                onChange={(e) => {
-                  setHealthDetails(prev => ({ ...prev, numberOfChildren: e.target.value }));
-                  generateFloaterMembers();
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </>
-        )}
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Proposer Name</label>
-          <input
-            type="text"
-            value={healthDetails.proposerName}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerName: toUpperCase(e.target.value) }))}
-            className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">DOB</label>
-          <input
-            type="date"
-            value={healthDetails.proposerDOB}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerDOB: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Family Income</label>
-          <input
-            type="number"
-            value={healthDetails.familyIncome}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, familyIncome: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Height (ft/in)</label>
-          <input
-            type="text"
-            value={healthDetails.height}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, height: e.target.value }))}
-            placeholder="e.g., 5'8\"
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Weight (kg)</label>
-          <input
-            type="number"
-            value={healthDetails.weight}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, weight: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Qualification</label>
-          <select
-            value={healthDetails.qualification}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, qualification: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="">Select</option>
-            {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Occupation</label>
-          <select
-            value={healthDetails.occupation}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, occupation: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="">Select</option>
-            {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </div>
-
-        {healthDetails.policyType === "Individual" && (
-          <>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Nominee Name</label>
-              <input
-                type="text"
-                value={healthDetails.nomineeName}
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: toUpperCase(e.target.value) }))}
-                className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Nominee DOB</label>
+              <label className="text-sm font-medium text-gray-700">DOB of Senior One</label>
               <input
                 type="date"
-                value={healthDetails.nomineeDOB}
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeDOB: e.target.value }))}
+                value={healthDetails.seniorOneDOB}
+                onChange={(e) => setHealthDetails(prev => ({ ...prev, seniorOneDOB: e.target.value }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
             </div>
+          )}
+
+          {/* Proposer Details */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Proposer Name</label>
+            <input
+              type="text"
+              value={healthDetails.proposerName}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerName: toUpperCase(e.target.value) }))}
+              className="w-full p-2 border border-gray-300 rounded-lg uppercase"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">DOB</label>
+            <input
+              type="date"
+              value={healthDetails.proposerDOB}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, proposerDOB: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Family Income</label>
+            <input
+              type="number"
+              value={healthDetails.familyIncome}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, familyIncome: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Height (ft/in)</label>
+            <input
+              type="text"
+              value={healthDetails.height}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, height: e.target.value }))}
+              placeholder="e.g., 5'8\"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Weight (kg)</label>
+            <input
+              type="number"
+              value={healthDetails.weight}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, weight: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Qualification</label>
+            <select
+              value={healthDetails.qualification}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, qualification: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Occupation</label>
+            <select
+              value={healthDetails.occupation}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, occupation: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {/* Proposer is a Member within the Plan - Only for Floater */}
+          {healthDetails.policyType === "Floater" && (
             <div>
-              <label className="text-sm font-medium text-gray-700">Relationship</label>
+              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan</label>
               <select
-                value={healthDetails.nomineeRelationship}
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeRelationship: e.target.value }))}
+                value={healthDetails.proposerIsMember}
+                onChange={(e) => {
+                  setHealthDetails(prev => ({ ...prev, proposerIsMember: e.target.value }));
+                  generateFloaterMembers();
+                }}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               >
                 <option value="">Select</option>
-                {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
               </select>
             </div>
-          </>
-        )}
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
-          <input
-            type="text"
-            value={healthDetails.aadhaarNumber}
-            onChange={(e) => {
-              const val = e.target.value.replace(/\D/g, '');
-              if (val.length <= 12) setHealthDetails(prev => ({ ...prev, aadhaarNumber: val }));
-            }}
-            maxLength="12"
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-          {healthDetails.aadhaarNumber && !validateAadhaar(healthDetails.aadhaarNumber) && (
-            <p className="text-red-500 text-xs mt-1">Enter 12 digits</p>
           )}
-        </div>
 
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">PAN Number</label>
-          <input
-            type="text"
-            value={healthDetails.panNumber}
-            onChange={(e) => {
-              const val = e.target.value.toUpperCase();
-              if (val.length <= 10) setHealthDetails(prev => ({ ...prev, panNumber: val }));
-            }}
-            maxLength="10"
-            className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-          />
-          {healthDetails.panNumber && !validatePAN(healthDetails.panNumber) && (
-            <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F</p>
+          {/* Nominee Details - Individual Only */}
+          {healthDetails.policyType === "Individual" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Nominee Name</label>
+                <input
+                  type="text"
+                  value={healthDetails.nomineeName}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: toUpperCase(e.target.value) }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg uppercase"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Nominee DOB</label>
+                <input
+                  type="date"
+                  value={healthDetails.nomineeDOB}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeDOB: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Relationship</label>
+                <select
+                  value={healthDetails.nomineeRelationship}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeRelationship: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select</option>
+                  {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+            </>
           )}
+
+          {/* Aadhaar */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
+            <input
+              type="text"
+              value={healthDetails.aadhaarNumber}
+              onChange={(e) => {
+                const val = e.target.value.replace(/\D/g, '');
+                if (val.length <= 12) setHealthDetails(prev => ({ ...prev, aadhaarNumber: val }));
+              }}
+              maxLength="12"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+            {healthDetails.aadhaarNumber && !validateAadhaar(healthDetails.aadhaarNumber) && (
+              <p className="text-red-500 text-xs mt-1">Enter 12 digits</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg"
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          {/* PAN */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">PAN Number</label>
+            <input
+              type="text"
+              value={healthDetails.panNumber}
+              onChange={(e) => {
+                const val = e.target.value.toUpperCase();
+                if (val.length <= 10) setHealthDetails(prev => ({ ...prev, panNumber: val }));
+              }}
+              maxLength="10"
+              className="w-full p-2 border border-gray-300 rounded-lg uppercase"
+            />
+            {healthDetails.panNumber && !validatePAN(healthDetails.panNumber) && (
+              <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F</p>
+            )}
+          </div>
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            <input
+              type="file"
+              accept=".pdf,.jpg,.jpeg"
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            />
+          </div>
+
+          {/* Previous Year Policy */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">Active Previous Policy?</label>
+            <select
+              value={healthDetails.hasPreviousPolicy}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, hasPreviousPolicy: e.target.value }))}
+              className="w-full p-2 border border-gray-300 rounded-lg"
+            >
+              <option value="">Select</option>
+              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+          </div>
+
+          {healthDetails.hasPreviousPolicy === "Yes" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Previous Insurer</label>
+                <input
+                  type="text"
+                  value={healthDetails.previousInsurer}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, previousInsurer: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Number</label>
+                <input
+                  type="text"
+                  value={healthDetails.previousPolicyNumber}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyNumber: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Due Date</label>
+                <input
+                  type="date"
+                  value={healthDetails.previousPolicyDueDate}
+                  onChange={(e) => {
+                    const selected = new Date(e.target.value);
+                    const today = new Date();
+                    const tomorrow = new Date();
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    if (selected.toDateString() === today.toDateString() || 
+                        selected.toDateString() === tomorrow.toDateString()) {
+                      setHealthDetails(prev => ({ ...prev, previousPolicyDueDate: e.target.value }));
+                    } else {
+                      alert("Due date must be Today or Tomorrow only");
+                    }
+                  }}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload PYP</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyFile: e.target.files[0] }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+            </>
+          )}
+
+          {/* Medical Remarks */}
+          <div className="lg:col-span-3">
+            <label className="text-sm font-medium text-gray-700">Medical Remarks</label>
+            <textarea
+              value={healthDetails.medicalRemarks}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, medicalRemarks: e.target.value }))}
+              placeholder="Pre-existing diseases, treatment history, other medical remarks"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              rows="3"
+            />
+          </div>
         </div>
 
-        <div>
-          <label className="text-sm font-medium text-gray-700">Upload PAN</label>
-          <input
-            type="file"
-            accept=".pdf,.jpg,.jpeg"
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          />
-        </div>
-
-        <div>
-          <label className="text-sm font-medium text-gray-700">Active Previous Policy?</label>
-          <select
-            value={healthDetails.hasPreviousPolicy}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, hasPreviousPolicy: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
-          >
-            <option value="">Select</option>
-            {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-        </div>
-
-        {healthDetails.hasPreviousPolicy === "Yes" && (
-          <>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Previous Insurer</label>
-              <input
-                type="text"
-                value={healthDetails.previousInsurer}
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousInsurer: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Number</label>
-              <input
-                type="text"
-                value={healthDetails.previousPolicyNumber}
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyNumber: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Due Date</label>
-              <input
-                type="date"
-                value={healthDetails.previousPolicyDueDate}
-                onChange={(e) => {
-                  const selected = new Date(e.target.value);
-                  const today = new Date();
-                  const tomorrow = new Date();
-                  tomorrow.setDate(tomorrow.getDate() + 1);
-                  if (selected.toDateString() === today.toDateString() || 
-                      selected.toDateString() === tomorrow.toDateString()) {
-                    setHealthDetails(prev => ({ ...prev, previousPolicyDueDate: e.target.value }));
-                  } else {
-                    alert("Due date must be Today or Tomorrow only");
-                  }
-                }}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Upload PYP</label>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setHealthDetails(prev => ({ ...prev, previousPolicyFile: e.target.files[0] }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-          </>
-        )}
-
-        <div className="lg:col-span-3">
-          <label className="text-sm font-medium text-gray-700">Medical Remarks</label>
-          <textarea
-            value={healthDetails.medicalRemarks}
-            onChange={(e) => setHealthDetails(prev => ({ ...prev, medicalRemarks: e.target.value }))}
-            placeholder="Pre-existing diseases, treatment history, other medical remarks"
-            className="w-full p-2 border border-gray-300 rounded-lg"
-            rows="3"
-          />
-        </div>
-      </div>
-
-      {/* Floater Members */}
-      {showFloaterMembers && healthDetails.members.length > 0 && (
-        <div className="mt-4 border-t-2 border-indigo-200 pt-4">
-          <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-            <FaFloater /> Floater Members
-          </h4>
-          {healthDetails.members.map((member, index) => (
-            <div key={member.id} className="border rounded-lg p-4 mb-4 bg-gray-50">
-              <h5 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                {member.type === 'adult' ? <FaUser /> : <FaChild />}
-                {member.type === 'adult' 
-                  ? `Adult ${Math.floor(index + 1)}` 
-                  : `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0) + 1}`}
-              </h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Name</label>
-                  <input
-                    type="text"
-                    value={member.name}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].name = toUpperCase(e.target.value);
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg uppercase text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">DOB</label>
-                  <input
-                    type="date"
-                    value={member.dob}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].dob = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Monthly Income</label>
-                  <input
-                    type="number"
-                    value={member.monthlyIncome}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].monthlyIncome = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Height</label>
-                  <input
-                    type="text"
-                    value={member.height}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].height = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Weight</label>
-                  <input
-                    type="number"
-                    value={member.weight}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].weight = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Qualification</label>
-                  <select
-                    value={member.qualification}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].qualification = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Select</option>
-                    {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Occupation</label>
-                  <select
-                    value={member.occupation}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].occupation = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Select</option>
-                    {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Relationship</label>
-                  <select
-                    value={member.relationship}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].relationship = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  >
-                    <option value="">Select</option>
-                    {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Aadhaar</label>
-                  <input
-                    type="text"
-                    value={member.aadhaarNumber}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      if (val.length <= 12) {
+        {/* Floater Members */}
+        {showFloaterMembers && healthDetails.members.length > 0 && (
+          <div className="mt-4 border-t-2 border-indigo-200 pt-4">
+            <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
+              <FaFloater /> Floater Members
+            </h4>
+            {healthDetails.members.map((member, index) => (
+              <div key={member.id} className="border rounded-lg p-4 mb-4 bg-gray-50">
+                <h5 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
+                  {member.type === 'proposer' ? <FaUserMd className="text-indigo-600" /> : 
+                   member.type === 'adult' ? <FaUser /> : <FaChild />}
+                  {member.type === 'proposer' ? 'Proposer' : 
+                   member.type === 'adult' ? `Adult ${Math.floor(index + 1)}` : 
+                   `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0) + 1}`}
+                </h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Name</label>
+                    <input
+                      type="text"
+                      value={member.name}
+                      onChange={(e) => {
                         const newMembers = [...healthDetails.members];
-                        newMembers[index].aadhaarNumber = val;
+                        newMembers[index].name = toUpperCase(e.target.value);
                         setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }
-                    }}
-                    maxLength="12"
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-medium text-gray-700">Upload Document</label>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg"
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].aadhaarFile = e.target.files[0];
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                  />
-                </div>
-                <div className="lg:col-span-3">
-                  <label className="text-xs font-medium text-gray-700">Remarks (PED/Treatment)</label>
-                  <textarea
-                    value={member.medicalRemarks}
-                    onChange={(e) => {
-                      const newMembers = [...healthDetails.members];
-                      newMembers[index].medicalRemarks = e.target.value;
-                      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                    }}
-                    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    rows="2"
-                  />
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg uppercase text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">DOB</label>
+                    <input
+                      type="date"
+                      value={member.dob}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].dob = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Monthly Income</label>
+                    <input
+                      type="number"
+                      value={member.monthlyIncome}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].monthlyIncome = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Height</label>
+                    <input
+                      type="text"
+                      value={member.height}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].height = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Weight</label>
+                    <input
+                      type="number"
+                      value={member.weight}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].weight = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Qualification</label>
+                    <select
+                      value={member.qualification}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].qualification = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select</option>
+                      {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Occupation</label>
+                    <select
+                      value={member.occupation}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].occupation = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select</option>
+                      {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Relationship</label>
+                    <select
+                      value={member.relationship}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].relationship = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select</option>
+                      {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Aadhaar</label>
+                    <input
+                      type="text"
+                      value={member.aadhaarNumber}
+                      onChange={(e) => {
+                        const val = e.target.value.replace(/\D/g, '');
+                        if (val.length <= 12) {
+                          const newMembers = [...healthDetails.members];
+                          newMembers[index].aadhaarNumber = val;
+                          setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                        }
+                      }}
+                      maxLength="12"
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Upload Document</label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].aadhaarFile = e.target.files[0];
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                  </div>
+                  
+                  {/* Rider Section */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
+                    <select
+                      value={member.wantRider}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].wantRider = e.target.value;
+                        if (e.target.value === "No") {
+                          newMembers[index].selectedRider = '';
+                          newMembers[index].riderDetails = {
+                            instaShield: '',
+                            asthma: '',
+                            diabetes: '',
+                            hypertension: '',
+                            hyperlipidaemia: '',
+                          };
+                        }
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    >
+                      <option value="">Select</option>
+                      {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  </div>
+
+                  {member.wantRider === "Yes" && (
+                    <>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Select Rider</label>
+                        <select
+                          value={member.selectedRider}
+                          onChange={(e) => handleMemberRiderChange(index, 'selectedRider', e.target.value)}
+                          className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                        >
+                          <option value="">Select</option>
+                          {RIDER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                        </select>
+                      </div>
+
+                      {/* Insta Shield dependent dropdowns */}
+                      {member.selectedRider === "Insta Shield" && (
+                        <div className="lg:col-span-3 border-t pt-2 mt-2 border-gray-200">
+                          <h6 className="text-xs font-semibold text-gray-600 mb-2">Insta Shield Details</h6>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">For Asthma</label>
+                              <select
+                                value={member.riderDetails?.asthma || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, 'asthma', e.target.value)}
+                                className="w-full p-1 border border-gray-300 rounded text-xs"
+                              >
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Diabetes</label>
+                              <select
+                                value={member.riderDetails?.diabetes || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, 'diabetes', e.target.value)}
+                                className="w-full p-1 border border-gray-300 rounded text-xs"
+                              >
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Hypertension (Blood Pressure)</label>
+                              <select
+                                value={member.riderDetails?.hypertension || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, 'hypertension', e.target.value)}
+                                className="w-full p-1 border border-gray-300 rounded text-xs"
+                              >
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Hyperlipidaemia</label>
+                              <select
+                                value={member.riderDetails?.hyperlipidaemia || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, 'hyperlipidaemia', e.target.value)}
+                                className="w-full p-1 border border-gray-300 rounded text-xs"
+                              >
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Other Rider fields */}
+                      {member.selectedRider === "Fetal Flourish" && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Fetal Flourish</label>
+                          <input
+                            type="text"
+                            value={member.fetalFlourish || ''}
+                            onChange={(e) => {
+                              const newMembers = [...healthDetails.members];
+                              newMembers[index].fetalFlourish = e.target.value;
+                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Enter details"
+                          />
+                        </div>
+                      )}
+
+                      {member.selectedRider === "NRInsure" && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">NRInsure</label>
+                          <input
+                            type="text"
+                            value={member.nrInsure || ''}
+                            onChange={(e) => {
+                              const newMembers = [...healthDetails.members];
+                              newMembers[index].nrInsure = e.target.value;
+                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Enter details"
+                          />
+                        </div>
+                      )}
+
+                      {member.selectedRider === "Loss of Income (Any Illness excluding Infection)" && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Loss of Income</label>
+                          <input
+                            type="text"
+                            value={member.lossOfIncome || ''}
+                            onChange={(e) => {
+                              const newMembers = [...healthDetails.members];
+                              newMembers[index].lossOfIncome = e.target.value;
+                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Enter details"
+                          />
+                        </div>
+                      )}
+
+                      {member.selectedRider === "Major Illness and Accident Multiplier" && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Major Illness and Accident Multiplier</label>
+                          <input
+                            type="text"
+                            value={member.majorIllness || ''}
+                            onChange={(e) => {
+                              const newMembers = [...healthDetails.members];
+                              newMembers[index].majorIllness = e.target.value;
+                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Enter details"
+                          />
+                        </div>
+                      )}
+
+                      {member.selectedRider === "International Cover-Emergency Care" && (
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">International Cover</label>
+                          <input
+                            type="text"
+                            value={member.internationalCover || ''}
+                            onChange={(e) => {
+                              const newMembers = [...healthDetails.members];
+                              newMembers[index].internationalCover = e.target.value;
+                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                            }}
+                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                            placeholder="Enter details"
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  <div className="lg:col-span-3">
+                    <label className="text-xs font-medium text-gray-700">Remarks (PED/Treatment)</label>
+                    <textarea
+                      value={member.medicalRemarks}
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].medicalRemarks = e.target.value;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      rows="2"
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ============================================================
   // RENDER: MOTOR FORM
@@ -2022,6 +2489,7 @@ function LeadTable() {
                           <option value="">Select</option>
                           <option value="Monthly">Monthly</option>
                           <option value="Quarterly">Quarterly</option>
+                          <option value="Half Quarterly">Half Quarterly</option>
                           <option value="Half Yearly">Half Yearly</option>
                           <option value="Yearly">Yearly</option>
                         </select>
@@ -2433,6 +2901,9 @@ function LeadTable() {
               }`}>{selectedLead.status}</span>
             </div>
             <div><span className="font-medium">Policy Number:</span> {selectedLead.policyNumber || "-"}</div>
+            <div><span className="font-medium">Policy Tenure:</span> {selectedLead.policyTenure || "-"}</div>
+            <div><span className="font-medium">Payment Term:</span> {selectedLead.paymentTerm || "-"}</div>
+            <div><span className="font-medium">Sum Insured:</span> {selectedLead.sumInsured || "-"}</div>
             <div><span className="font-medium">Insurer:</span> {selectedLead.insurer || "-"}</div>
             <div><span className="font-medium">Policy Start:</span> {selectedLead.policyStartDate || "-"}</div>
             <div><span className="font-medium">Policy Expiry:</span> {selectedLead.policyExpiryDate || "-"}</div>
@@ -2447,7 +2918,14 @@ function LeadTable() {
                   <div>Proposer: {selectedLead.healthDetails.proposerName || "-"}</div>
                   <div>DOB: {selectedLead.healthDetails.proposerDOB || "-"}</div>
                   <div>Family Income: {selectedLead.healthDetails.familyIncome || "-"}</div>
+                  <div>Senior One DOB: {selectedLead.healthDetails.seniorOneDOB || "-"}</div>
+                  <div>Proposer is Member: {selectedLead.healthDetails.proposerIsMember || "-"}</div>
                 </div>
+                {selectedLead.healthDetails.members && selectedLead.healthDetails.members.length > 0 && (
+                  <div className="mt-2">
+                    <h5 className="font-medium text-sm">Members: {selectedLead.healthDetails.members.length}</h5>
+                  </div>
+                )}
               </div>
             )}
             {selectedLead.motorDetails && (
@@ -2617,6 +3095,8 @@ function LeadTable() {
                 <th className="p-3">LOB</th>
                 <th className="p-3">Source</th>
                 <th className="p-3">Status</th>
+                <th className="p-3">Tenure</th>
+                <th className="p-3">Sum Insured</th>
                 <th className="p-3">Actions</th>
               </tr>
             </thead>
@@ -2642,6 +3122,8 @@ function LeadTable() {
                       {lead.status}
                     </span>
                   </td>
+                  <td className="p-3">{lead.policyTenure || "-"}</td>
+                  <td className="p-3">{lead.sumInsured || "-"}</td>
                   <td className="p-3 flex gap-2 items-center">
                     <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
                       <FaEye className="h-5 w-5" />
@@ -2671,6 +3153,8 @@ function LeadTable() {
                 <div><strong>Policy #:</strong> {lead.policyNumber || "-"}</div>
                 <div><strong>LOB:</strong> {lead.lob || "-"}</div>
                 <div><strong>Source:</strong> {lead.source || "-"}</div>
+                <div><strong>Tenure:</strong> {lead.policyTenure || "-"}</div>
+                <div><strong>Sum Insured:</strong> {lead.sumInsured || "-"}</div>
                 <div><strong>Status:</strong> 
                   <span className={`ml-1 px-2 py-1 rounded text-xs ${
                     lead.status === "Open" ? "bg-yellow-100 text-yellow-800" :
@@ -2705,4 +3189,4 @@ function LeadTable() {
   );
 }
 
-export default LeadTable;
+export default InsuranceLeadManagement;
