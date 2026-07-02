@@ -39,11 +39,12 @@ import {
   FaLungs,
   FaBrain,
   FaTint,
+  FaSpinner,
 } from "react-icons/fa";
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 
-function InsuranceLeadManagement() {
+function LeadTable() {
   // ============================================================
   // CONSTANTS
   // ============================================================
@@ -253,6 +254,8 @@ function InsuranceLeadManagement() {
   const [uploadStatus, setUploadStatus] = useState({ show: false, message: "", type: "" });
   const [isUploading, setIsUploading] = useState(false);
   const [renewalAlerts, setRenewalAlerts] = useState([]);
+  const [isFetchingPin, setIsFetchingPin] = useState(false);
+  const [pinFetchError, setPinFetchError] = useState("");
 
   // Form States
   const [formData, setFormData] = useState({
@@ -383,6 +386,14 @@ function InsuranceLeadManagement() {
   useEffect(() => {
     if (formData.pinCode && validatePIN(formData.pinCode)) {
       fetchCityState(formData.pinCode);
+    } else if (formData.pinCode && formData.pinCode.length > 0 && formData.pinCode.length < 6) {
+      setPinFetchError("Enter 6 digits");
+    } else {
+      // Clear state and city if pin is cleared or invalid
+      if (!formData.pinCode || formData.pinCode.length === 0) {
+        setFormData(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("");
+      }
     }
   }, [formData.pinCode]);
 
@@ -417,7 +428,6 @@ function InsuranceLeadManagement() {
   }, [formData.source]);
 
   useEffect(() => {
-    // Show Senior One DOB when Floater is selected
     setShowSeniorOneDOB(healthDetails.policyType === "Floater");
   }, [healthDetails.policyType]);
 
@@ -448,6 +458,38 @@ function InsuranceLeadManagement() {
       }
     } catch (err) {
       console.error("Fetch leads error:", err);
+    }
+  };
+
+  // ============================================================
+  // PIN CODE AUTO-FETCH - FIXED
+  // ============================================================
+  const fetchCityState = async (pinCode) => {
+    setIsFetchingPin(true);
+    setPinFetchError("");
+    
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pinCode}`);
+      const data = await response.json();
+      
+      if (data && data[0]?.Status === "Success" && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const postOffice = data[0].PostOffice[0];
+        setFormData(prev => ({
+          ...prev,
+          state: postOffice.State || "",
+          city: postOffice.District || postOffice.Name || "",
+        }));
+        setPinFetchError("");
+      } else {
+        setFormData(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("Invalid PIN code");
+      }
+    } catch (error) {
+      console.error("Error fetching city/state:", error);
+      setFormData(prev => ({ ...prev, state: "", city: "" }));
+      setPinFetchError("Could not fetch location");
+    } finally {
+      setIsFetchingPin(false);
     }
   };
 
@@ -493,26 +535,6 @@ function InsuranceLeadManagement() {
   };
 
   // ============================================================
-  // PIN CODE AUTO-FETCH
-  // ============================================================
-  const fetchCityState = async (pinCode) => {
-    try {
-      const response = await fetch(`https://api.postalpincode.in/pincode/${pinCode}`);
-      const data = await response.json();
-      if (data[0]?.Status === "Success") {
-        const postOffice = data[0].PostOffice[0];
-        setFormData(prev => ({
-          ...prev,
-          state: postOffice.State,
-          city: postOffice.District,
-        }));
-      }
-    } catch (error) {
-      console.error("Error fetching city/state:", error);
-    }
-  };
-
-  // ============================================================
   // LOB DETECTION
   // ============================================================
   const detectLOB = (lob) => {
@@ -549,12 +571,6 @@ function InsuranceLeadManagement() {
   const generateFloaterMembers = () => {
     let adults = parseInt(healthDetails.numberOfAdults) || 0;
     let children = parseInt(healthDetails.numberOfChildren) || 0;
-    
-    // If Proposer is a Member, then 2+1 = 3 members total
-    if (healthDetails.proposerIsMember === "Yes") {
-      // Keep the counts as entered by user (2 adults, 1 child)
-      // But ensure the proposer is included as the first adult
-    }
     
     const members = [];
     
@@ -783,6 +799,9 @@ function InsuranceLeadManagement() {
       "Policy Tenure": lead.policyTenure || "",
       "Payment Term": lead.paymentTerm || "",
       "Sum Insured": lead.sumInsured || "",
+      "PIN Code": lead.pinCode || "",
+      State: lead.state || "",
+      City: lead.city || "",
       Insurer: lead.insurer || "",
       Remarks: lead.remarks || "",
       "Policy Start Date": lead.policyStartDate || "",
@@ -827,7 +846,6 @@ function InsuranceLeadManagement() {
           return;
         }
         
-        // Validate data
         const errors = [];
         jsonData.forEach((row, index) => {
           if (!row.name || !row.mobileNo) {
@@ -882,7 +900,7 @@ function InsuranceLeadManagement() {
   };
 
   // ============================================================
-  // CREATE LEAD
+  // CREATE LEAD - FIXED
   // ============================================================
   const handleCreateLead = async (e) => {
     e.preventDefault();
@@ -913,8 +931,9 @@ function InsuranceLeadManagement() {
       return;
     }
 
-    const leadCode = generateLeadCode(leads);
     const submitData = new FormData();
+    
+    // Basic fields
     submitData.append("name", formData.name);
     submitData.append("email", formData.email);
     submitData.append("mobileNo", formData.mobileNo);
@@ -925,16 +944,30 @@ function InsuranceLeadManagement() {
     submitData.append("pinCode", formData.pinCode);
     submitData.append("state", formData.state);
     submitData.append("city", formData.city);
-    submitData.append("leadCode", leadCode);
     submitData.append("sourceDependentValue", formData.sourceDependentValue);
     submitData.append("status", "Open");
     submitData.append("policyTenure", formData.policyTenure);
     submitData.append("paymentTerm", formData.paymentTerm);
     submitData.append("sumInsured", formData.sumInsured);
+    
+    // DO NOT send leadCode - backend generates it
 
     // Health details
     if (showHealthSection) {
-      submitData.append("healthDetails", JSON.stringify(healthDetails));
+      const healthData = { ...healthDetails };
+      if (healthData.members) {
+        healthData.members = healthData.members.map(member => ({
+          ...member,
+          riderDetails: member.riderDetails || {
+            instaShield: '',
+            asthma: '',
+            diabetes: '',
+            hypertension: '',
+            hyperlipidaemia: '',
+          }
+        }));
+      }
+      submitData.append("healthDetails", JSON.stringify(healthData));
     }
 
     // Motor details
@@ -963,7 +996,7 @@ function InsuranceLeadManagement() {
         alert("Lead created successfully!");
       } else {
         const error = await res.json();
-        alert(`Failed to create lead: ${error.error || "Unknown error"}`);
+        alert(`Failed to create lead: ${error.error || error.message || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Create error:", err);
@@ -974,7 +1007,7 @@ function InsuranceLeadManagement() {
   };
 
   // ============================================================
-  // UPDATE LEAD (Workflow)
+  // UPDATE LEAD - FIXED
   // ============================================================
   const handleUpdateLead = async (e) => {
     e.preventDefault();
@@ -983,6 +1016,19 @@ function InsuranceLeadManagement() {
     const submitData = new FormData();
     submitData.append("status", workflowDetails.status);
     submitData.append("workflowDetails", JSON.stringify(workflowDetails));
+    
+    if (editLead) {
+      submitData.append("name", editLead.name);
+      submitData.append("mobileNo", editLead.mobileNo);
+      submitData.append("email", editLead.email || "");
+      submitData.append("gender", editLead.gender || "");
+      submitData.append("source", editLead.source || "");
+      submitData.append("remarks", editLead.remarks || "");
+      submitData.append("lob", editLead.lob || "");
+      submitData.append("policyTenure", editLead.policyTenure || "");
+      submitData.append("paymentTerm", editLead.paymentTerm || "");
+      submitData.append("sumInsured", editLead.sumInsured || "");
+    }
 
     const token = localStorage.getItem("token");
     try {
@@ -1000,7 +1046,7 @@ function InsuranceLeadManagement() {
         alert("Lead updated successfully!");
       } else {
         const error = await res.json();
-        alert(`Failed to update lead: ${error.error || "Unknown error"}`);
+        alert(`Failed to update lead: ${error.error || error.message || "Unknown error"}`);
       }
     } catch (err) {
       console.error("Update error:", err);
@@ -1116,6 +1162,8 @@ function InsuranceLeadManagement() {
     setShowElectronicSection(false);
     setShowFloaterMembers(false);
     setShowSeniorOneDOB(false);
+    setPinFetchError("");
+    setIsFetchingPin(false);
   };
 
   // ============================================================
@@ -1137,27 +1185,27 @@ function InsuranceLeadManagement() {
   };
 
   // ============================================================
-  // OPEN EDIT MODAL
+  // OPEN EDIT MODAL - FIXED
   // ============================================================
   const openEditModal = (lead) => {
     setEditLead(lead);
     setWorkflowDetails({
-      status: lead.status || "Open",
-      quoteNumber: lead.quoteNumber || "",
-      selectedInsurers: lead.selectedInsurers || [],
-      insurerQuotes: lead.insurerQuotes || [],
-      paymentStatus: lead.paymentStatus || "",
-      paymentUrl: lead.paymentUrl || "",
-      utrNumber: lead.utrNumber || "",
-      paymentSnapshot: lead.paymentSnapshot || null,
-      policyNumber: lead.policyNumber || "",
-      policyIssuedOn: lead.policyIssuedOn || "",
-      policyStartDate: lead.policyStartDate || "",
-      policyExpiryDate: lead.policyExpiryDate || "",
-      policyCopy: lead.policyCopy || null,
-      remarks: lead.remarks || "",
+      status: lead.status || lead.workflowDetails?.status || "Open",
+      quoteNumber: lead.quoteNumber || lead.workflowDetails?.quoteNumber || "",
+      selectedInsurers: lead.selectedInsurers || lead.workflowDetails?.selectedInsurers || [],
+      insurerQuotes: lead.insurerQuotes || lead.workflowDetails?.insurerQuotes || [],
+      paymentStatus: lead.paymentStatus || lead.workflowDetails?.paymentStatus || "",
+      paymentUrl: lead.paymentUrl || lead.workflowDetails?.paymentUrl || "",
+      utrNumber: lead.utrNumber || lead.workflowDetails?.utrNumber || "",
+      paymentSnapshot: lead.paymentSnapshot || lead.workflowDetails?.paymentSnapshot || null,
+      policyNumber: lead.policyNumber || lead.workflowDetails?.policyNumber || "",
+      policyIssuedOn: lead.policyIssuedOn || lead.workflowDetails?.policyIssuedOn || "",
+      policyStartDate: lead.policyStartDate || lead.workflowDetails?.policyStartDate || "",
+      policyExpiryDate: lead.policyExpiryDate || lead.workflowDetails?.policyExpiryDate || "",
+      policyCopy: lead.policyCopy || lead.workflowDetails?.policyCopy || null,
+      remarks: lead.remarks || lead.workflowDetails?.workflowRemarks || "",
     });
-    setShowInsurerQuotes(lead.status === "Quotation Generated");
+    setShowInsurerQuotes(lead.status === "Quotation Generated" || lead.workflowDetails?.status === "Quotation Generated");
     setShowEditModal(true);
   };
 
@@ -1287,16 +1335,9 @@ function InsuranceLeadManagement() {
   // RENDER: HEALTH FORM
   // ============================================================
   const renderHealthForm = () => {
-    // Handle member rider changes
     const handleMemberRiderChange = (index, field, value) => {
       const newMembers = [...healthDetails.members];
       newMembers[index][field] = value;
-      
-      // If selecting Insta Shield, show dependent dropdowns
-      if (field === 'selectedRider' && value === 'Insta Shield') {
-        // Keep the rider details section visible
-      }
-      
       setHealthDetails(prev => ({ ...prev, members: newMembers }));
     };
 
@@ -1313,7 +1354,6 @@ function InsuranceLeadManagement() {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Policy Type */}
           <div>
             <label className="text-sm font-medium text-gray-700">Policy Type</label>
             <select
@@ -1331,7 +1371,6 @@ function InsuranceLeadManagement() {
             </select>
           </div>
 
-          {/* Policy Tenure */}
           <div>
             <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
             <select
@@ -1344,7 +1383,6 @@ function InsuranceLeadManagement() {
             </select>
           </div>
 
-          {/* Payment Term */}
           <div>
             <label className="text-sm font-medium text-gray-700">Paying Term</label>
             <select
@@ -1357,7 +1395,6 @@ function InsuranceLeadManagement() {
             </select>
           </div>
 
-          {/* Sum Insured */}
           <div>
             <label className="text-sm font-medium text-gray-700">Sum Insured</label>
             <select
@@ -1401,7 +1438,6 @@ function InsuranceLeadManagement() {
             </>
           )}
 
-          {/* Senior One DOB - Only for Floater */}
           {showSeniorOneDOB && (
             <div>
               <label className="text-sm font-medium text-gray-700">DOB of Senior One</label>
@@ -1414,7 +1450,6 @@ function InsuranceLeadManagement() {
             </div>
           )}
 
-          {/* Proposer Details */}
           <div>
             <label className="text-sm font-medium text-gray-700">Proposer Name</label>
             <input
@@ -1490,7 +1525,6 @@ function InsuranceLeadManagement() {
             </select>
           </div>
 
-          {/* Proposer is a Member within the Plan - Only for Floater */}
           {healthDetails.policyType === "Floater" && (
             <div>
               <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan</label>
@@ -1508,7 +1542,6 @@ function InsuranceLeadManagement() {
             </div>
           )}
 
-          {/* Nominee Details - Individual Only */}
           {healthDetails.policyType === "Individual" && (
             <>
               <div>
@@ -1543,7 +1576,6 @@ function InsuranceLeadManagement() {
             </>
           )}
 
-          {/* Aadhaar */}
           <div>
             <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
             <input
@@ -1571,7 +1603,6 @@ function InsuranceLeadManagement() {
             />
           </div>
 
-          {/* PAN */}
           <div>
             <label className="text-sm font-medium text-gray-700">PAN Number</label>
             <input
@@ -1599,7 +1630,6 @@ function InsuranceLeadManagement() {
             />
           </div>
 
-          {/* Previous Year Policy */}
           <div>
             <label className="text-sm font-medium text-gray-700">Active Previous Policy?</label>
             <select
@@ -1664,7 +1694,6 @@ function InsuranceLeadManagement() {
             </>
           )}
 
-          {/* Medical Remarks */}
           <div className="lg:col-span-3">
             <label className="text-sm font-medium text-gray-700">Medical Remarks</label>
             <textarea
@@ -1677,7 +1706,6 @@ function InsuranceLeadManagement() {
           </div>
         </div>
 
-        {/* Floater Members */}
         {showFloaterMembers && healthDetails.members.length > 0 && (
           <div className="mt-4 border-t-2 border-indigo-200 pt-4">
             <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
@@ -1834,7 +1862,6 @@ function InsuranceLeadManagement() {
                     />
                   </div>
                   
-                  {/* Rider Section */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
                     <select
@@ -1875,7 +1902,6 @@ function InsuranceLeadManagement() {
                         </select>
                       </div>
 
-                      {/* Insta Shield dependent dropdowns */}
                       {member.selectedRider === "Insta Shield" && (
                         <div className="lg:col-span-3 border-t pt-2 mt-2 border-gray-200">
                           <h6 className="text-xs font-semibold text-gray-600 mb-2">Insta Shield Details</h6>
@@ -1928,7 +1954,6 @@ function InsuranceLeadManagement() {
                         </div>
                       )}
 
-                      {/* Other Rider fields */}
                       {member.selectedRider === "Fetal Flourish" && (
                         <div>
                           <label className="text-xs font-medium text-gray-700">Fetal Flourish</label>
@@ -2655,7 +2680,6 @@ function InsuranceLeadManagement() {
         </div>
 
         <form onSubmit={handleCreateLead}>
-          {/* Basic Information */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
@@ -2712,31 +2736,65 @@ function InsuranceLeadManagement() {
               )}
             </div>
 
+            {/* PIN Code with Auto-fetch */}
             <div>
               <label className="text-sm font-medium text-gray-700">Pin/Zip Code</label>
-              <input
-                type="text"
-                value={formData.pinCode}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val.length <= 6) setFormData({ ...formData, pinCode: val });
-                }}
-                maxLength="6"
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-              {formData.pinCode && !validatePIN(formData.pinCode) && (
-                <p className="text-red-500 text-xs mt-1">Enter 6 digits</p>
+              <div className="relative">
+                <input
+                  type="text"
+                  value={formData.pinCode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 6) {
+                      setFormData(prev => ({ ...prev, pinCode: val }));
+                      if (val.length < 6) {
+                        setFormData(prev => ({ ...prev, state: "", city: "" }));
+                      }
+                    }
+                  }}
+                  maxLength="6"
+                  className="w-full p-2 border border-gray-300 rounded-lg pr-10"
+                  placeholder="Enter 6 digit PIN code"
+                />
+                {isFetchingPin && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <FaSpinner className="animate-spin text-indigo-500 h-5 w-5" />
+                  </div>
+                )}
+              </div>
+              {formData.pinCode && !validatePIN(formData.pinCode) && formData.pinCode.length === 6 && (
+                <p className="text-red-500 text-xs mt-1">{pinFetchError || "Invalid PIN code"}</p>
+              )}
+              {formData.pinCode && validatePIN(formData.pinCode) && formData.state && (
+                <p className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                  <FaCheck className="h-3 w-3" /> {formData.city}, {formData.state}
+                </p>
+              )}
+              {formData.pinCode && validatePIN(formData.pinCode) && !formData.state && !isFetchingPin && (
+                <p className="text-yellow-500 text-xs mt-1">Fetching location...</p>
               )}
             </div>
 
             <div>
               <label className="text-sm font-medium text-gray-700">State</label>
-              <input type="text" value={formData.state} readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
+              <input
+                type="text"
+                value={formData.state}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                placeholder="Auto-fetched from PIN"
+              />
             </div>
 
             <div>
               <label className="text-sm font-medium text-gray-700">City</label>
-              <input type="text" value={formData.city} readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50" />
+              <input
+                type="text"
+                value={formData.city}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+                placeholder="Auto-fetched from PIN"
+              />
             </div>
 
             <div>
@@ -2788,12 +2846,10 @@ function InsuranceLeadManagement() {
             </div>
           </div>
 
-          {/* LOB Specific Sections */}
           {showHealthSection && renderHealthForm()}
           {showMotorSection && renderMotorForm()}
           {showElectronicSection && renderElectronicForm()}
 
-          {/* Actions */}
           <div className="flex gap-4 justify-end mt-6 pt-4 border-t">
             <button type="button" onClick={() => setShowLeadForm(false)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
               Cancel
@@ -2834,7 +2890,6 @@ function InsuranceLeadManagement() {
         </div>
 
         <form onSubmit={handleUpdateLead}>
-          {/* Lead Info */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-lg mb-4">
             <div><span className="font-medium">Lead Code:</span> {editLead?.leadCode}</div>
             <div><span className="font-medium">Name:</span> {editLead?.name}</div>
@@ -2842,10 +2897,8 @@ function InsuranceLeadManagement() {
             <div><span className="font-medium">LOB:</span> {editLead?.lob}</div>
           </div>
 
-          {/* Workflow Form */}
           {renderWorkflowForm()}
 
-          {/* Actions */}
           <div className="flex gap-4 justify-end mt-6 pt-4 border-t">
             <button type="button" onClick={() => setShowEditModal(false)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
               Cancel
@@ -2892,6 +2945,10 @@ function InsuranceLeadManagement() {
             <div><span className="font-medium">Email:</span> {selectedLead.email || "-"}</div>
             <div><span className="font-medium">Gender:</span> {selectedLead.gender || "-"}</div>
             <div><span className="font-medium">Source:</span> {selectedLead.source || "-"}</div>
+            <div><span className="font-medium">Source Value:</span> {selectedLead.sourceDependentValue || "-"}</div>
+            <div><span className="font-medium">PIN Code:</span> {selectedLead.pinCode || "-"}</div>
+            <div><span className="font-medium">State:</span> {selectedLead.state || "-"}</div>
+            <div><span className="font-medium">City:</span> {selectedLead.city || "-"}</div>
             <div><span className="font-medium">LOB:</span> {selectedLead.lob || "-"}</div>
             <div><span className="font-medium">Status:</span> 
               <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
@@ -2920,12 +2977,8 @@ function InsuranceLeadManagement() {
                   <div>Family Income: {selectedLead.healthDetails.familyIncome || "-"}</div>
                   <div>Senior One DOB: {selectedLead.healthDetails.seniorOneDOB || "-"}</div>
                   <div>Proposer is Member: {selectedLead.healthDetails.proposerIsMember || "-"}</div>
+                  <div>Members: {selectedLead.healthDetails.members?.length || 0}</div>
                 </div>
-                {selectedLead.healthDetails.members && selectedLead.healthDetails.members.length > 0 && (
-                  <div className="mt-2">
-                    <h5 className="font-medium text-sm">Members: {selectedLead.healthDetails.members.length}</h5>
-                  </div>
-                )}
               </div>
             )}
             {selectedLead.motorDetails && (
@@ -2966,7 +3019,6 @@ function InsuranceLeadManagement() {
   // ============================================================
   return (
     <div className="space-y-4 p-4">
-      {/* Upload Status */}
       {uploadStatus.show && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -2977,10 +3029,8 @@ function InsuranceLeadManagement() {
         </motion.div>
       )}
 
-      {/* Renewal Alerts */}
       {renderRenewalAlerts()}
 
-      {/* Controls */}
       <motion.div
         initial={{ opacity: 0, x: -20 }}
         animate={{ opacity: 1, x: 0 }}
@@ -3013,7 +3063,6 @@ function InsuranceLeadManagement() {
         </div>
       </motion.div>
 
-      {/* Search and Filters */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -3073,7 +3122,6 @@ function InsuranceLeadManagement() {
         </div>
       </motion.div>
 
-      {/* Leads Table */}
       <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
         <div className="p-4 bg-gray-50 border-b flex justify-between items-center">
           <p className="text-sm text-gray-600">
@@ -3082,7 +3130,6 @@ function InsuranceLeadManagement() {
           </p>
         </div>
 
-        {/* Desktop Table */}
         <div className="hidden lg:block overflow-x-auto">
           <table className="w-full table-auto min-w-full">
             <thead>
@@ -3141,7 +3188,6 @@ function InsuranceLeadManagement() {
           </table>
         </div>
 
-        {/* Mobile Cards */}
         <div className="block lg:hidden p-4 space-y-4">
           {filteredLeads.map((lead) => (
             <div key={lead._id} className="border rounded-lg p-4 bg-gray-50 shadow-sm">
@@ -3181,7 +3227,6 @@ function InsuranceLeadManagement() {
         )}
       </div>
 
-      {/* Modals */}
       {showLeadForm && renderLeadFormModal()}
       {showEditModal && renderEditModal()}
       {selectedLead && renderLeadDetails()}
@@ -3189,4 +3234,4 @@ function InsuranceLeadManagement() {
   );
 }
 
-export default InsuranceLeadManagement;
+export default LeadTable;
