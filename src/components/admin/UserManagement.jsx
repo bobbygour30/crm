@@ -5,6 +5,26 @@ import {
   FaTimes,
   FaEye,
   FaEyeSlash,
+  FaUser,
+  FaBuilding,
+  FaGraduationCap,
+  FaIdCard,
+  FaMapMarkerAlt,
+  FaBriefcase,
+  FaPhone,
+  FaEnvelope,
+  FaCalendarAlt,
+  FaCheck,
+  FaSpinner,
+  FaUserPlus,
+  FaStore,
+  FaHandshake,
+  FaUsers,
+  FaUserTie,
+  FaFileAlt,
+  FaFilePdf,
+  FaFileImage,
+  FaExclamationCircle,
 } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -13,12 +33,169 @@ import { jwtDecode } from "jwt-decode";
 function UserManagement() {
   const [users, setUsers] = useState([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFetchingPin, setIsFetchingPin] = useState(false);
+  const [pinFetchError, setPinFetchError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editUser, setEditUser] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
+  const [validationPopup, setValidationPopup] = useState({ show: false, errors: [] });
+
+  // Department and Designation options
+  const DEPARTMENT_OPTIONS = [
+    "Sales",
+    "Marketing",
+    "Operations",
+    "IT",
+    "HR",
+    "Finance",
+    "Customer Service",
+    "Claims",
+    "Underwriting",
+    "Legal",
+    "Compliance",
+    "Risk Management",
+    "Product Development",
+    "Business Development",
+    "Other"
+  ];
+
+  const DESIGNATION_OPTIONS = {
+    "Sales": ["Sales Executive", "Senior Sales Executive", "Sales Manager", "Regional Sales Manager", "Sales Director"],
+    "Marketing": ["Marketing Executive", "Digital Marketing Specialist", "Marketing Manager", "Brand Manager"],
+    "Operations": ["Operations Executive", "Operations Manager", "Senior Operations Manager", "VP Operations"],
+    "IT": ["IT Executive", "Software Developer", "IT Manager", "System Administrator", "CTO"],
+    "HR": ["HR Executive", "HR Manager", "Senior HR Manager", "HR Director"],
+    "Finance": ["Finance Executive", "Accountant", "Finance Manager", "CFO"],
+    "Customer Service": ["Customer Service Executive", "Team Lead", "Customer Service Manager"],
+    "Claims": ["Claims Executive", "Claims Manager", "Senior Claims Manager"],
+    "Underwriting": ["Underwriter", "Senior Underwriter", "Underwriting Manager"],
+    "Legal": ["Legal Executive", "Legal Manager", "Legal Head"],
+    "Compliance": ["Compliance Executive", "Compliance Manager", "Compliance Head"],
+    "Risk Management": ["Risk Analyst", "Risk Manager", "Senior Risk Manager"],
+    "Product Development": ["Product Executive", "Product Manager", "Senior Product Manager"],
+    "Business Development": ["BD Executive", "BD Manager", "BD Director"],
+    "Other": ["Other"]
+  };
+
+  // Qualification options
+  const QUALIFICATION_OPTIONS = [
+    "Matriculation",
+    "Intermediate",
+    "Under Graduate",
+    "Post Graduate",
+    "Others"
+  ];
+
+  // LOB options for vendors
+  const LOB_OPTIONS = [
+    "Health Insurance",
+    "Motor Insurance",
+    "Mobile/Electronic Equipment Insurance",
+    "Private Car-OD",
+    "Private Car-SOD",
+    "Private Car-Comprehensive",
+    "Private Car-TP",
+    "Taxi-Comprehensive",
+    "Taxi-TP",
+    "Commercial Vehicle-Comprehensive",
+    "Commercial Vehicle-TP",
+    "E-Rikshaw-TP",
+    "E-Rikshaw-Comprehensive",
+    "Two-Wheeler-TP",
+    "My Home",
+    "Mediclaim Health Insurance",
+    "Bharat Sookshma Udyam Suraksha",
+    "Bharat Laghu Udyam Suraksha",
+    "Bharat Grih Raksha",
+    "Burglary",
+    "MARINE-OPEN",
+    "MARINE-SPECIFIC",
+    "MARINE-STOP",
+    "PERSONAL ACCIDENT",
+    "Employee Compensation",
+    "Group Health Insurance",
+    "Terms Insurance",
+    "Ulip Plan",
+    "Traditional Plan",
+    "Travel Insurance",
+    "New Vehicle Insurance",
+    "New Two Wheeler Insurance",
+    "Other Insurance",
+  ];
+
+  // User Types
+  const USER_TYPES = ["Employee", "Vendor", "Store", "Channel Partner", "Admin"];
+
+  // New User State - Employee
   const [newUser, setNewUser] = useState({
+    // User Type
+    userType: "Employee",
+    
+    // Personal Information (Employee)
+    fullName: "",
+    fathersName: "",
+    mothersName: "",
+    dateOfBirth: "",
+    
+    // Educational Qualification (Employee)
+    qualification: "",
+    otherQualification: "",
+    
+    // KYC & Document Upload (Employee)
+    aadhaarNumber: "",
+    aadhaarFile: null,
+    panNumber: "",
+    panFile: null,
+    
+    // Educational Documents (Employee)
+    tenthMarksheet: null,
+    twelfthMarksheet: null,
+    ugMarksheet: null,
+    pgMarksheet: null,
+    
+    // Address Details (Employee)
+    pinCode: "",
+    state: "",
+    city: "",
+    village: "",
+    block: "",
+    
+    // Official Details (Employee)
+    department: "",
+    designation: "",
+    
+    // Contact Details (Employee)
+    mobileNumber: "",
+    alternateMobile: "",
+    personalEmail: "",
+    officialEmail: "",
+    emergencyContact: "",
+    
+    // Employment Details (Employee)
+    dateOfJoining: "",
+    employeeId: "",
+    
+    // Vendor/Store/Channel Partner Details
+    organizationName: "",
+    gstNumber: "",
+    contactPersonName: "",
+    contactMobile: "",
+    contactEmail: "",
+    address: "",
+    interestedLobs: [],
+    
+    // Auto Generated Code
+    generatedCode: "",
+    
+    // Password
+    password: "",
+    
+    // Legacy fields for compatibility
     username: "",
     email: "",
     mobile: "",
-    password: "",
-    designation: "",
     role: "Employee",
     gst: "",
     pan: "",
@@ -26,12 +203,159 @@ function UserManagement() {
     ownerName: "",
     cancelCheck: null,
     gstCertificate: null,
-    aadharCard: null, // New field for Aadhar upload
+    aadharCard: null,
     assignedSalesperson: "",
   });
-  const [editUser, setEditUser] = useState(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
+
+  const [editUserState, setEditUserState] = useState({
+    // Same structure as newUser for editing
+    userType: "Employee",
+    fullName: "",
+    fathersName: "",
+    mothersName: "",
+    dateOfBirth: "",
+    qualification: "",
+    otherQualification: "",
+    aadhaarNumber: "",
+    aadhaarFile: null,
+    panNumber: "",
+    panFile: null,
+    tenthMarksheet: null,
+    twelfthMarksheet: null,
+    ugMarksheet: null,
+    pgMarksheet: null,
+    pinCode: "",
+    state: "",
+    city: "",
+    village: "",
+    block: "",
+    department: "",
+    designation: "",
+    mobileNumber: "",
+    alternateMobile: "",
+    personalEmail: "",
+    officialEmail: "",
+    emergencyContact: "",
+    dateOfJoining: "",
+    employeeId: "",
+    organizationName: "",
+    gstNumber: "",
+    contactPersonName: "",
+    contactMobile: "",
+    contactEmail: "",
+    address: "",
+    interestedLobs: [],
+    generatedCode: "",
+    password: "",
+    username: "",
+    email: "",
+    mobile: "",
+    role: "Employee",
+    gst: "",
+    pan: "",
+    storeName: "",
+    ownerName: "",
+    cancelCheck: null,
+    gstCertificate: null,
+    aadharCard: null,
+    assignedSalesperson: "",
+    _id: "",
+  });
+
+  // Helper Functions
+  const validateAadhaar = (aadhaar) => /^[0-9]{12}$/.test(aadhaar);
+  const validatePAN = (pan) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(pan);
+  const validatePIN = (pin) => /^[0-9]{6}$/.test(pin);
+  const validateMobile = (mobile) => /^[0-9]{10}$/.test(mobile);
+  const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+  const generateEmployeeId = (users) => {
+    // Find the highest employee ID number
+    let maxNumber = 0;
+    users.forEach(user => {
+      if (user.employeeId && user.employeeId.startsWith('ARS')) {
+        const num = parseInt(user.employeeId.replace('ARS', ''));
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    });
+    const newNumber = maxNumber + 1;
+    return `ARS${String(newNumber).padStart(4, '0')}`;
+  };
+
+  const generateVendorCode = (users, type) => {
+    const prefix = type === 'Vendor' ? 'CP' : type === 'Channel Partner' ? 'CP' : 'STR';
+    let maxNumber = 0;
+    users.forEach(user => {
+      if (user.generatedCode && user.generatedCode.startsWith(prefix)) {
+        const num = parseInt(user.generatedCode.replace(prefix, ''));
+        if (!isNaN(num) && num > maxNumber) {
+          maxNumber = num;
+        }
+      }
+    });
+    const newNumber = maxNumber + 1;
+    return `${prefix}${String(newNumber).padStart(4, '0')}`;
+  };
+
+  const fetchCityState = async (pinCode) => {
+    setIsFetchingPin(true);
+    setPinFetchError("");
+    
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pinCode}`);
+      const data = await response.json();
+      
+      if (data && data[0]?.Status === "Success" && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const postOffice = data[0].PostOffice[0];
+        setNewUser(prev => ({
+          ...prev,
+          state: postOffice.State || "",
+          city: postOffice.District || postOffice.Name || "",
+        }));
+        setPinFetchError("");
+      } else {
+        setNewUser(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("Invalid PIN code");
+      }
+    } catch (error) {
+      console.error("Error fetching city/state:", error);
+      setNewUser(prev => ({ ...prev, state: "", city: "" }));
+      setPinFetchError("Could not fetch location");
+    } finally {
+      setIsFetchingPin(false);
+    }
+  };
+
+  const fetchEditCityState = async (pinCode) => {
+    setIsFetchingPin(true);
+    setPinFetchError("");
+    
+    try {
+      const response = await fetch(`https://api.postalpincode.in/pincode/${pinCode}`);
+      const data = await response.json();
+      
+      if (data && data[0]?.Status === "Success" && data[0].PostOffice && data[0].PostOffice.length > 0) {
+        const postOffice = data[0].PostOffice[0];
+        setEditUserState(prev => ({
+          ...prev,
+          state: postOffice.State || "",
+          city: postOffice.District || postOffice.Name || "",
+        }));
+        setPinFetchError("");
+      } else {
+        setEditUserState(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("Invalid PIN code");
+      }
+    } catch (error) {
+      console.error("Error fetching city/state:", error);
+      setEditUserState(prev => ({ ...prev, state: "", city: "" }));
+      setPinFetchError("Could not fetch location");
+    } finally {
+      setIsFetchingPin(false);
+    }
+  };
 
   const fetchUsers = async () => {
     try {
@@ -75,28 +399,294 @@ function UserManagement() {
     }
   }, []);
 
-  if (!isAdmin) {
-    return <div>Access Denied: Admin privileges required.</div>;
-  }
+  // Auto-generate codes when user type changes
+  useEffect(() => {
+    if (newUser.userType === "Employee" && !newUser.employeeId) {
+      const id = generateEmployeeId(users);
+      setNewUser(prev => ({ ...prev, employeeId: id }));
+    } else if (["Vendor", "Store", "Channel Partner"].includes(newUser.userType) && !newUser.generatedCode) {
+      const code = generateVendorCode(users, newUser.userType);
+      setNewUser(prev => ({ ...prev, generatedCode: code }));
+    }
+  }, [newUser.userType, users]);
+
+  // Auto-fetch state/city when PIN changes
+  useEffect(() => {
+    if (newUser.pinCode && validatePIN(newUser.pinCode)) {
+      fetchCityState(newUser.pinCode);
+    } else if (newUser.pinCode && newUser.pinCode.length > 0 && newUser.pinCode.length < 6) {
+      setPinFetchError("Enter 6 digits");
+    } else {
+      if (!newUser.pinCode || newUser.pinCode.length === 0) {
+        setNewUser(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("");
+      }
+    }
+  }, [newUser.pinCode]);
+
+  useEffect(() => {
+    if (editUserState.pinCode && validatePIN(editUserState.pinCode)) {
+      fetchEditCityState(editUserState.pinCode);
+    } else if (editUserState.pinCode && editUserState.pinCode.length > 0 && editUserState.pinCode.length < 6) {
+      setPinFetchError("Enter 6 digits");
+    } else {
+      if (!editUserState.pinCode || editUserState.pinCode.length === 0) {
+        setEditUserState(prev => ({ ...prev, state: "", city: "" }));
+        setPinFetchError("");
+      }
+    }
+  }, [editUserState.pinCode]);
+
+  const handleUserTypeChange = (type, isEdit = false) => {
+    if (isEdit) {
+      setEditUserState(prev => ({ ...prev, userType: type }));
+    } else {
+      setNewUser(prev => ({ ...prev, userType: type }));
+      if (type === "Employee") {
+        const id = generateEmployeeId(users);
+        setNewUser(prev => ({ ...prev, employeeId: id }));
+      } else if (["Vendor", "Store", "Channel Partner"].includes(type)) {
+        const code = generateVendorCode(users, type);
+        setNewUser(prev => ({ ...prev, generatedCode: code }));
+      }
+    }
+  };
+
+  const handleLOBChange = (lob, isEdit = false) => {
+    if (isEdit) {
+      const current = editUserState.interestedLobs || [];
+      const updated = current.includes(lob) 
+        ? current.filter(item => item !== lob)
+        : [...current, lob];
+      setEditUserState(prev => ({ ...prev, interestedLobs: updated }));
+    } else {
+      const current = newUser.interestedLobs || [];
+      const updated = current.includes(lob) 
+        ? current.filter(item => item !== lob)
+        : [...current, lob];
+      setNewUser(prev => ({ ...prev, interestedLobs: updated }));
+    }
+  };
+
+  const handleSelectAllLOBs = (isEdit = false) => {
+    if (isEdit) {
+      setEditUserState(prev => ({ ...prev, interestedLobs: [...LOB_OPTIONS] }));
+    } else {
+      setNewUser(prev => ({ ...prev, interestedLobs: [...LOB_OPTIONS] }));
+    }
+  };
+
+  const handleClearAllLOBs = (isEdit = false) => {
+    if (isEdit) {
+      setEditUserState(prev => ({ ...prev, interestedLobs: [] }));
+    } else {
+      setNewUser(prev => ({ ...prev, interestedLobs: [] }));
+    }
+  };
+
+  const validateAllFields = (userData, isEdit = false) => {
+    const errors = {};
+    const errorList = [];
+
+    if (userData.userType === "Employee") {
+      // Personal Information
+      if (!userData.fullName) {
+        errors.fullName = "Full Name is required";
+        errorList.push({ field: "fullName", message: "Full Name is required" });
+      }
+      if (!userData.fathersName) {
+        errors.fathersName = "Father's Name is required";
+        errorList.push({ field: "fathersName", message: "Father's Name is required" });
+      }
+      if (!userData.mothersName) {
+        errors.mothersName = "Mother's Name is required";
+        errorList.push({ field: "mothersName", message: "Mother's Name is required" });
+      }
+      if (!userData.dateOfBirth) {
+        errors.dateOfBirth = "Date of Birth is required";
+        errorList.push({ field: "dateOfBirth", message: "Date of Birth is required" });
+      }
+
+      // Educational Qualification
+      if (!userData.qualification) {
+        errors.qualification = "Qualification is required";
+        errorList.push({ field: "qualification", message: "Qualification is required" });
+      }
+      if (userData.qualification === "Others" && !userData.otherQualification) {
+        errors.otherQualification = "Please specify your qualification";
+        errorList.push({ field: "otherQualification", message: "Please specify your qualification" });
+      }
+
+      // Aadhaar
+      if (userData.aadhaarNumber && !validateAadhaar(userData.aadhaarNumber)) {
+        errors.aadhaarNumber = "Aadhaar must be exactly 12 digits";
+        errorList.push({ field: "aadhaarNumber", message: "Aadhaar must be exactly 12 digits" });
+      }
+
+      // PAN
+      if (userData.panNumber && !validatePAN(userData.panNumber)) {
+        errors.panNumber = "PAN format: ABCDE1234F (5 letters, 4 digits, 1 letter)";
+        errorList.push({ field: "panNumber", message: "PAN format: ABCDE1234F (5 letters, 4 digits, 1 letter)" });
+      }
+
+      // Address
+      if (!userData.pinCode) {
+        errors.pinCode = "PIN Code is required";
+        errorList.push({ field: "pinCode", message: "PIN Code is required" });
+      }
+      if (userData.pinCode && !validatePIN(userData.pinCode)) {
+        errors.pinCode = "Enter valid 6-digit PIN code";
+        errorList.push({ field: "pinCode", message: "Enter valid 6-digit PIN code" });
+      }
+      if (!userData.village) {
+        errors.village = "Village is required";
+        errorList.push({ field: "village", message: "Village is required" });
+      }
+      if (!userData.block) {
+        errors.block = "Block is required";
+        errorList.push({ field: "block", message: "Block is required" });
+      }
+
+      // Official Details
+      if (!userData.department) {
+        errors.department = "Department is required";
+        errorList.push({ field: "department", message: "Department is required" });
+      }
+      if (!userData.designation) {
+        errors.designation = "Designation is required";
+        errorList.push({ field: "designation", message: "Designation is required" });
+      }
+
+      // Contact Details
+      if (!userData.mobileNumber) {
+        errors.mobileNumber = "Mobile Number is required";
+        errorList.push({ field: "mobileNumber", message: "Mobile Number is required" });
+      }
+      if (userData.mobileNumber && !validateMobile(userData.mobileNumber)) {
+        errors.mobileNumber = "Enter valid 10-digit mobile number";
+        errorList.push({ field: "mobileNumber", message: "Enter valid 10-digit mobile number" });
+      }
+      if (userData.personalEmail && !validateEmail(userData.personalEmail)) {
+        errors.personalEmail = "Invalid email format";
+        errorList.push({ field: "personalEmail", message: "Invalid email format" });
+      }
+      if (userData.officialEmail && !validateEmail(userData.officialEmail)) {
+        errors.officialEmail = "Invalid email format";
+        errorList.push({ field: "officialEmail", message: "Invalid email format" });
+      }
+
+      // Employment Details
+      if (!userData.dateOfJoining) {
+        errors.dateOfJoining = "Date of Joining is required";
+        errorList.push({ field: "dateOfJoining", message: "Date of Joining is required" });
+      }
+
+      // Password for new user
+      if (!isEdit && !userData.password) {
+        errors.password = "Password is required";
+        errorList.push({ field: "password", message: "Password is required" });
+      }
+    }
+
+    // Vendor/Store/Channel Partner validation
+    if (["Vendor", "Store", "Channel Partner"].includes(userData.userType)) {
+      if (!userData.organizationName) {
+        errors.organizationName = "Organization Name is required";
+        errorList.push({ field: "organizationName", message: "Organization Name is required" });
+      }
+      if (!userData.contactPersonName) {
+        errors.contactPersonName = "Contact Person Name is required";
+        errorList.push({ field: "contactPersonName", message: "Contact Person Name is required" });
+      }
+      if (!userData.contactMobile) {
+        errors.contactMobile = "Mobile Number is required";
+        errorList.push({ field: "contactMobile", message: "Mobile Number is required" });
+      }
+      if (userData.contactMobile && !validateMobile(userData.contactMobile)) {
+        errors.contactMobile = "Enter valid 10-digit mobile number";
+        errorList.push({ field: "contactMobile", message: "Enter valid 10-digit mobile number" });
+      }
+      if (userData.contactEmail && !validateEmail(userData.contactEmail)) {
+        errors.contactEmail = "Invalid email format";
+        errorList.push({ field: "contactEmail", message: "Invalid email format" });
+      }
+      if (!userData.address) {
+        errors.address = "Address is required";
+        errorList.push({ field: "address", message: "Address is required" });
+      }
+      if (!isEdit && !userData.password) {
+        errors.password = "Password is required";
+        errorList.push({ field: "password", message: "Password is required" });
+      }
+    }
+
+    setValidationErrors(errors);
+    
+    if (errorList.length > 0) {
+      setValidationPopup({ show: true, errors: errorList });
+      return false;
+    }
+    
+    return true;
+  };
+
+  const scrollToError = (fieldName) => {
+    setValidationPopup({ show: false, errors: [] });
+    
+    let element = document.querySelector(`[name="${fieldName}"]`);
+    if (!element) {
+      element = document.querySelector(`[data-field="${fieldName}"]`);
+    }
+    if (!element) {
+      element = document.getElementById(fieldName);
+    }
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus();
+      element.style.borderColor = '#ef4444';
+      element.style.boxShadow = '0 0 0 3px rgba(239, 68, 68, 0.3)';
+      setTimeout(() => {
+        element.style.borderColor = '';
+        element.style.boxShadow = '';
+      }, 3000);
+    }
+  };
 
   const handleAddUser = async (e) => {
     e.preventDefault();
-    if (
-      !newUser.username ||
-      !newUser.email ||
-      !newUser.mobile ||
-      !newUser.password
-    ) {
-      alert("Please fill in all required fields.");
+    
+    // Validate based on user type
+    if (!validateAllFields(newUser, false)) {
       return;
     }
 
+    setIsLoading(true);
     const formData = new FormData();
+    
+    // Append all fields
     Object.keys(newUser).forEach((key) => {
       if (newUser[key] !== null && newUser[key] !== undefined) {
-        formData.append(key, newUser[key]);
+        if (key === 'interestedLobs') {
+          formData.append(key, JSON.stringify(newUser[key]));
+        } else if (key === 'aadhaarFile' || key === 'panFile' || 
+                   key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
+                   key === 'ugMarksheet' || key === 'pgMarksheet' ||
+                   key === 'cancelCheck' || key === 'gstCertificate' || 
+                   key === 'aadharCard') {
+          if (newUser[key] instanceof File) {
+            formData.append(key, newUser[key]);
+          }
+        } else {
+          formData.append(key, newUser[key]);
+        }
       }
     });
+
+    // Add role for backward compatibility
+    formData.append('role', newUser.userType);
+    formData.append('username', newUser.userType === 'Employee' ? newUser.fullName : newUser.organizationName);
+    formData.append('email', newUser.userType === 'Employee' ? newUser.officialEmail || newUser.personalEmail : newUser.contactEmail);
+    formData.append('mobile', newUser.userType === 'Employee' ? newUser.mobileNumber : newUser.contactMobile);
 
     try {
       const token = localStorage.getItem("token");
@@ -111,56 +701,163 @@ function UserManagement() {
         }
       );
       fetchUsers();
-      setNewUser({
-        username: "",
-        email: "",
-        mobile: "",
-        password: "",
-        designation: "",
-        role: "Employee",
-        gst: "",
-        pan: "",
-        storeName: "",
-        ownerName: "",
-        cancelCheck: null,
-        gstCertificate: null,
-        aadharCard: null, // Reset new field
-        assignedSalesperson: "",
-      });
+      resetNewUserForm();
+      alert("User added successfully!");
     } catch (err) {
       console.error("Add user error:", err);
       alert(err.response?.data?.msg || "Error adding user.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
+  const resetNewUserForm = () => {
+    setNewUser({
+      userType: "Employee",
+      fullName: "",
+      fathersName: "",
+      mothersName: "",
+      dateOfBirth: "",
+      qualification: "",
+      otherQualification: "",
+      aadhaarNumber: "",
+      aadhaarFile: null,
+      panNumber: "",
+      panFile: null,
+      tenthMarksheet: null,
+      twelfthMarksheet: null,
+      ugMarksheet: null,
+      pgMarksheet: null,
+      pinCode: "",
+      state: "",
+      city: "",
+      village: "",
+      block: "",
+      department: "",
+      designation: "",
+      mobileNumber: "",
+      alternateMobile: "",
+      personalEmail: "",
+      officialEmail: "",
+      emergencyContact: "",
+      dateOfJoining: "",
+      employeeId: generateEmployeeId(users),
+      organizationName: "",
+      gstNumber: "",
+      contactPersonName: "",
+      contactMobile: "",
+      contactEmail: "",
+      address: "",
+      interestedLobs: [],
+      generatedCode: "",
+      password: "",
+      username: "",
+      email: "",
+      mobile: "",
+      role: "Employee",
+      gst: "",
+      pan: "",
+      storeName: "",
+      ownerName: "",
+      cancelCheck: null,
+      gstCertificate: null,
+      aadharCard: null,
+      assignedSalesperson: "",
+    });
+    setValidationErrors({});
+    setValidationPopup({ show: false, errors: [] });
+  };
+
   const handleEditUser = (user) => {
-    setEditUser({
-      ...user,
-      password: "", // Don't prefill password
-      cancelCheck: null, // Reset file input
-      gstCertificate: null, // Reset file input
-      aadharCard: null, // Reset new file input
+    setEditUserState({
+      _id: user._id,
+      userType: user.userType || user.role || "Employee",
+      fullName: user.fullName || user.username || "",
+      fathersName: user.fathersName || "",
+      mothersName: user.mothersName || "",
+      dateOfBirth: user.dateOfBirth || "",
+      qualification: user.qualification || "",
+      otherQualification: user.otherQualification || "",
+      aadhaarNumber: user.aadhaarNumber || "",
+      aadhaarFile: null,
+      panNumber: user.panNumber || "",
+      panFile: null,
+      tenthMarksheet: null,
+      twelfthMarksheet: null,
+      ugMarksheet: null,
+      pgMarksheet: null,
+      pinCode: user.pinCode || "",
+      state: user.state || "",
+      city: user.city || "",
+      village: user.village || "",
+      block: user.block || "",
+      department: user.department || "",
+      designation: user.designation || "",
+      mobileNumber: user.mobileNumber || "",
+      alternateMobile: user.alternateMobile || "",
+      personalEmail: user.personalEmail || "",
+      officialEmail: user.officialEmail || "",
+      emergencyContact: user.emergencyContact || "",
+      dateOfJoining: user.dateOfJoining || "",
+      employeeId: user.employeeId || "",
+      organizationName: user.organizationName || user.storeName || "",
+      gstNumber: user.gstNumber || user.gst || "",
+      contactPersonName: user.contactPersonName || user.ownerName || "",
+      contactMobile: user.contactMobile || user.mobile || "",
+      contactEmail: user.contactEmail || user.email || "",
+      address: user.address || "",
+      interestedLobs: user.interestedLobs || [],
+      generatedCode: user.generatedCode || "",
+      password: "",
+      username: user.username || "",
+      email: user.email || "",
+      mobile: user.mobile || "",
+      role: user.role || "Employee",
+      gst: user.gst || "",
+      pan: user.pan || "",
+      storeName: user.storeName || "",
+      ownerName: user.ownerName || "",
+      cancelCheck: null,
+      gstCertificate: null,
+      aadharCard: null,
+      assignedSalesperson: user.assignedSalesperson || "",
     });
     setIsModalOpen(true);
   };
 
   const handleUpdateUser = async (e) => {
     e.preventDefault();
+    
+    // Validate based on user type
+    if (!validateAllFields(editUserState, true)) {
+      return;
+    }
+
+    setIsLoading(true);
     const formData = new FormData();
-    Object.keys(editUser).forEach((key) => {
-      if (
-        editUser[key] !== null &&
-        editUser[key] !== undefined &&
-        key !== "_id"
-      ) {
-        formData.append(key, editUser[key]);
+    
+    Object.keys(editUserState).forEach((key) => {
+      if (editUserState[key] !== null && editUserState[key] !== undefined && key !== "_id") {
+        if (key === 'interestedLobs') {
+          formData.append(key, JSON.stringify(editUserState[key]));
+        } else if (key === 'aadhaarFile' || key === 'panFile' || 
+                   key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
+                   key === 'ugMarksheet' || key === 'pgMarksheet' ||
+                   key === 'cancelCheck' || key === 'gstCertificate' || 
+                   key === 'aadharCard') {
+          if (editUserState[key] instanceof File) {
+            formData.append(key, editUserState[key]);
+          }
+        } else {
+          formData.append(key, editUserState[key]);
+        }
       }
     });
 
     try {
       const token = localStorage.getItem("token");
       await axios.put(
-        `${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${editUser._id}`,
+        `${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${editUserState._id}`,
         formData,
         {
           headers: {
@@ -171,10 +868,65 @@ function UserManagement() {
       );
       fetchUsers();
       setIsModalOpen(false);
-      setEditUser(null);
+      setEditUserState({
+        _id: "",
+        userType: "Employee",
+        fullName: "",
+        fathersName: "",
+        mothersName: "",
+        dateOfBirth: "",
+        qualification: "",
+        otherQualification: "",
+        aadhaarNumber: "",
+        aadhaarFile: null,
+        panNumber: "",
+        panFile: null,
+        tenthMarksheet: null,
+        twelfthMarksheet: null,
+        ugMarksheet: null,
+        pgMarksheet: null,
+        pinCode: "",
+        state: "",
+        city: "",
+        village: "",
+        block: "",
+        department: "",
+        designation: "",
+        mobileNumber: "",
+        alternateMobile: "",
+        personalEmail: "",
+        officialEmail: "",
+        emergencyContact: "",
+        dateOfJoining: "",
+        employeeId: "",
+        organizationName: "",
+        gstNumber: "",
+        contactPersonName: "",
+        contactMobile: "",
+        contactEmail: "",
+        address: "",
+        interestedLobs: [],
+        generatedCode: "",
+        password: "",
+        username: "",
+        email: "",
+        mobile: "",
+        role: "Employee",
+        gst: "",
+        pan: "",
+        storeName: "",
+        ownerName: "",
+        cancelCheck: null,
+        gstCertificate: null,
+        aadharCard: null,
+        assignedSalesperson: "",
+      });
+      alert("User updated successfully!");
     } catch (err) {
       console.error("Update user error:", err);
       alert(err.response?.data?.msg || "Error updating user.");
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -198,62 +950,748 @@ function UserManagement() {
 
   const closeModal = () => {
     setIsModalOpen(false);
-    setEditUser(null);
+    setEditUserState({
+      _id: "",
+      userType: "Employee",
+      fullName: "",
+      fathersName: "",
+      mothersName: "",
+      dateOfBirth: "",
+      qualification: "",
+      otherQualification: "",
+      aadhaarNumber: "",
+      aadhaarFile: null,
+      panNumber: "",
+      panFile: null,
+      tenthMarksheet: null,
+      twelfthMarksheet: null,
+      ugMarksheet: null,
+      pgMarksheet: null,
+      pinCode: "",
+      state: "",
+      city: "",
+      village: "",
+      block: "",
+      department: "",
+      designation: "",
+      mobileNumber: "",
+      alternateMobile: "",
+      personalEmail: "",
+      officialEmail: "",
+      emergencyContact: "",
+      dateOfJoining: "",
+      employeeId: "",
+      organizationName: "",
+      gstNumber: "",
+      contactPersonName: "",
+      contactMobile: "",
+      contactEmail: "",
+      address: "",
+      interestedLobs: [],
+      generatedCode: "",
+      password: "",
+      username: "",
+      email: "",
+      mobile: "",
+      role: "Employee",
+      gst: "",
+      pan: "",
+      storeName: "",
+      ownerName: "",
+      cancelCheck: null,
+      gstCertificate: null,
+      aadharCard: null,
+      assignedSalesperson: "",
+    });
+    setValidationErrors({});
+    setValidationPopup({ show: false, errors: [] });
   };
 
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.5 }}
-      className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
-    >
-      <h2 className="text-2xl font-semibold text-gray-900">User Management</h2>
+  // Render Validation Popup
+  const renderValidationPopup = () => {
+    if (!validationPopup.show) return null;
 
-      <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
-        <h3 className="text-xl font-medium text-gray-800 mb-4">
-          Add New User / Vendor
-        </h3>
-        <form
-          onSubmit={handleAddUser}
-          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4"
+        onClick={() => setValidationPopup({ show: false, errors: [] })}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
+          onClick={(e) => e.stopPropagation()}
         >
-          <input
-            type="text"
-            placeholder="Username"
-            value={newUser.username}
-            onChange={(e) =>
-              setNewUser({ ...newUser, username: e.target.value })
-            }
-            className="p-3 border rounded-lg"
-            required
-          />
-          <input
-            type="email"
-            placeholder="Email"
-            value={newUser.email}
-            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-            className="p-3 border rounded-lg"
-            required
-          />
-          <input
-            type="text"
-            placeholder="Mobile Number"
-            value={newUser.mobile}
-            onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value })}
-            className="p-3 border rounded-lg"
-            required
-          />
+          <div className="flex items-start gap-3 mb-4">
+            <div className="bg-red-100 p-2 rounded-full">
+              <FaExclamationCircle className="text-red-600 h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-gray-800">Validation Errors</h3>
+              <p className="text-sm text-gray-500">Please fix the following issues:</p>
+            </div>
+          </div>
+          
+          <div className="max-h-60 overflow-y-auto space-y-2">
+            {validationPopup.errors.map((error, index) => (
+              <div 
+                key={index}
+                className="flex items-center justify-between p-2 bg-red-50 rounded-lg border border-red-200"
+              >
+                <span className="text-sm text-red-700">{error.message}</span>
+                {error.field !== "general" && (
+                  <button
+                    onClick={() => scrollToError(error.field)}
+                    className="px-3 py-1 bg-red-600 text-white rounded-lg text-xs hover:bg-red-700 transition-colors"
+                  >
+                    Go to Field
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex justify-end mt-4 pt-4 border-t">
+            <button
+              onClick={() => setValidationPopup({ show: false, errors: [] })}
+              className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+            >
+              Close
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
+  };
+
+  // Render Employee Form
+  const renderEmployeeForm = (formData, setFormData, isEdit = false) => {
+    const getQualificationFiles = () => {
+      const qual = formData.qualification;
+      const files = [];
+      if (qual === "Matriculation" || qual === "Intermediate" || qual === "Under Graduate" || qual === "Post Graduate") {
+        files.push({ key: "tenthMarksheet", label: "10th Marksheet" });
+      }
+      if (qual === "Intermediate" || qual === "Under Graduate" || qual === "Post Graduate") {
+        files.push({ key: "twelfthMarksheet", label: "12th Marksheet" });
+      }
+      if (qual === "Under Graduate" || qual === "Post Graduate") {
+        files.push({ key: "ugMarksheet", label: "UG Marksheet" });
+      }
+      if (qual === "Post Graduate") {
+        files.push({ key: "pgMarksheet", label: "PG Marksheet" });
+      }
+      return files;
+    };
+
+    const prefix = isEdit ? "edit" : "";
+
+    return (
+      <div className="space-y-6">
+        {/* Personal Information */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaUser className="text-indigo-600" /> Personal Information
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Full Name <span className="text-red-500">*</span></label>
+              <input
+                name="fullName"
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.fullName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter full name"
+              />
+              {validationErrors.fullName && <p className="text-red-500 text-xs mt-1">{validationErrors.fullName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Father's Name <span className="text-red-500">*</span></label>
+              <input
+                name="fathersName"
+                type="text"
+                value={formData.fathersName}
+                onChange={(e) => setFormData({ ...formData, fathersName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.fathersName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter father's name"
+              />
+              {validationErrors.fathersName && <p className="text-red-500 text-xs mt-1">{validationErrors.fathersName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mother's Name <span className="text-red-500">*</span></label>
+              <input
+                name="mothersName"
+                type="text"
+                value={formData.mothersName}
+                onChange={(e) => setFormData({ ...formData, mothersName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.mothersName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter mother's name"
+              />
+              {validationErrors.mothersName && <p className="text-red-500 text-xs mt-1">{validationErrors.mothersName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Date of Birth <span className="text-red-500">*</span></label>
+              <input
+                name="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.dateOfBirth ? 'border-red-500' : 'border-gray-300'}`}
+                max={new Date().toISOString().split('T')[0]}
+              />
+              {validationErrors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{validationErrors.dateOfBirth}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Educational Qualification */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaGraduationCap className="text-indigo-600" /> Educational Qualification
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Qualification <span className="text-red-500">*</span></label>
+              <select
+                name="qualification"
+                value={formData.qualification}
+                onChange={(e) => setFormData({ ...formData, qualification: e.target.value, otherQualification: "" })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.qualification ? 'border-red-500' : 'border-gray-300'}`}
+              >
+                <option value="">Select Qualification</option>
+                {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+              {validationErrors.qualification && <p className="text-red-500 text-xs mt-1">{validationErrors.qualification}</p>}
+            </div>
+            {formData.qualification === "Others" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Specify Qualification <span className="text-red-500">*</span></label>
+                <input
+                  name="otherQualification"
+                  type="text"
+                  value={formData.otherQualification}
+                  onChange={(e) => setFormData({ ...formData, otherQualification: e.target.value })}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.otherQualification ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Specify your qualification"
+                />
+                {validationErrors.otherQualification && <p className="text-red-500 text-xs mt-1">{validationErrors.otherQualification}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Educational Documents Upload - Dynamic */}
+          {formData.qualification && formData.qualification !== "Others" && (
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Upload Educational Documents</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {getQualificationFiles().map((file) => (
+                  <div key={file.key}>
+                    <label className="text-xs font-medium text-gray-600">{file.label}</label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg"
+                      onChange={(e) => setFormData({ ...formData, [file.key]: e.target.files[0] })}
+                      className="w-full p-1 border border-gray-300 rounded-lg text-sm"
+                    />
+                    {formData[file.key] && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* KYC & Document Upload */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaIdCard className="text-indigo-600" /> KYC & Document Upload
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
+              <input
+                name="aadhaarNumber"
+                type="text"
+                value={formData.aadhaarNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 12) setFormData({ ...formData, aadhaarNumber: val });
+                }}
+                maxLength="12"
+                className={`w-full p-2 border rounded-lg ${validationErrors.aadhaarNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter 12 digits only"
+              />
+              {formData.aadhaarNumber && formData.aadhaarNumber.length > 0 && !validateAadhaar(formData.aadhaarNumber) && (
+                <p className="text-red-500 text-xs mt-1">Enter exactly 12 digits</p>
+              )}
+              {validationErrors.aadhaarNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.aadhaarNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg"
+                onChange={(e) => setFormData({ ...formData, aadhaarFile: e.target.files[0] })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {formData.aadhaarFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">PAN Number</label>
+              <input
+                name="panNumber"
+                type="text"
+                value={formData.panNumber}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  if (val.length <= 10) setFormData({ ...formData, panNumber: val });
+                }}
+                maxLength="10"
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.panNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="ABCDE1234F"
+              />
+              {formData.panNumber && formData.panNumber.length > 0 && !validatePAN(formData.panNumber) && (
+                <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F (5 letters, 4 digits, 1 letter)</p>
+              )}
+              {validationErrors.panNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.panNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg"
+                onChange={(e) => setFormData({ ...formData, panFile: e.target.files[0] })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {formData.panFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Address Details */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaMapMarkerAlt className="text-indigo-600" /> Address Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">PIN/ZIP Code <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  name="pinCode"
+                  type="text"
+                  value={formData.pinCode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 6) {
+                      setFormData({ ...formData, pinCode: val });
+                      if (val.length < 6) {
+                        setFormData(prev => ({ ...prev, state: "", city: "" }));
+                      }
+                    }
+                  }}
+                  maxLength="6"
+                  className={`w-full p-2 border rounded-lg pr-10 ${validationErrors.pinCode ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter 6 digit PIN code"
+                />
+                {isFetchingPin && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <FaSpinner className="animate-spin text-indigo-500 h-5 w-5" />
+                  </div>
+                )}
+              </div>
+              {formData.pinCode && !validatePIN(formData.pinCode) && formData.pinCode.length === 6 && (
+                <p className="text-red-500 text-xs mt-1">{pinFetchError || "Invalid PIN code"}</p>
+              )}
+              {formData.pinCode && validatePIN(formData.pinCode) && formData.state && (
+                <p className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                  <FaCheck className="h-3 w-3" /> {formData.city}, {formData.state}
+                </p>
+              )}
+              {validationErrors.pinCode && <p className="text-red-500 text-xs mt-1">{validationErrors.pinCode}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">State</label>
+              <input
+                type="text"
+                value={formData.state}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">City/District</label>
+              <input
+                type="text"
+                value={formData.city}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Village <span className="text-red-500">*</span></label>
+              <input
+                name="village"
+                type="text"
+                value={formData.village}
+                onChange={(e) => setFormData({ ...formData, village: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.village ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter village name"
+              />
+              {validationErrors.village && <p className="text-red-500 text-xs mt-1">{validationErrors.village}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Block <span className="text-red-500">*</span></label>
+              <input
+                name="block"
+                type="text"
+                value={formData.block}
+                onChange={(e) => setFormData({ ...formData, block: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.block ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter block name"
+              />
+              {validationErrors.block && <p className="text-red-500 text-xs mt-1">{validationErrors.block}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Official Details */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaBriefcase className="text-indigo-600" /> Official Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Department <span className="text-red-500">*</span></label>
+              <select
+                name="department"
+                value={formData.department}
+                onChange={(e) => setFormData({ ...formData, department: e.target.value, designation: "" })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.department ? 'border-red-500' : 'border-gray-300'}`}
+              >
+                <option value="">Select Department</option>
+                {DEPARTMENT_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+              {validationErrors.department && <p className="text-red-500 text-xs mt-1">{validationErrors.department}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Designation <span className="text-red-500">*</span></label>
+              <select
+                name="designation"
+                value={formData.designation}
+                onChange={(e) => setFormData({ ...formData, designation: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.designation ? 'border-red-500' : 'border-gray-300'}`}
+                disabled={!formData.department}
+              >
+                <option value="">{formData.department ? "Select Designation" : "Select Department first"}</option>
+                {formData.department && DESIGNATION_OPTIONS[formData.department]?.map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+              {validationErrors.designation && <p className="text-red-500 text-xs mt-1">{validationErrors.designation}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Contact Details */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaPhone className="text-indigo-600" /> Contact Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mobile Number <span className="text-red-500">*</span></label>
+              <input
+                name="mobileNumber"
+                type="text"
+                value={formData.mobileNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, mobileNumber: val });
+                }}
+                maxLength="10"
+                className={`w-full p-2 border rounded-lg ${validationErrors.mobileNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter 10 digit mobile number"
+              />
+              {validationErrors.mobileNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.mobileNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Alternate Mobile Number</label>
+              <input
+                name="alternateMobile"
+                type="text"
+                value={formData.alternateMobile}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, alternateMobile: val });
+                }}
+                maxLength="10"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="Enter alternate mobile number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Personal Email ID</label>
+              <input
+                name="personalEmail"
+                type="email"
+                value={formData.personalEmail}
+                onChange={(e) => setFormData({ ...formData, personalEmail: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.personalEmail ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter personal email"
+              />
+              {validationErrors.personalEmail && <p className="text-red-500 text-xs mt-1">{validationErrors.personalEmail}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Official Email ID</label>
+              <input
+                name="officialEmail"
+                type="email"
+                value={formData.officialEmail}
+                onChange={(e) => setFormData({ ...formData, officialEmail: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.officialEmail ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter official email"
+              />
+              {validationErrors.officialEmail && <p className="text-red-500 text-xs mt-1">{validationErrors.officialEmail}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Emergency Contact Number</label>
+              <input
+                name="emergencyContact"
+                type="text"
+                value={formData.emergencyContact}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, emergencyContact: val });
+                }}
+                maxLength="10"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="Enter emergency contact"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Employment Details */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaCalendarAlt className="text-indigo-600" /> Employment Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Date of Joining <span className="text-red-500">*</span></label>
+              <input
+                name="dateOfJoining"
+                type="date"
+                value={formData.dateOfJoining}
+                onChange={(e) => setFormData({ ...formData, dateOfJoining: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.dateOfJoining ? 'border-red-500' : 'border-gray-300'}`}
+                max={new Date().toISOString().split('T')[0]}
+              />
+              {validationErrors.dateOfJoining && <p className="text-red-500 text-xs mt-1">{validationErrors.dateOfJoining}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Employee ID (Auto Generated)</label>
+              <input
+                type="text"
+                value={formData.employeeId}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-mono text-indigo-600 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Vendor/Store/Channel Partner Form
+  const renderVendorForm = (formData, setFormData, isEdit = false) => {
+    return (
+      <div className="space-y-6">
+        {/* Organization Details */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaBuilding className="text-indigo-600" /> Organization Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Organization Name <span className="text-red-500">*</span></label>
+              <input
+                name="organizationName"
+                type="text"
+                value={formData.organizationName}
+                onChange={(e) => setFormData({ ...formData, organizationName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.organizationName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter organization name"
+              />
+              {validationErrors.organizationName && <p className="text-red-500 text-xs mt-1">{validationErrors.organizationName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">GST Number (Optional)</label>
+              <input
+                name="gstNumber"
+                type="text"
+                value={formData.gstNumber}
+                onChange={(e) => setFormData({ ...formData, gstNumber: e.target.value.toUpperCase() })}
+                className="w-full p-2 border border-gray-300 rounded-lg uppercase"
+                placeholder="Enter GST number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Contact Person Name <span className="text-red-500">*</span></label>
+              <input
+                name="contactPersonName"
+                type="text"
+                value={formData.contactPersonName}
+                onChange={(e) => setFormData({ ...formData, contactPersonName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.contactPersonName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter contact person name"
+              />
+              {validationErrors.contactPersonName && <p className="text-red-500 text-xs mt-1">{validationErrors.contactPersonName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mobile Number <span className="text-red-500">*</span></label>
+              <input
+                name="contactMobile"
+                type="text"
+                value={formData.contactMobile}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, contactMobile: val });
+                }}
+                maxLength="10"
+                className={`w-full p-2 border rounded-lg ${validationErrors.contactMobile ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter 10 digit mobile number"
+              />
+              {validationErrors.contactMobile && <p className="text-red-500 text-xs mt-1">{validationErrors.contactMobile}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Email ID</label>
+              <input
+                name="contactEmail"
+                type="email"
+                value={formData.contactEmail}
+                onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.contactEmail ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter email address"
+              />
+              {validationErrors.contactEmail && <p className="text-red-500 text-xs mt-1">{validationErrors.contactEmail}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Address <span className="text-red-500">*</span></label>
+              <textarea
+                name="address"
+                value={formData.address}
+                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.address ? 'border-red-500' : 'border-gray-300'}`}
+                rows="2"
+                placeholder="Enter full address"
+              />
+              {validationErrors.address && <p className="text-red-500 text-xs mt-1">{validationErrors.address}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Interested LOB Selection */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaFileAlt className="text-indigo-600" /> Interested LOB Selection
+          </h4>
+          <div className="flex gap-2 mb-3">
+            <button
+              type="button"
+              onClick={() => handleSelectAllLOBs(isEdit)}
+              className="px-3 py-1 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700"
+            >
+              Select All
+            </button>
+            <button
+              type="button"
+              onClick={() => handleClearAllLOBs(isEdit)}
+              className="px-3 py-1 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700"
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 max-h-60 overflow-y-auto p-2 border rounded-lg">
+            {LOB_OPTIONS.map((lob) => (
+              <label key={lob} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={formData.interestedLobs?.includes(lob) || false}
+                  onChange={() => handleLOBChange(lob, isEdit)}
+                  className="rounded text-indigo-600"
+                />
+                <span className="truncate">{lob}</span>
+              </label>
+            ))}
+          </div>
+          {formData.interestedLobs && formData.interestedLobs.length > 0 && (
+            <p className="text-xs text-gray-500 mt-2">Selected: {formData.interestedLobs.length} LOB(s)</p>
+          )}
+        </div>
+
+        {/* Auto Generated Code */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Auto Generated Code</label>
+              <input
+                type="text"
+                value={formData.generatedCode}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-mono text-indigo-600 font-semibold"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Render Add/Edit Form
+  const renderUserForm = (formData, setFormData, isEdit = false) => {
+    const isEmployee = formData.userType === "Employee";
+    const isVendor = ["Vendor", "Store", "Channel Partner"].includes(formData.userType);
+
+    return (
+      <div className="space-y-4">
+        {/* User Type Selection */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <label className="text-sm font-medium text-gray-700">User Type <span className="text-red-500">*</span></label>
+          <select
+            value={formData.userType}
+            onChange={(e) => handleUserTypeChange(e.target.value, isEdit)}
+            className="w-full p-2 border border-gray-300 rounded-lg"
+          >
+            {USER_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+          </select>
+        </div>
+
+        {/* Employee Form */}
+        {isEmployee && renderEmployeeForm(formData, setFormData, isEdit)}
+
+        {/* Vendor/Store/Channel Partner Form */}
+        {isVendor && renderVendorForm(formData, setFormData, isEdit)}
+
+        {/* Password - Common for all */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaUserPlus className="text-indigo-600" /> Account Credentials
+          </h4>
           <div className="relative">
             <input
+              name="password"
               type={showPassword ? "text" : "password"}
-              placeholder="Password"
-              value={newUser.password}
-              onChange={(e) =>
-                setNewUser({ ...newUser, password: e.target.value })
-              }
-              className="w-full p-3 border rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 text-sm sm:text-base"
-              required
+              placeholder={isEdit ? "New Password (optional)" : "Password *"}
+              value={formData.password}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+              className={`w-full p-2 border rounded-lg ${validationErrors.password ? 'border-red-500' : 'border-gray-300'}`}
+              required={!isEdit}
             />
             <button
               type="button"
@@ -263,164 +1701,81 @@ function UserManagement() {
               {showPassword ? <FaEyeSlash /> : <FaEye />}
             </button>
           </div>
-          <input
-            type="text"
-            placeholder="Designation"
-            value={newUser.designation}
-            onChange={(e) =>
-              setNewUser({ ...newUser, designation: e.target.value })
-            }
-            className="p-3 border rounded-lg"
-          />
-          <select
-            value={newUser.role}
-            onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
-            className="p-3 border rounded-lg"
-          >
-            <option value="Employee">Employee</option>
-            <option value="External Vendor">External Vendor</option>
-            <option value="Admin">Admin</option>
-          </select>
-          {newUser.role === "External Vendor" && (
-            <>
-              <input
-                type="text"
-                placeholder="GST"
-                value={newUser.gst}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, gst: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="PAN Card"
-                value={newUser.pan}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, pan: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Store/Outlet Name"
-                value={newUser.storeName}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, storeName: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Owner Name"
-                value={newUser.ownerName}
-                onChange={(e) =>
-                  setNewUser({ ...newUser, ownerName: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Cancel Check (Image)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) =>
-                    setNewUser({ ...newUser, cancelCheck: e.target.files[0] })
-                  }
-                  className="p-3 border rounded-lg w-full"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  GST Certificate (PDF)
-                </label>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      if (
-                        file.type !== "application/pdf" ||
-                        !file.name.toLowerCase().endsWith(".pdf")
-                      ) {
-                        alert(
-                          "Please select a valid PDF file (must have .pdf extension and correct format)."
-                        );
-                        e.target.value = ""; // Clear the input
-                        return;
-                      }
-                      setNewUser({ ...newUser, gstCertificate: file });
-                    }
-                  }}
-                  className="p-3 border rounded-lg w-full"
-                />
-              </div>
-              {/* New Aadhar Upload Field */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Aadhar Card (Image/PDF)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*,application/pdf"
-                  onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      if (
-                        !file.type.startsWith('image/') &&
-                        file.type !== 'application/pdf'
-                      ) {
-                        alert(
-                          "Please select a valid image or PDF file for Aadhar Card."
-                        );
-                        e.target.value = ""; // Clear the input
-                        return;
-                      }
-                      setNewUser({ ...newUser, aadharCard: file });
-                    }
-                  }}
-                  className="p-3 border rounded-lg w-full"
-                />
-              </div>
-              <input
-                type="text"
-                placeholder="Assign to Salesperson"
-                value={newUser.assignedSalesperson}
-                onChange={(e) =>
-                  setNewUser({
-                    ...newUser,
-                    assignedSalesperson: e.target.value,
-                  })
-                }
-                className="p-3 border rounded-lg"
-              />
-            </>
-          )}
+          {validationErrors.password && <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>}
+        </div>
+      </div>
+    );
+  };
+
+  if (!isAdmin) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <FaExclamationCircle className="h-12 w-12 text-red-500 mx-auto mb-3" />
+          <h3 className="text-lg font-semibold text-gray-700">Access Denied</h3>
+          <p className="text-gray-500">Admin privileges required to access this page.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5 }}
+      className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8"
+    >
+      <div className="flex justify-between items-center">
+        <h2 className="text-2xl font-semibold text-gray-900">User Management</h2>
+        <div className="text-sm text-gray-500">
+          Total Users: {users.length}
+        </div>
+      </div>
+
+      {/* Add New User Form */}
+      <div className="bg-gray-50 p-6 rounded-xl border border-gray-100">
+        <h3 className="text-xl font-medium text-gray-800 mb-4 flex items-center gap-2">
+          <FaUserPlus className="text-indigo-600" /> Add New User
+        </h3>
+        <form onSubmit={handleAddUser}>
+          {renderUserForm(newUser, setNewUser, false)}
+          
           <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
             type="submit"
-            className="sm:col-span-2 bg-indigo-600 text-white py-2 px-4 rounded-lg"
+            disabled={isLoading}
+            className="mt-6 w-full bg-indigo-600 text-white py-3 px-4 rounded-lg hover:bg-indigo-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Add User
+            {isLoading ? (
+              <>
+                <FaSpinner className="animate-spin" />
+                Adding User...
+              </>
+            ) : (
+              <>
+                <FaUserPlus />
+                Add User
+              </>
+            )}
           </motion.button>
         </form>
       </div>
 
+      {/* Users List */}
       <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg border border-gray-100 overflow-x-auto">
         {users.length === 0 ? (
-          <p className="text-center py-4">No users available.</p>
+          <p className="text-center py-4 text-gray-500">No users available.</p>
         ) : (
-          <table className="w-full table-auto min-w-[600px]">
+          <table className="w-full table-auto min-w-[800px]">
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="p-3 font-medium">Username</th>
-                <th className="p-3 font-medium">Role</th>
-                <th className="p-3 font-medium">Email</th>
-                <th className="p-3 font-medium">Employee ID</th>
+                <th className="p-3 font-medium">User/Org Name</th>
+                <th className="p-3 font-medium">Type</th>
+                <th className="p-3 font-medium">Contact</th>
+                <th className="p-3 font-medium">Code/ID</th>
+                <th className="p-3 font-medium">Department</th>
                 <th className="p-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -433,16 +1788,33 @@ function UserManagement() {
                   transition={{ duration: 0.3 }}
                   className="border-b hover:bg-gray-50"
                 >
-                  <td className="p-3">{user.username}</td>
-                  <td className="p-3">{user.role}</td>
-                  <td className="p-3">{user.email}</td>
-                  <td className="p-3">{user.employeeId}</td>
+                  <td className="p-3 font-medium">
+                    {user.userType === "Employee" ? user.fullName || user.username : user.organizationName || user.storeName}
+                  </td>
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded-full text-xs ${
+                      user.userType === "Admin" ? "bg-purple-100 text-purple-800" :
+                      user.userType === "Employee" ? "bg-blue-100 text-blue-800" :
+                      user.userType === "Vendor" ? "bg-green-100 text-green-800" :
+                      user.userType === "Store" ? "bg-yellow-100 text-yellow-800" :
+                      user.userType === "Channel Partner" ? "bg-orange-100 text-orange-800" :
+                      "bg-gray-100 text-gray-800"
+                    }`}>
+                      {user.userType || user.role}
+                    </span>
+                  </td>
+                  <td className="p-3">{user.mobile || user.contactMobile || user.mobileNumber}</td>
+                  <td className="p-3 font-mono text-indigo-600 text-sm">
+                    {user.employeeId || user.generatedCode || "-"}
+                  </td>
+                  <td className="p-3">{user.department || "-"}</td>
                   <td className="p-3 flex space-x-2">
                     <motion.button
                       whileHover={{ scale: 1.1 }}
                       whileTap={{ scale: 0.9 }}
                       onClick={() => handleEditUser(user)}
                       className="text-indigo-600 hover:text-indigo-800 p-1"
+                      title="Edit User"
                     >
                       <FaPencilAlt />
                     </motion.button>
@@ -451,6 +1823,7 @@ function UserManagement() {
                       whileTap={{ scale: 0.9 }}
                       onClick={() => handleDeleteUser(user._id)}
                       className="text-red-600 hover:text-red-800 p-1"
+                      title="Delete User"
                     >
                       <FaTrash />
                     </motion.button>
@@ -462,270 +1835,71 @@ function UserManagement() {
         )}
       </div>
 
-      {isModalOpen && editUser && (
-        <motion.div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <motion.div className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-2xl mx-4 overflow-y-auto max-h-[80vh]">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Edit User</h3>
-              <motion.button onClick={closeModal}>
-                <FaTimes />
+      {/* Edit Modal */}
+      {isModalOpen && editUserState && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
+          onClick={closeModal}
+        >
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-4xl mx-4 overflow-y-auto max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
+              <h3 className="text-xl font-semibold flex items-center gap-2">
+                <FaPencilAlt className="text-indigo-600" /> Edit User
+                <span className="text-sm font-normal text-gray-500 ml-2">
+                  ({editUserState.userType || editUserState.role})
+                </span>
+              </h3>
+              <motion.button
+                onClick={closeModal}
+                className="text-gray-500 hover:text-gray-700 p-1"
+              >
+                <FaTimes className="h-5 w-5" />
               </motion.button>
             </div>
-            <form
-              onSubmit={handleUpdateUser}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-4"
-            >
-              <input
-                type="text"
-                placeholder="Username"
-                value={editUser.username || ""}
-                onChange={(e) =>
-                  setEditUser({ ...editUser, username: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <input
-                type="email"
-                placeholder="Email"
-                value={editUser.email || ""}
-                onChange={(e) =>
-                  setEditUser({ ...editUser, email: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <input
-                type="text"
-                placeholder="Mobile Number"
-                value={editUser.mobile || ""}
-                onChange={(e) =>
-                  setEditUser({ ...editUser, mobile: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  placeholder="New Password (optional)"
-                  value={editUser.password || ""}
-                  onChange={(e) =>
-                    setEditUser({ ...editUser, password: e.target.value })
-                  }
-                  className="w-full p-3 border rounded-lg"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-600 hover:text-gray-800"
-                >
-                  {showPassword ? <FaEyeSlash /> : <FaEye />}
-                </button>
-              </div>
-              <input
-                type="text"
-                placeholder="Designation"
-                value={editUser.designation || ""}
-                onChange={(e) =>
-                  setEditUser({ ...editUser, designation: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              />
-              <select
-                value={editUser.role || "Employee"}
-                onChange={(e) =>
-                  setEditUser({ ...editUser, role: e.target.value })
-                }
-                className="p-3 border rounded-lg"
-              >
-                <option value="Employee">Employee</option>
-                <option value="External Vendor">External Vendor</option>
-                <option value="Admin">Admin</option>
-              </select>
-              {editUser.role === "External Vendor" && (
-                <>
-                  <input
-                    type="text"
-                    placeholder="GST"
-                    value={editUser.gst || ""}
-                    onChange={(e) =>
-                      setEditUser({ ...editUser, gst: e.target.value })
-                    }
-                    className="p-3 border rounded-lg"
-                  />
-                  <input
-                    type="text"
-                    placeholder="PAN Card"
-                    value={editUser.pan || ""}
-                    onChange={(e) =>
-                      setEditUser({ ...editUser, pan: e.target.value })
-                    }
-                    className="p-3 border rounded-lg"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Store/Outlet Name"
-                    value={editUser.storeName || ""}
-                    onChange={(e) =>
-                      setEditUser({ ...editUser, storeName: e.target.value })
-                    }
-                    className="p-3 border rounded-lg"
-                  />
-                  <input
-                    type="text"
-                    placeholder="Owner Name"
-                    value={editUser.ownerName || ""}
-                    onChange={(e) =>
-                      setEditUser({ ...editUser, ownerName: e.target.value })
-                    }
-                    className="p-3 border rounded-lg"
-                  />
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Cancel Check (re-upload to change)
-                    </label>
-                    {editUser.cancelCheck && (
-                      <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Current Cancel Check:
-                        </label>
-                        <img
-                          src={editUser.cancelCheck}
-                          alt="Cancel Check"
-                          className="w-32 h-32 object-cover"
-                        />
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={(e) =>
-                        setEditUser({
-                          ...editUser,
-                          cancelCheck: e.target.files[0],
-                        })
-                      }
-                      className="p-3 border rounded-lg w-full"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      GST Certificate (re-upload to change)
-                    </label>
-                    {editUser.gstCertificate && (
-                      <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Current GST Certificate:
-                        </label>
-                        <a
-                          href={editUser.gstCertificate}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          View PDF
-                        </a>
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          if (
-                            file.type !== "application/pdf" ||
-                            !file.name.toLowerCase().endsWith(".pdf")
-                          ) {
-                            alert(
-                              "Please select a valid PDF file (must have .pdf extension and correct format)."
-                            );
-                            e.target.value = ""; // Clear the input
-                            return;
-                          }
-                          setEditUser({ ...editUser, gstCertificate: file });
-                        }
-                      }}
-                      className="p-3 border rounded-lg w-full"
-                    />
-                  </div>
-                  {/* New Aadhar Upload Field in Edit Modal */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Aadhar Card (re-upload to change)
-                    </label>
-                    {editUser.aadharCard && (
-                      <div className="mb-2">
-                        <label className="block text-sm font-medium text-gray-700">
-                          Current Aadhar Card:
-                        </label>
-                        {editUser.aadharCard.startsWith('http') ? (
-                          <a
-                            href={editUser.aadharCard}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:underline"
-                          >
-                            View File
-                          </a>
-                        ) : (
-                          <span className="text-gray-500">File uploaded</span>
-                        )}
-                      </div>
-                    )}
-                    <input
-                      type="file"
-                      accept="image/*,application/pdf"
-                      onChange={(e) => {
-                        const file = e.target.files[0];
-                        if (file) {
-                          if (
-                            !file.type.startsWith('image/') &&
-                            file.type !== 'application/pdf'
-                          ) {
-                            alert(
-                              "Please select a valid image or PDF file for Aadhar Card."
-                            );
-                            e.target.value = ""; // Clear the input
-                            return;
-                          }
-                          setEditUser({ ...editUser, aadharCard: file });
-                        }
-                      }}
-                      className="p-3 border rounded-lg w-full"
-                    />
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="Assign to Salesperson"
-                    value={editUser.assignedSalesperson || ""}
-                    onChange={(e) =>
-                      setEditUser({
-                        ...editUser,
-                        assignedSalesperson: e.target.value,
-                      })
-                    }
-                    className="p-3 border rounded-lg"
-                  />
-                </>
-              )}
-              <div className="sm:col-span-2 flex justify-end space-x-2">
+
+            <form onSubmit={handleUpdateUser}>
+              {renderUserForm(editUserState, setEditUserState, true)}
+              
+              <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
                 <motion.button
                   type="button"
                   onClick={closeModal}
-                  className="px-4 py-2 border rounded-lg"
+                  className="px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
                 >
                   Cancel
                 </motion.button>
                 <motion.button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-lg"
+                  disabled={isLoading}
+                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save
+                  {isLoading ? (
+                    <>
+                      <FaSpinner className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <FaCheck />
+                      Save Changes
+                    </>
+                  )}
                 </motion.button>
               </div>
             </form>
           </motion.div>
         </motion.div>
       )}
+
+      {/* Validation Popup */}
+      {renderValidationPopup()}
     </motion.div>
   );
 }
