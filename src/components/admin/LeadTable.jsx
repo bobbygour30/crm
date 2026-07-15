@@ -132,11 +132,31 @@ function LeadTable() {
   
   const NCB_OPTIONS = ["0%", "20%", "25%", "35%", "45%", "50%"];
   
+  // Updated Vehicle Type Options
   const VEHICLE_TYPE_OPTIONS = [
-    "Two Wheeler", "Private Car", "Taxi", "Commercial Vehicle"
+    "Two Wheeler",
+    "Private Car",
+    "Taxi",
+    "School Bus",
+    "e-Rickshaw",
+    "Auto Rickshaw",
+    "Truck",
+    "Tractor",
+    "Commercial Vehicle"
   ];
   
-  const INSURANCE_TYPE_OPTIONS = ["Comprehensive", "TP", "SAOD"];
+  // Previous Insurance Status Options
+  const PREVIOUS_INSURANCE_STATUS_OPTIONS = ["Active", "Expired", "New"];
+  
+  // Insurance Type Options
+  const INSURANCE_TYPE_OPTIONS = [
+    "Bundle Package (1 Yr OD + 1 Yr TP)",
+    "Bundle Package (1 Yr OD + 3 Yr TP)",
+    "Bundle Package (1 Yr OD + 5 Yr TP)",
+    "Comprehensive (OD+TP)",
+    "SAOD (On Damage)",
+    "TP (Third Party)"
+  ];
   
   const DEVICE_TYPE_OPTIONS = ["Mobile", "Tablet", "Laptop", "Other"];
 
@@ -171,6 +191,40 @@ function LeadTable() {
     "Star Health Insurance",
     "Aditya Birla Health Insurance",
     "Bajaj Allianz Life Insurance",
+  ];
+
+  // Manufacturer Options for Motor Insurance
+  const MANUFACTURER_OPTIONS = [
+    "Maruti Suzuki",
+    "Hyundai",
+    "Tata Motors",
+    "Mahindra",
+    "Honda",
+    "Toyota",
+    "Ford",
+    "Volkswagen",
+    "Renault",
+    "Nissan",
+    "Skoda",
+    "Kia",
+    "MG Motor",
+    "Jeep",
+    "Mercedes-Benz",
+    "BMW",
+    "Audi",
+    "Volvo",
+    "Land Rover",
+    "Jaguar",
+    "Porsche",
+    "Lamborghini",
+    "Ferrari",
+    "Maserati",
+    "Bentley",
+    "Rolls-Royce",
+    "Aston Martin",
+    "McLaren",
+    "Bugatti",
+    "Koegnigsegg"
   ];
 
   const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
@@ -217,6 +271,29 @@ function LeadTable() {
   const PREVIOUS_POLICY_CASE_OPTIONS = ["Renew Case", "Portability Case", "Fresh Case"];
   const EXPERIENCE_YEARS_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 1);
 
+  // Add-On options for Motor Insurance
+  const ADD_ON_OPTIONS = [
+    "Zero Depreciation",
+    "Engine Protection",
+    "Return to Invoice",
+    "Key Replacement",
+    "Consumables Cover",
+    "Daily Allowance",
+    "Hospital Cash Benefit",
+    "Personal Accident Cover",
+    "Legal Liability to Driver",
+    "Loss of Personal Belongings",
+    "Emergency Assistance & Towing",
+    "No Claim Bonus Protection",
+    "Electrical/Electronic Items Cover",
+    "Hydraulic System Cover",
+    "CNG/LPG Kit Cover",
+    "Driver Assistant Cover",
+    "Road Side Assistance",
+    "Garage Cover",
+    "Medical Expenses Cover"
+  ];
+
   // ============================================================
   // VALIDATION HELPERS
   // ============================================================
@@ -238,9 +315,22 @@ function LeadTable() {
     return `LEAD-${String(newNumber).padStart(5, "0")}`;
   };
 
-  // Get date restrictions - Today only (no future dates)
+  // Get date restrictions
   const getMaxDate = () => {
     return new Date().toISOString().split('T')[0];
+  };
+
+  // Get date restrictions for OD Due Date (90 days before, 60 days after)
+  const getODDueDateRestrictions = () => {
+    const today = new Date();
+    const minDate = new Date(today);
+    minDate.setDate(today.getDate() - 90);
+    const maxDate = new Date(today);
+    maxDate.setDate(today.getDate() + 60);
+    return {
+      min: minDate.toISOString().split('T')[0],
+      max: maxDate.toISOString().split('T')[0]
+    };
   };
 
   // ============================================================
@@ -292,7 +382,6 @@ function LeadTable() {
     policyType: "",
     numberOfAdults: 0,
     numberOfChildren: 0,
-    // Proposer Details - using main form data (no duplication)
     familyIncome: "",
     height: "",
     weight: "",
@@ -321,23 +410,59 @@ function LeadTable() {
     seniorOneDOB: "",
   });
 
-  // Motor Insurance
+  // Motor Insurance - Updated with new requirements
   const [motorDetails, setMotorDetails] = useState({
+    // Basic Details
     vehicleType: "",
-    insuranceType: "",
-    registrationNumber: "",
+    previousInsuranceStatus: "",
+    
+    // New Vehicle Details
+    manufacturer: "",
+    model: "",
     rtoCode: "",
-    previousPolicyStatus: "",
-    previousInsurer: "",
-    pypDueDate: "",
+    chesisNo: "",
+    yearOfManufacturing: "",
+    monthOfManufacturing: "",
+    idvAsPerInvoice: "",
+    
+    // Insurance Type
+    insuranceType: "",
+    
+    // For Active Policy
+    odDueDate: "",
+    tpDueDate: "",
+    policyNo: "",
+    previousInsurerName: "",
     idvAsPerPYP: "",
+    
+    // SAOD Specific
+    saodOdDueDate: "",
+    saodTpDueDate: "",
+    saodPolicyNo: "",
+    saodPreviousInsurerName: "",
+    saodIdvAsPerPYP: "",
+    
+    // TP Specific
+    tpDueDate: "",
+    
+    // Registration & RTO
+    registrationNumber: "",
+    autoRtoCode: "",
+    
+    // Claim & NCB
     claimTaken: "",
     ncb: "",
+    
+    // Add-On
     addOnRequired: "",
-    quoteRequired: "",
+    selectedAddOns: [],
+    
+    // Uploads
     pypFile: null,
     rcFrontFile: null,
     rcBackFile: null,
+    chesisPhoto: null,
+    invoiceCopy: null,
   });
 
   // Electronic Insurance
@@ -387,6 +512,7 @@ function LeadTable() {
   const [showPortabilityFields, setShowPortabilityFields] = useState(false);
   const [showRenewalFields, setShowRenewalFields] = useState(false);
   const [showFreshCaseFields, setShowFreshCaseFields] = useState(false);
+  const [showAddOnModal, setShowAddOnModal] = useState(false);
 
   const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -460,6 +586,20 @@ function LeadTable() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  // Auto-fetch RTO from Registration Number
+  useEffect(() => {
+    if (motorDetails.registrationNumber && motorDetails.registrationNumber.length >= 4) {
+      const reg = motorDetails.registrationNumber.toUpperCase();
+      // Extract RTO code: first 2 alphabets + numbers before next alphabet
+      const rtoMatch = reg.match(/^([A-Z]{2}[0-9]+)/);
+      if (rtoMatch) {
+        setMotorDetails(prev => ({ ...prev, autoRtoCode: rtoMatch[1] }));
+      }
+    } else {
+      setMotorDetails(prev => ({ ...prev, autoRtoCode: "" }));
+    }
+  }, [motorDetails.registrationNumber]);
 
   // ============================================================
   // API CALLS
@@ -573,7 +713,22 @@ function LeadTable() {
                     lob.includes("Two-Wheeler") || 
                     lob.includes("Taxi") ||
                     lob.includes("Commercial Vehicle") ||
-                    lob.includes("E-Rikshaw");
+                    lob.includes("E-Rikshaw") ||
+                    lob.includes("School Bus") ||
+                    lob.includes("Truck") ||
+                    lob.includes("Tractor") ||
+                    lob.includes("Auto Rickshaw") ||
+                    lob === "Private Car-OD" ||
+                    lob === "Private Car-SOD" ||
+                    lob === "Private Car-Comprehensive" ||
+                    lob === "Private Car-TP" ||
+                    lob === "Taxi-Comprehensive" ||
+                    lob === "Taxi-TP" ||
+                    lob === "Commercial Vehicle-Comprehensive" ||
+                    lob === "Commercial Vehicle-TP" ||
+                    lob === "E-Rikshaw-TP" ||
+                    lob === "E-Rikshaw-Comprehensive" ||
+                    lob === "Two-Wheeler-TP";
     const isElectronic = lob.toLowerCase().includes("mobile") || 
                          lob.toLowerCase().includes("electronic") || 
                          lob.toLowerCase().includes("equipment") ||
@@ -594,9 +749,7 @@ function LeadTable() {
     
     const members = [];
     
-    // If Proposer is a Member, first member is the Proposer
     if (healthDetails.proposerIsMember === "Yes") {
-      // Proposer is automatically the first adult
       members.push({
         id: `proposer`,
         type: 'proposer',
@@ -631,8 +784,6 @@ function LeadTable() {
         internationalCover: '',
       });
       
-      // Add remaining adults (excluding proposer)
-      // If proposer is a member, we need adults-1 more adults
       const remainingAdults = adults > 1 ? adults - 1 : 0;
       for (let i = 1; i <= remainingAdults; i++) {
         members.push({
@@ -670,7 +821,6 @@ function LeadTable() {
         });
       }
     } else {
-      // All adults (proposer is separate)
       for (let i = 1; i <= adults; i++) {
         members.push({
           id: `adult-${i}`,
@@ -708,7 +858,6 @@ function LeadTable() {
       }
     }
     
-    // Add children
     for (let i = 1; i <= children; i++) {
       members.push({
         id: `child-${i}`,
@@ -749,7 +898,7 @@ function LeadTable() {
   };
 
   // ============================================================
-  // PREVIOUS POLICY HANDLERS - Updated with Fresh Case
+  // PREVIOUS POLICY HANDLERS
   // ============================================================
   const handlePreviousPolicyChange = (value) => {
     setHealthDetails(prev => ({ ...prev, hasPreviousPolicy: value }));
@@ -998,7 +1147,7 @@ function LeadTable() {
     const errors = {};
     const errorList = [];
     
-    // Basic validation - Mandatory as per BRD
+    // Basic validation
     if (!formData.name) {
       errors.name = "Name is required";
       errorList.push({ field: "name", message: "Name is required" });
@@ -1024,9 +1173,8 @@ function LeadTable() {
       errorList.push({ field: "lob", message: "LOB is required" });
     }
     
-    // Health validation - Mandatory as per BRD
+    // Health validation
     if (showHealthSection) {
-      // Policy Type is mandatory
       if (!healthDetails.policyType) {
         errors.policyType = "Policy Type is required";
         errorList.push({ field: "policyType", message: "Policy Type is required" });
@@ -1058,19 +1206,16 @@ function LeadTable() {
         }
       }
       
-      // Aadhaar validation - 12 digits only
       if (healthDetails.aadhaarNumber && !validateAadhaar(healthDetails.aadhaarNumber)) {
         errors.aadhaar = "Aadhaar must be exactly 12 digits";
         errorList.push({ field: "aadhaarNumber", message: "Aadhaar must be exactly 12 digits" });
       }
       
-      // PAN validation - Format: ABCDE1234F
       if (healthDetails.panNumber && !validatePAN(healthDetails.panNumber)) {
         errors.pan = "PAN format: ABCDE1234F (5 letters, 4 digits, 1 letter)";
         errorList.push({ field: "panNumber", message: "PAN format: ABCDE1234F" });
       }
       
-      // DOB validation - No future dates
       if (healthDetails.seniorOneDOB) {
         const dob = new Date(healthDetails.seniorOneDOB);
         const today = new Date();
@@ -1096,7 +1241,6 @@ function LeadTable() {
         }
       }
       
-      // Previous Policy validation
       if (healthDetails.hasPreviousPolicy === "Yes") {
         if (!healthDetails.previousPolicyCase) {
           errors.previousPolicyCase = "Previous Policy Case is required";
@@ -1153,19 +1297,136 @@ function LeadTable() {
       }
     }
     
-    // Motor validation
+    // Motor validation - Updated
     if (showMotorSection) {
       if (!motorDetails.vehicleType) {
         errors.vehicleType = "Vehicle type is required";
         errorList.push({ field: "vehicleType", message: "Vehicle type is required" });
       }
+      
+      if (!motorDetails.previousInsuranceStatus) {
+        errors.previousInsuranceStatus = "Previous Insurance Status is required";
+        errorList.push({ field: "previousInsuranceStatus", message: "Previous Insurance Status is required" });
+      }
+      
       if (!motorDetails.registrationNumber) {
         errors.registration = "Registration number is required";
         errorList.push({ field: "registrationNumber", message: "Registration number is required" });
       }
+      
       if (!motorDetails.insuranceType) {
         errors.insuranceType = "Insurance type is required";
         errorList.push({ field: "insuranceType", message: "Insurance type is required" });
+      }
+      
+      // New Vehicle Details validation
+      if (motorDetails.previousInsuranceStatus === "New") {
+        if (!motorDetails.manufacturer) {
+          errors.manufacturer = "Manufacturer is required for New Vehicle";
+          errorList.push({ field: "manufacturer", message: "Manufacturer is required for New Vehicle" });
+        }
+        if (!motorDetails.model) {
+          errors.model = "Model is required for New Vehicle";
+          errorList.push({ field: "model", message: "Model is required for New Vehicle" });
+        }
+        if (!motorDetails.rtoCode) {
+          errors.rtoCode = "RTO Code is required for New Vehicle";
+          errorList.push({ field: "rtoCode", message: "RTO Code is required for New Vehicle" });
+        }
+        if (!motorDetails.chesisNo) {
+          errors.chesisNo = "Chesis No. is required for New Vehicle";
+          errorList.push({ field: "chesisNo", message: "Chesis No. is required for New Vehicle" });
+        }
+        if (!motorDetails.yearOfManufacturing) {
+          errors.yearOfManufacturing = "Year of Manufacturing is required for New Vehicle";
+          errorList.push({ field: "yearOfManufacturing", message: "Year of Manufacturing is required for New Vehicle" });
+        }
+        if (!motorDetails.monthOfManufacturing) {
+          errors.monthOfManufacturing = "Month of Manufacturing is required for New Vehicle";
+          errorList.push({ field: "monthOfManufacturing", message: "Month of Manufacturing is required for New Vehicle" });
+        }
+        if (!motorDetails.idvAsPerInvoice) {
+          errors.idvAsPerInvoice = "IDV (As per Invoice) is required for New Vehicle";
+          errorList.push({ field: "idvAsPerInvoice", message: "IDV (As per Invoice) is required for New Vehicle" });
+        }
+      }
+      
+      // Active Policy validations
+      if (motorDetails.previousInsuranceStatus === "Active") {
+        // For Comprehensive or SAOD, OD Due Date and TP Due Date are required
+        if (motorDetails.insuranceType === "Comprehensive (OD+TP)" || motorDetails.insuranceType === "SAOD (On Damage)") {
+          if (!motorDetails.odDueDate) {
+            errors.odDueDate = "OD Due Date is required for Active Policy";
+            errorList.push({ field: "odDueDate", message: "OD Due Date is required for Active Policy" });
+          }
+          if (!motorDetails.tpDueDate) {
+            errors.tpDueDate = "TP Due Date is required for Active Policy";
+            errorList.push({ field: "tpDueDate", message: "TP Due Date is required for Active Policy" });
+          }
+        }
+        
+        if (!motorDetails.policyNo) {
+          errors.policyNo = "Policy No. is required for Active Policy";
+          errorList.push({ field: "policyNo", message: "Policy No. is required for Active Policy" });
+        }
+        if (!motorDetails.previousInsurerName) {
+          errors.previousInsurerName = "Previous Insurer Name is required for Active Policy";
+          errorList.push({ field: "previousInsurerName", message: "Previous Insurer Name is required for Active Policy" });
+        }
+        if (!motorDetails.idvAsPerPYP) {
+          errors.idvAsPerPYP = "IDV (As per PYP) is required for Active Policy";
+          errorList.push({ field: "idvAsPerPYP", message: "IDV (As per PYP) is required for Active Policy" });
+        }
+        
+        // Claim and NCB validation
+        if (!motorDetails.claimTaken) {
+          errors.claimTaken = "Claim Taken is required for Active Policy";
+          errorList.push({ field: "claimTaken", message: "Claim Taken is required for Active Policy" });
+        }
+        if (motorDetails.claimTaken === "No" && !motorDetails.ncb) {
+          errors.ncb = "NCB selection is required when Claim Taken is No";
+          errorList.push({ field: "ncb", message: "NCB selection is required when Claim Taken is No" });
+        }
+      }
+      
+      // TP Insurance validation
+      if (motorDetails.insuranceType === "TP (Third Party)") {
+        if (!motorDetails.tpDueDate) {
+          errors.tpDueDate = "TP Due Date is required for TP Insurance";
+          errorList.push({ field: "tpDueDate", message: "TP Due Date is required for TP Insurance" });
+        }
+      }
+      
+      // Add-On validation
+      if (motorDetails.insuranceType !== "TP (Third Party)") {
+        if (!motorDetails.addOnRequired) {
+          errors.addOnRequired = "Add-On selection is required";
+          errorList.push({ field: "addOnRequired", message: "Add-On selection is required" });
+        }
+        if (motorDetails.addOnRequired === "Yes" && (!motorDetails.selectedAddOns || motorDetails.selectedAddOns.length === 0)) {
+          errors.selectedAddOns = "Please select at least one Add-On";
+          errorList.push({ field: "selectedAddOns", message: "Please select at least one Add-On" });
+        }
+      }
+      
+      // PYP Upload validation - Only for Active Policy
+      if (motorDetails.previousInsuranceStatus === "Active") {
+        if (!motorDetails.pypFile) {
+          errors.pypFile = "Upload PYP is required for Active Policy";
+          errorList.push({ field: "pypFile", message: "Upload PYP is required for Active Policy" });
+        }
+      }
+      
+      // RC Upload validation - Except for New Vehicle
+      if (motorDetails.previousInsuranceStatus !== "New") {
+        if (!motorDetails.rcFrontFile) {
+          errors.rcFrontFile = "RC Front Upload is required";
+          errorList.push({ field: "rcFrontFile", message: "RC Front Upload is required" });
+        }
+        if (!motorDetails.rcBackFile) {
+          errors.rcBackFile = "RC Back Upload is required";
+          errorList.push({ field: "rcBackFile", message: "RC Back Upload is required" });
+        }
       }
     }
     
@@ -1538,20 +1799,37 @@ function LeadTable() {
     });
     setMotorDetails({
       vehicleType: "",
-      insuranceType: "",
-      registrationNumber: "",
+      previousInsuranceStatus: "",
+      manufacturer: "",
+      model: "",
       rtoCode: "",
-      previousPolicyStatus: "",
-      previousInsurer: "",
-      pypDueDate: "",
+      chesisNo: "",
+      yearOfManufacturing: "",
+      monthOfManufacturing: "",
+      idvAsPerInvoice: "",
+      insuranceType: "",
+      odDueDate: "",
+      tpDueDate: "",
+      policyNo: "",
+      previousInsurerName: "",
       idvAsPerPYP: "",
+      saodOdDueDate: "",
+      saodTpDueDate: "",
+      saodPolicyNo: "",
+      saodPreviousInsurerName: "",
+      saodIdvAsPerPYP: "",
+      tpDueDate: "",
+      registrationNumber: "",
+      autoRtoCode: "",
       claimTaken: "",
       ncb: "",
       addOnRequired: "",
-      quoteRequired: "",
+      selectedAddOns: [],
       pypFile: null,
       rcFrontFile: null,
       rcBackFile: null,
+      chesisPhoto: null,
+      invoiceCopy: null,
     });
     setElectronicDetails({
       deviceType: "",
@@ -1576,6 +1854,7 @@ function LeadTable() {
     setShowPortabilityFields(false);
     setShowRenewalFields(false);
     setShowFreshCaseFields(false);
+    setShowAddOnModal(false);
     setPinFetchError("");
     setIsFetchingPin(false);
     setValidationErrors({});
@@ -1598,6 +1877,86 @@ function LeadTable() {
       socialMedia: false,
       directSource: false,
     });
+  };
+
+  // ============================================================
+  // RENDER: ADD-ON MODAL
+  // ============================================================
+  const renderAddOnModal = () => {
+    if (!showAddOnModal) return null;
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 overflow-y-auto"
+        onClick={() => setShowAddOnModal(false)}
+      >
+        <motion.div
+          initial={{ scale: 0.9, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white rounded-2xl p-6 max-w-2xl max-h-[90vh] overflow-y-auto w-full"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
+            <h2 className="text-xl font-bold flex items-center gap-2">
+              <FaShieldAlt className="text-indigo-600" /> Select Add-Ons
+            </h2>
+            <button onClick={() => setShowAddOnModal(false)} className="text-gray-500 hover:text-gray-700">
+              <FaTimes className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-sm text-gray-600 mb-4">Select the add-ons you want to include in the policy:</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {ADD_ON_OPTIONS.map((addOn) => (
+                <label key={addOn} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={motorDetails.selectedAddOns?.includes(addOn) || false}
+                    onChange={(e) => {
+                      const current = motorDetails.selectedAddOns || [];
+                      let updated;
+                      if (e.target.checked) {
+                        updated = [...current, addOn];
+                      } else {
+                        updated = current.filter(item => item !== addOn);
+                      }
+                      setMotorDetails(prev => ({ ...prev, selectedAddOns: updated }));
+                    }}
+                    className="mt-1 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-gray-700">{addOn}</span>
+                    <p className="text-xs text-gray-500">Additional coverage for your policy</p>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-4 mt-6 pt-4 border-t">
+            <button
+              type="button"
+              onClick={() => setShowAddOnModal(false)}
+              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setShowAddOnModal(false);
+              }}
+              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
+            >
+              <FaCheck /> Confirm Add-Ons
+            </button>
+          </div>
+        </motion.div>
+      </motion.div>
+    );
   };
 
   // ============================================================
@@ -2063,7 +2422,7 @@ function LeadTable() {
   };
 
   // ============================================================
-  // RENDER: HEALTH FORM - UPDATED with Active Previous Policy at top
+  // RENDER: HEALTH FORM
   // ============================================================
   const renderHealthForm = () => {
     const handleMemberRiderChange = (index, field, value) => {
@@ -2086,7 +2445,7 @@ function LeadTable() {
           <FaHeartbeat /> Health Insurance Details
         </h3>
 
-        {/* ACTIVE PREVIOUS POLICY - NOW AT THE TOP */}
+        {/* ACTIVE PREVIOUS POLICY */}
         <div className="bg-indigo-50 p-4 rounded-lg mb-4 border border-indigo-200">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -2234,7 +2593,6 @@ function LeadTable() {
             </div>
           )}
 
-          {/* Proposer Details - Using Name from main form, no duplication */}
           <div>
             <label className="text-sm font-medium text-gray-700">Proposer Name</label>
             <input
@@ -2389,7 +2747,6 @@ function LeadTable() {
             </>
           )}
 
-          {/* Aadhaar - 12 digits only */}
           <div>
             <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
             <input
@@ -2420,7 +2777,6 @@ function LeadTable() {
             />
           </div>
 
-          {/* PAN - Format: ABCDE1234F */}
           <div>
             <label className="text-sm font-medium text-gray-700">PAN Number</label>
             <input
@@ -2830,10 +3186,55 @@ function LeadTable() {
   };
 
   // ============================================================
-  // RENDER: MOTOR FORM
+  // RENDER: MOTOR FORM - UPDATED with new requirements
   // ============================================================
   const renderMotorForm = () => {
     const maxDate = getMaxDate();
+    const odRestrictions = getODDueDateRestrictions();
+    
+    // Get current year and previous years (up to 20 years back)
+    const currentYear = new Date().getFullYear();
+    const yearOptions = [];
+    for (let i = 0; i <= 20; i++) {
+      yearOptions.push(currentYear - i);
+    }
+    
+    // Month options
+    const monthOptions = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+
+    // Determine if insurance type is a Bundle Package
+    const isBundlePackage = motorDetails.insuranceType?.startsWith("Bundle Package");
+
+    // Determine if insurance type is Comprehensive or SAOD
+    const isComprehensiveOrSAOD = 
+      motorDetails.insuranceType === "Comprehensive (OD+TP)" || 
+      motorDetails.insuranceType === "SAOD (On Damage)";
+
+    // Determine if insurance type is TP
+    const isTP = motorDetails.insuranceType === "TP (Third Party)";
+
+    // Determine if showing Active Policy fields
+    const showActiveFields = motorDetails.previousInsuranceStatus === "Active";
+
+    // Determine if showing New Vehicle fields
+    const showNewVehicleFields = motorDetails.previousInsuranceStatus === "New";
+
+    // Determine if showing SAOD fields
+    const showSAODFields = motorDetails.insuranceType === "SAOD (On Damage)";
+
+    // Determine if showing TP fields
+    const showTPFields = motorDetails.insuranceType === "TP (Third Party)";
+
+    // Determine NCB display
+    const getNCBDisplay = () => {
+      if (motorDetails.claimTaken === "Yes") {
+        return "0% (Auto - Claim Taken)";
+      }
+      return motorDetails.ncb || "";
+    };
 
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
@@ -2842,194 +3243,607 @@ function LeadTable() {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Vehicle Type */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Vehicle Type</label>
+            <label className="text-sm font-medium text-gray-700">Vehicle Type <span className="text-red-500">*</span></label>
             <select
               data-field="vehicleType"
               value={motorDetails.vehicleType}
               onChange={(e) => setMotorDetails(prev => ({ ...prev, vehicleType: e.target.value }))}
               className={`w-full p-2 border rounded-lg ${validationErrors.vehicleType ? 'border-red-500' : 'border-gray-300'}`}
             >
-              <option value="">Select</option>
+              <option value="">Select Vehicle Type</option>
               {VEHICLE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
             {validationErrors.vehicleType && <p className="text-red-500 text-xs mt-1">{validationErrors.vehicleType}</p>}
           </div>
 
+          {/* Previous Insurance Status */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Insurance Type</label>
+            <label className="text-sm font-medium text-gray-700">Previous Insurance Status <span className="text-red-500">*</span></label>
             <select
-              data-field="insuranceType"
-              value={motorDetails.insuranceType}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, insuranceType: e.target.value }))}
-              className={`w-full p-2 border rounded-lg ${validationErrors.insuranceType ? 'border-red-500' : 'border-gray-300'}`}
+              data-field="previousInsuranceStatus"
+              value={motorDetails.previousInsuranceStatus}
+              onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsuranceStatus: e.target.value }))}
+              className={`w-full p-2 border rounded-lg ${validationErrors.previousInsuranceStatus ? 'border-red-500' : 'border-gray-300'}`}
             >
-              <option value="">Select</option>
-              {INSURANCE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              <option value="">Select Status</option>
+              {PREVIOUS_INSURANCE_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
-            {validationErrors.insuranceType && <p className="text-red-500 text-xs mt-1">{validationErrors.insuranceType}</p>}
+            {validationErrors.previousInsuranceStatus && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsuranceStatus}</p>}
           </div>
 
+          {/* Registration Number */}
           <div>
-            <label className="text-sm font-medium text-gray-700">Registration Number</label>
+            <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
             <input
               data-field="registrationNumber"
               type="text"
               value={motorDetails.registrationNumber}
               onChange={(e) => setMotorDetails(prev => ({ ...prev, registrationNumber: e.target.value.toUpperCase() }))}
               className={`w-full p-2 border rounded-lg uppercase ${validationErrors.registration ? 'border-red-500' : 'border-gray-300'}`}
+              placeholder="e.g., BR01AB1234"
             />
             {validationErrors.registration && <p className="text-red-500 text-xs mt-1">{validationErrors.registration}</p>}
           </div>
 
-          <div>
-            <label className="text-sm font-medium text-gray-700">RTO Code</label>
-            <input
-              type="text"
-              value={motorDetails.rtoCode}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, rtoCode: e.target.value.toUpperCase() }))}
-              placeholder="e.g., BR01"
-              className="w-full p-2 border border-gray-300 rounded-lg uppercase"
-            />
-          </div>
+          {/* Auto-fetched RTO Code */}
+          {motorDetails.autoRtoCode && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">RTO Code (Auto-fetched)</label>
+              <input
+                type="text"
+                value={motorDetails.autoRtoCode}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 uppercase"
+              />
+            </div>
+          )}
 
-          <div>
-            <label className="text-sm font-medium text-gray-700">Previous Policy Status</label>
+          {/* Insurance Type */}
+          <div className={showNewVehicleFields ? "lg:col-span-3" : ""}>
+            <label className="text-sm font-medium text-gray-700">Insurance Type <span className="text-red-500">*</span></label>
             <select
-              value={motorDetails.previousPolicyStatus}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, previousPolicyStatus: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
+              data-field="insuranceType"
+              value={motorDetails.insuranceType}
+              onChange={(e) => {
+                const selectedType = e.target.value;
+                setMotorDetails(prev => ({ 
+                  ...prev, 
+                  insuranceType: selectedType,
+                  // Reset dependent fields
+                  odDueDate: "",
+                  tpDueDate: "",
+                  saodOdDueDate: "",
+                  saodTpDueDate: "",
+                  saodPolicyNo: "",
+                  saodPreviousInsurerName: "",
+                  saodIdvAsPerPYP: "",
+                }));
+              }}
+              className={`w-full p-2 border rounded-lg ${validationErrors.insuranceType ? 'border-red-500' : 'border-gray-300'}`}
             >
-              <option value="">Select</option>
-              <option value="Active">Active</option>
-              <option value="Expired">Expired</option>
+              <option value="">Select Insurance Type</option>
+              {INSURANCE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
             </select>
+            {validationErrors.insuranceType && <p className="text-red-500 text-xs mt-1">{validationErrors.insuranceType}</p>}
+            
+            {isBundlePackage && (
+              <p className="text-xs text-blue-600 mt-1">
+                Bundle Package selected - {motorDetails.insuranceType}
+              </p>
+            )}
           </div>
+        </div>
 
-          {motorDetails.previousPolicyStatus === "Active" && (
-            <>
+        {/* New Vehicle Details Section */}
+        {showNewVehicleFields && (
+          <div className="mt-4 border-t border-blue-200 pt-4">
+            <h4 className="text-md font-semibold text-blue-600 mb-3 flex items-center gap-2">
+              <FaCar /> New Vehicle Details
+            </h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Previous Insurer</label>
+                <label className="text-sm font-medium text-gray-700">Manufacturer <span className="text-red-500">*</span></label>
                 <select
-                  value={motorDetails.previousInsurer}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsurer: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  data-field="manufacturer"
+                  value={motorDetails.manufacturer}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, manufacturer: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'}`}
                 >
-                  <option value="">Select</option>
-                  {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="">Select Manufacturer</option>
+                  {MANUFACTURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {validationErrors.manufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.manufacturer}</p>}
               </div>
+
               <div>
-                <label className="text-sm font-medium text-gray-700">PYP Due Date</label>
+                <label className="text-sm font-medium text-gray-700">Model <span className="text-red-500">*</span></label>
                 <input
-                  type="date"
-                  max={maxDate}
-                  value={motorDetails.pypDueDate}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, pypDueDate: e.target.value }))}
+                  data-field="model"
+                  type="text"
+                  value={motorDetails.model}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, model: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.model ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter model name"
+                />
+                {validationErrors.model && <p className="text-red-500 text-xs mt-1">{validationErrors.model}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">RTO Code <span className="text-red-500">*</span></label>
+                <input
+                  data-field="rtoCode"
+                  type="text"
+                  value={motorDetails.rtoCode}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, rtoCode: e.target.value.toUpperCase() }))}
+                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.rtoCode ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="e.g., BR01"
+                />
+                {validationErrors.rtoCode && <p className="text-red-500 text-xs mt-1">{validationErrors.rtoCode}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Chesis No. <span className="text-red-500">*</span></label>
+                <input
+                  data-field="chesisNo"
+                  type="text"
+                  value={motorDetails.chesisNo}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisNo: e.target.value.toUpperCase() }))}
+                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.chesisNo ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter chassis number"
+                />
+                {validationErrors.chesisNo && <p className="text-red-500 text-xs mt-1">{validationErrors.chesisNo}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Year of Manufacturing <span className="text-red-500">*</span></label>
+                <select
+                  data-field="yearOfManufacturing"
+                  value={motorDetails.yearOfManufacturing}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, yearOfManufacturing: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.yearOfManufacturing ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Select Year</option>
+                  {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
+                </select>
+                {validationErrors.yearOfManufacturing && <p className="text-red-500 text-xs mt-1">{validationErrors.yearOfManufacturing}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Month of Manufacturing <span className="text-red-500">*</span></label>
+                <select
+                  data-field="monthOfManufacturing"
+                  value={motorDetails.monthOfManufacturing}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, monthOfManufacturing: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.monthOfManufacturing ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Select Month</option>
+                  {monthOptions.map(month => <option key={month} value={month}>{month}</option>)}
+                </select>
+                {validationErrors.monthOfManufacturing && <p className="text-red-500 text-xs mt-1">{validationErrors.monthOfManufacturing}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">IDV (As per Invoice) <span className="text-red-500">*</span></label>
+                <input
+                  data-field="idvAsPerInvoice"
+                  type="number"
+                  value={motorDetails.idvAsPerInvoice}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, idvAsPerInvoice: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.idvAsPerInvoice ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter IDV amount"
+                />
+                {validationErrors.idvAsPerInvoice && <p className="text-red-500 text-xs mt-1">{validationErrors.idvAsPerInvoice}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
+                <input
+                  type="file"
+                  accept=".jpg,.jpeg,.png"
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] }))}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
+                {motorDetails.chesisPhoto && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
               </div>
+
               <div>
-                <label className="text-sm font-medium text-gray-700">IDV as per PYP</label>
+                <label className="text-sm font-medium text-gray-700">Invoice Copy (Not Mandatory)</label>
                 <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+                {motorDetails.invoiceCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Active Policy Fields */}
+        {showActiveFields && (
+          <div className="mt-4 border-t border-green-200 pt-4">
+            <h4 className="text-md font-semibold text-green-600 mb-3 flex items-center gap-2">
+              <FaShieldAlt /> Active Policy Details
+            </h4>
+            
+            {/* Comprehensive or SAOD - OD Due Date & TP Due Date */}
+            {isComprehensiveOrSAOD && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">OD Due Date <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="odDueDate"
+                    type="date"
+                    min={odRestrictions.min}
+                    max={odRestrictions.max}
+                    value={motorDetails.odDueDate}
+                    onChange={(e) => {
+                      const selected = new Date(e.target.value);
+                      const minDate = new Date(odRestrictions.min);
+                      const maxDate = new Date(odRestrictions.max);
+                      if (selected >= minDate && selected <= maxDate) {
+                        setMotorDetails(prev => ({ ...prev, odDueDate: e.target.value }));
+                      } else {
+                        alert("OD Due Date must be within 90 days before or 60 days after today");
+                      }
+                    }}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.odDueDate ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">Range: 90 days before to 60 days after today</p>
+                  {validationErrors.odDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.odDueDate}</p>}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="tpDueDate"
+                    type="date"
+                    value={motorDetails.tpDueDate}
+                    onChange={(e) => setMotorDetails(prev => ({ ...prev, tpDueDate: e.target.value }))}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.tpDueDate ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {validationErrors.tpDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpDueDate}</p>}
+                </div>
+              </div>
+            )}
+
+            {/* Common Active Policy Fields */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy No. <span className="text-red-500">*</span></label>
+                <input
+                  data-field="policyNo"
+                  type="text"
+                  value={motorDetails.policyNo}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, policyNo: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.policyNo ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter policy number"
+                />
+                {validationErrors.policyNo && <p className="text-red-500 text-xs mt-1">{validationErrors.policyNo}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Previous Insurer Name <span className="text-red-500">*</span></label>
+                <select
+                  data-field="previousInsurerName"
+                  value={motorDetails.previousInsurerName}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsurerName: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.previousInsurerName ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Select Insurer</option>
+                  {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+                {validationErrors.previousInsurerName && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsurerName}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">IDV (As per PYP) <span className="text-red-500">*</span></label>
+                <input
+                  data-field="idvAsPerPYP"
                   type="number"
                   value={motorDetails.idvAsPerPYP}
                   onChange={(e) => setMotorDetails(prev => ({ ...prev, idvAsPerPYP: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${validationErrors.idvAsPerPYP ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter IDV amount"
                 />
+                {validationErrors.idvAsPerPYP && <p className="text-red-500 text-xs mt-1">{validationErrors.idvAsPerPYP}</p>}
               </div>
+            </div>
+
+            {/* Claim & NCB Section - Only for Active Policy */}
+            <div className="mt-4 border-t border-gray-200 pt-4">
+              <h5 className="text-sm font-semibold text-gray-700 mb-3">Claim & NCB Details</h5>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Claim Taken? <span className="text-red-500">*</span></label>
+                  <select
+                    data-field="claimTaken"
+                    value={motorDetails.claimTaken}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setMotorDetails(prev => ({ 
+                        ...prev, 
+                        claimTaken: value,
+                        ncb: value === "Yes" ? "0%" : prev.ncb
+                      }));
+                    }}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.claimTaken ? 'border-red-500' : 'border-gray-300'}`}
+                  >
+                    <option value="">Select</option>
+                    {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                  {validationErrors.claimTaken && <p className="text-red-500 text-xs mt-1">{validationErrors.claimTaken}</p>}
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">NCB</label>
+                  {motorDetails.claimTaken === "Yes" ? (
+                    <div>
+                      <input
+                        type="text"
+                        value="0%"
+                        readOnly
+                        className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 text-red-600 font-semibold"
+                      />
+                      <p className="text-xs text-red-500 mt-1">Auto-set to 0% as Claim Taken is Yes</p>
+                    </div>
+                  ) : (
+                    <select
+                      data-field="ncb"
+                      value={motorDetails.ncb}
+                      onChange={(e) => setMotorDetails(prev => ({ ...prev, ncb: e.target.value }))}
+                      className={`w-full p-2 border rounded-lg ${validationErrors.ncb ? 'border-red-500' : 'border-gray-300'}`}
+                      disabled={motorDetails.claimTaken === ""}
+                    >
+                      <option value="">{motorDetails.claimTaken === "" ? "Select Claim Taken first" : "Select NCB"}</option>
+                      {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
+                  )}
+                  {validationErrors.ncb && <p className="text-red-500 text-xs mt-1">{validationErrors.ncb}</p>}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* SAOD Specific Fields */}
+        {showSAODFields && showActiveFields && (
+          <div className="mt-4 border-t border-purple-200 pt-4">
+            <h5 className="text-sm font-semibold text-purple-600 mb-3">SAOD (On Damage) Details</h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
-                <label className="text-sm font-medium text-gray-700">Claim Taken?</label>
-                <select
-                  value={motorDetails.claimTaken}
+                <label className="text-sm font-medium text-gray-700">OD Due Date <span className="text-red-500">*</span></label>
+                <input
+                  data-field="saodOdDueDate"
+                  type="date"
+                  min={odRestrictions.min}
+                  max={odRestrictions.max}
+                  value={motorDetails.saodOdDueDate}
                   onChange={(e) => {
-                    setMotorDetails(prev => ({ ...prev, claimTaken: e.target.value }));
-                    if (e.target.value === "Yes") {
-                      setMotorDetails(prev => ({ ...prev, ncb: "NIL" }));
+                    const selected = new Date(e.target.value);
+                    const minDate = new Date(odRestrictions.min);
+                    const maxDate = new Date(odRestrictions.max);
+                    if (selected >= minDate && selected <= maxDate) {
+                      setMotorDetails(prev => ({ ...prev, saodOdDueDate: e.target.value }));
+                    } else {
+                      alert("OD Due Date must be within 90 days before or 60 days after today");
                     }
                   }}
                   className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+                <p className="text-xs text-gray-500 mt-1">Range: 90 days before to 60 days after today</p>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
+                <input
+                  data-field="saodTpDueDate"
+                  type="date"
+                  value={motorDetails.saodTpDueDate}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodTpDueDate: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Previous Policy No. <span className="text-red-500">*</span></label>
+                <input
+                  data-field="saodPolicyNo"
+                  type="text"
+                  value={motorDetails.saodPolicyNo}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodPolicyNo: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Previous Insurer Name <span className="text-red-500">*</span></label>
+                <select
+                  data-field="saodPreviousInsurerName"
+                  value={motorDetails.saodPreviousInsurerName}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodPreviousInsurerName: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                >
+                  <option value="">Select Insurer</option>
+                  {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">IDV (As per PYP) <span className="text-red-500">*</span></label>
+                <input
+                  data-field="saodIdvAsPerPYP"
+                  type="number"
+                  value={motorDetails.saodIdvAsPerPYP}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodIdvAsPerPYP: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  placeholder="Enter IDV amount"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TP Insurance Fields */}
+        {showTPFields && (
+          <div className="mt-4 border-t border-orange-200 pt-4">
+            <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
+                <input
+                  data-field="tpDueDate"
+                  type="date"
+                  value={motorDetails.tpDueDate}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, tpDueDate: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.tpDueDate ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {validationErrors.tpDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpDueDate}</p>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add-On Section - For all types except TP */}
+        {!isTP && (
+          <div className="mt-4 border-t border-pink-200 pt-4">
+            <h5 className="text-sm font-semibold text-pink-600 mb-3 flex items-center gap-2">
+              <FaShieldAlt /> Add-On
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">Add-On Required? <span className="text-red-500">*</span></label>
+                <select
+                  data-field="addOnRequired"
+                  value={motorDetails.addOnRequired}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMotorDetails(prev => ({ 
+                      ...prev, 
+                      addOnRequired: value,
+                      selectedAddOns: value === "No" ? [] : prev.selectedAddOns
+                    }));
+                    if (value === "Yes") {
+                      setShowAddOnModal(true);
+                    }
+                  }}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.addOnRequired ? 'border-red-500' : 'border-gray-300'}`}
                 >
                   <option value="">Select</option>
                   {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {validationErrors.addOnRequired && <p className="text-red-500 text-xs mt-1">{validationErrors.addOnRequired}</p>}
               </div>
-              {motorDetails.claimTaken === "No" && (
+
+              {motorDetails.addOnRequired === "Yes" && (
                 <div>
-                  <label className="text-sm font-medium text-gray-700">NCB</label>
-                  <select
-                    value={motorDetails.ncb}
-                    onChange={(e) => setMotorDetails(prev => ({ ...prev, ncb: e.target.value }))}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  <label className="text-sm font-medium text-gray-700">Selected Add-Ons</label>
+                  <div className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 min-h-[40px]">
+                    {motorDetails.selectedAddOns && motorDetails.selectedAddOns.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {motorDetails.selectedAddOns.map((addOn, idx) => (
+                          <span key={idx} className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs">
+                            {addOn}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-sm">No add-ons selected</span>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddOnModal(true)}
+                    className="mt-1 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
                   >
-                    <option value="">Select</option>
-                    {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
+                    <FaEdit className="h-3 w-3" /> Manage Add-Ons
+                  </button>
+                  {validationErrors.selectedAddOns && <p className="text-red-500 text-xs mt-1">{validationErrors.selectedAddOns}</p>}
                 </div>
               )}
-              {motorDetails.claimTaken === "Yes" && (
+              
+              {motorDetails.addOnRequired === "No" && (
+                <div className="flex items-center text-gray-500 text-sm">
+                  <FaCheck className="text-green-500 mr-2" /> No add-ons selected
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TP Insurance - Add-On automatically set to No */}
+        {isTP && (
+          <div className="mt-4 border-t border-orange-200 pt-4">
+            <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
+              <div className="flex items-center gap-2 text-orange-700">
+                <FaShieldAlt />
+                <span className="font-medium">Add-On:</span>
+                <span className="font-bold">No</span>
+                <span className="text-sm text-orange-600">(Auto-set for TP Insurance)</span>
+              </div>
+              <input type="hidden" value="No" />
+            </div>
+          </div>
+        )}
+
+        {/* Uploads Section */}
+        <div className="mt-4 border-t border-gray-200 pt-4">
+          <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* PYP Upload - Only for Active Policy */}
+            {showActiveFields && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload PYP <span className="text-red-500">*</span></label>
+                <input
+                  data-field="pypFile"
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {motorDetails.pypFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
+              </div>
+            )}
+
+            {/* RC Upload - Except for New Vehicle */}
+            {!showNewVehicleFields && (
+              <>
                 <div>
-                  <label className="text-sm font-medium text-gray-700">NCB</label>
-                  <input type="text" value="NIL" disabled className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" />
+                  <label className="text-sm font-medium text-gray-700">RC Front Upload <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="rcFrontFile"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg"
+                    onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {motorDetails.rcFrontFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                  {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
                 </div>
-              )}
-            </>
-          )}
 
-          <div>
-            <label className="text-sm font-medium text-gray-700">Add-On Required?</label>
-            <select
-              value={motorDetails.addOnRequired}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, addOnRequired: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">Select</option>
-              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Quote Required?</label>
-            <select
-              value={motorDetails.quoteRequired}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, quoteRequired: e.target.value }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            >
-              <option value="">Select</option>
-              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Upload PYP</label>
-            <input
-              type="file"
-              accept=".pdf"
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">RC Front</label>
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">RC Back</label>
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
+                <div>
+                  <label className="text-sm font-medium text-gray-700">RC Back Upload <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="rcBackFile"
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg"
+                    onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
+                  />
+                  {motorDetails.rcBackFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                  {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
+                </div>
+              </>
+            )}
           </div>
         </div>
+
+        {/* Add-On Modal */}
+        {renderAddOnModal()}
       </div>
     );
   };
@@ -4055,8 +4869,18 @@ function LeadTable() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
                   <div>Vehicle Type: {selectedLead.motorDetails.vehicleType || "-"}</div>
                   <div>Registration: {selectedLead.motorDetails.registrationNumber || "-"}</div>
-                  <div>RTO: {selectedLead.motorDetails.rtoCode || "-"}</div>
+                  <div>Previous Status: {selectedLead.motorDetails.previousInsuranceStatus || "-"}</div>
+                  <div>Insurance Type: {selectedLead.motorDetails.insuranceType || "-"}</div>
                   <div>NCB: {selectedLead.motorDetails.ncb || "-"}</div>
+                  <div>Claim Taken: {selectedLead.motorDetails.claimTaken || "-"}</div>
+                  {selectedLead.motorDetails.manufacturer && <div>Manufacturer: {selectedLead.motorDetails.manufacturer}</div>}
+                  {selectedLead.motorDetails.model && <div>Model: {selectedLead.motorDetails.model}</div>}
+                  {selectedLead.motorDetails.chesisNo && <div>Chesis No.: {selectedLead.motorDetails.chesisNo}</div>}
+                  {selectedLead.motorDetails.yearOfManufacturing && <div>Year: {selectedLead.motorDetails.yearOfManufacturing}</div>}
+                  {selectedLead.motorDetails.monthOfManufacturing && <div>Month: {selectedLead.motorDetails.monthOfManufacturing}</div>}
+                  {selectedLead.motorDetails.selectedAddOns && selectedLead.motorDetails.selectedAddOns.length > 0 && (
+                    <div className="sm:col-span-2">Add-Ons: {selectedLead.motorDetails.selectedAddOns.join(", ")}</div>
+                  )}
                 </div>
               </div>
             )}
