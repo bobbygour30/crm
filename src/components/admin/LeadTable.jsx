@@ -1568,10 +1568,26 @@ const handleCreateLead = async (e) => {
         );
       }
       if (healthData.members) {
-        healthData.members = healthData.members.map(
-          ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => rest
-        );
+  healthData.members = healthData.members.map(
+    ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
+      const member = { ...rest };
+
+      // Strip empty enum fields
+      if (!member.wantRider) delete member.wantRider;
+      if (!member.selectedRider) delete member.selectedRider;
+
+      if (member.riderDetails) {
+        const rd = { ...member.riderDetails };
+        ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+          if (!rd[k]) delete rd[k];
+        });
+        member.riderDetails = rd;
       }
+
+      return member;
+    }
+  );
+}
 
       // ✅ Remove empty-string enum fields (schema has no '' option)
       if (!healthData.policyType) delete healthData.policyType;
@@ -1742,11 +1758,27 @@ const handleCreateLead = async (e) => {
           ({ uploadPYP, ...rest }) => rest
         );
       }
-      if (healthData.members) {
-        healthData.members = healthData.members.map(
-          ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => rest
-        );
+     if (healthData.members) {
+  healthData.members = healthData.members.map(
+    ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
+      const member = { ...rest };
+
+      // Strip empty enum fields
+      if (!member.wantRider) delete member.wantRider;
+      if (!member.selectedRider) delete member.selectedRider;
+
+      if (member.riderDetails) {
+        const rd = { ...member.riderDetails };
+        ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+          if (!rd[k]) delete rd[k];
+        });
+        member.riderDetails = rd;
       }
+
+      return member;
+    }
+  );
+}
 
       // ✅ Remove empty-string enum fields
       if (!healthData.policyType) delete healthData.policyType;
