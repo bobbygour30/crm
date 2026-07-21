@@ -377,40 +377,40 @@ function LeadTable() {
     sumInsured: "",
   });
 
-  // Health Insurance - Updated with Previous Policy Cases
-  const [healthDetails, setHealthDetails] = useState({
-    policyType: "",
-    numberOfAdults: 0,
-    numberOfChildren: 0,
-    familyIncome: "",
-    height: "",
-    weight: "",
-    qualification: "",
-    occupation: "",
-    nomineeName: "",
-    nomineeDOB: "",
-    nomineeRelationship: "",
-    aadhaarNumber: "",
-    aadhaarFile: null,
-    panNumber: "",
-    panFile: null,
-    hasPreviousPolicy: "",
-    previousPolicyCase: "",
-    experienceYears: "",
-    renewalDetails: {
-      insurerName: "",
-      policyNumber: "",
-      policyDueDate: "",
-      uploadPolicy: null,
-    },
-    portabilityDetails: [],
-    medicalRemarks: "",
-    members: [],
-    proposerIsMember: "",
-    seniorOneDOB: "",
-  });
+const [healthDetails, setHealthDetails] = useState({
+  policyType: "",
+  numberOfAdults: 0,
+  numberOfChildren: 0,
+  familyIncome: "",
+  height: "",
+  weight: "",
+  qualification: "",
+  occupation: "",
+  nomineeName: "",
+  nomineeDOB: "",
+  nomineeRelationship: "",
+  aadhaarNumber: "",
+  aadhaarFile: null,
+  panNumber: "",
+  panFile: null,
+  hasPreviousPolicy: "",
+  previousPolicyCase: "",
+  experienceYears: "",
+  proposerDOB: "",          // ✅ ADDED
+  renewalDetails: {
+    insurerName: "",
+    policyNumber: "",
+    policyDueDate: "",
+    uploadPolicy: null,
+  },
+  portabilityDetails: [],
+  medicalRemarks: "",
+  members: [],
+  proposerIsMember: "",
+  seniorOneDOB: "",
+});
 
- // Motor Insurance - Updated with new requirements
+// Motor Insurance - Updated with new requirements
 const [motorDetails, setMotorDetails] = useState({
   // Basic Details
   vehicleType: "",
@@ -430,7 +430,10 @@ const [motorDetails, setMotorDetails] = useState({
   
   // For Active Policy
   odDueDate: "",
-  tpDueDate: "",  // This is for Active Policy TP Due Date
+  tpDueDate: "",
+  policyNo: "",            // ✅ ADDED
+  previousInsurerName: "", // ✅ ADDED
+  idvAsPerPYP: "",         // ✅ ADDED
   
   // SAOD Specific
   saodOdDueDate: "",
@@ -439,8 +442,8 @@ const [motorDetails, setMotorDetails] = useState({
   saodPreviousInsurerName: "",
   saodIdvAsPerPYP: "",
   
-  // TP Specific - Renamed to avoid duplicate key
-  tpInsuranceDueDate: "",  // Changed from tpDueDate to tpInsuranceDueDate
+  // TP Specific
+  tpInsuranceDueDate: "",
   
   // Registration & RTO
   registrationNumber: "",
@@ -1514,184 +1517,347 @@ if (motorDetails.insuranceType === "TP (Third Party)") {
     }
   };
 
-  // ============================================================
-  // CREATE LEAD
-  // ============================================================
-  const handleCreateLead = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields(false)) {
-      return;
-    }
-    
-    setIsSubmitting(true);
+const handleCreateLead = async (e) => {
+  e.preventDefault();
+  
+  if (!validateAllFields(false)) {
+    return;
+  }
+  
+  setIsSubmitting(true);
 
-    const submitData = new FormData();
-    
-    submitData.append("name", formData.name);
-    submitData.append("email", formData.email);
-    submitData.append("mobileNo", formData.mobileNo);
-    submitData.append("gender", formData.gender);
-    submitData.append("source", formData.source);
-    submitData.append("remarks", formData.remarks);
-    submitData.append("lob", formData.lob);
-    submitData.append("pinCode", formData.pinCode);
-    submitData.append("state", formData.state);
-    submitData.append("city", formData.city);
-    submitData.append("sourceDependentValue", formData.sourceDependentValue);
-    submitData.append("status", "Open");
-    submitData.append("policyTenure", formData.policyTenure);
-    submitData.append("paymentTerm", formData.paymentTerm);
-    submitData.append("sumInsured", formData.sumInsured);
-    
-    if (showHealthSection) {
+  const submitData = new FormData();
+  
+  // Basic fields
+  submitData.append("name", formData.name);
+  submitData.append("email", formData.email);
+  submitData.append("mobileNo", formData.mobileNo);
+  submitData.append("gender", formData.gender);
+  submitData.append("source", formData.source);
+  submitData.append("remarks", formData.remarks);
+  submitData.append("lob", formData.lob);
+  submitData.append("pinCode", formData.pinCode);
+  submitData.append("state", formData.state);
+  submitData.append("city", formData.city);
+  submitData.append("sourceDependentValue", formData.sourceDependentValue);
+  submitData.append("status", "Open");
+  submitData.append("policyTenure", formData.policyTenure);
+  submitData.append("paymentTerm", formData.paymentTerm);
+  submitData.append("sumInsured", formData.sumInsured);
+  
+  // Health Section - ONLY if Health LOB is selected
+  if (showHealthSection) {
+    const hasHealthData = healthDetails.policyType || 
+                          healthDetails.hasPreviousPolicy === "Yes" ||
+                          healthDetails.proposerDOB ||
+                          healthDetails.nomineeName;
+
+    if (hasHealthData) {
       const healthData = { ...healthDetails };
       healthData.proposerName = formData.name;
+
+      // ✅ Remove File objects — they can't be JSON.stringify'd meaningfully
+      delete healthData.aadhaarFile;
+      delete healthData.panFile;
+      if (healthData.renewalDetails) {
+        delete healthData.renewalDetails.uploadPolicy;
+      }
+      if (healthData.portabilityDetails) {
+        healthData.portabilityDetails = healthData.portabilityDetails.map(
+          ({ uploadPYP, ...rest }) => rest
+        );
+      }
       if (healthData.members) {
-        healthData.members = healthData.members.map(member => ({
-          ...member,
-          riderDetails: member.riderDetails || {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          }
-        }));
+        healthData.members = healthData.members.map(
+          ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => rest
+        );
       }
-      submitData.append("healthDetails", JSON.stringify(healthData));
-    }
 
-    if (showMotorSection) {
-      submitData.append("motorDetails", JSON.stringify(motorDetails));
-    }
+      // ✅ Remove empty-string enum fields (schema has no '' option)
+      if (!healthData.policyType) delete healthData.policyType;
+      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+      if (!healthData.proposerDOB) delete healthData.proposerDOB;
+      if (!healthData.nomineeName) delete healthData.nomineeName;
+      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+      if (!healthData.panNumber) delete healthData.panNumber;
+      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
 
-    if (showElectronicSection) {
-      submitData.append("electronicDetails", JSON.stringify(electronicDetails));
-    }
-
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
-      });
-
-      if (res.ok) {
-        const savedLead = await res.json();
-        setLeads((prev) => [savedLead, ...prev]);
-        resetForm();
-        setShowLeadForm(false);
-        alert("Lead created successfully!");
-      } else {
-        const error = await res.json();
-        const errorMsg = error.error || error.message || "Unknown error";
-        setValidationPopup({
-          show: true,
-          errors: [{ field: "general", message: errorMsg }]
-        });
+      if (Object.keys(healthData).length > 0) {
+        submitData.append("healthDetails", JSON.stringify(healthData));
       }
-    } catch (err) {
-      console.error("Create error:", err);
+    }
+  }
+
+  // Motor Section - ONLY if Motor LOB is selected
+  if (showMotorSection) {
+    const hasMotorData = motorDetails.vehicleType || 
+                         motorDetails.previousInsuranceStatus ||
+                         motorDetails.registrationNumber ||
+                         motorDetails.insuranceType;
+    
+    if (hasMotorData) {
+      const motorData = { ...motorDetails };
+      
+      // Clean up empty values
+      if (!motorData.vehicleType) delete motorData.vehicleType;
+      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+      if (!motorData.registrationNumber) delete motorData.registrationNumber;
+      if (!motorData.insuranceType) delete motorData.insuranceType;
+      
+      // Remove empty enum fields
+      if (!motorData.claimTaken) delete motorData.claimTaken;
+      if (!motorData.addOnRequired) delete motorData.addOnRequired;
+      
+      if (Object.keys(motorData).length > 0) {
+        submitData.append("motorDetails", JSON.stringify(motorData));
+      }
+    }
+    
+    // Motor Files - Only append if they exist
+    if (motorDetails.pypFile) {
+      submitData.append("pypFile", motorDetails.pypFile);
+    }
+    if (motorDetails.rcFrontFile) {
+      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+    }
+    if (motorDetails.rcBackFile) {
+      submitData.append("rcBackFile", motorDetails.rcBackFile);
+    }
+    if (motorDetails.chesisPhoto) {
+      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+    }
+    if (motorDetails.invoiceCopy) {
+      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+    }
+  }
+
+  // Electronic Section - ONLY if Electronic LOB is selected
+  if (showElectronicSection) {
+    const hasElectronicData = electronicDetails.deviceType || 
+                              electronicDetails.dateOfPurchase || 
+                              electronicDetails.purchaseValue;
+    
+    if (hasElectronicData) {
+      const electronicData = { ...electronicDetails };
+      
+      // ✅ Remove File objects
+      delete electronicData.aadhaarFile;
+      delete electronicData.panFile;
+      
+      // Clean up empty values
+      if (!electronicData.deviceType) delete electronicData.deviceType;
+      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+      
+      if (Object.keys(electronicData).length > 0) {
+        submitData.append("electronicDetails", JSON.stringify(electronicData));
+      }
+    }
+  }
+
+  const token = localStorage.getItem("token");
+  try {
+    const res = await fetch(`${API_BASE}/api/leads`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: submitData,
+    });
+
+    if (res.ok) {
+      const savedLead = await res.json();
+      setLeads((prev) => [savedLead, ...prev]);
+      resetForm();
+      setShowLeadForm(false);
+      alert("Lead created successfully!");
+    } else {
+      const error = await res.json();
+      const errorMsg = error.error || error.message || "Unknown error";
       setValidationPopup({
         show: true,
-        errors: [{ field: "general", message: "Error: " + err.message }]
+        errors: [{ field: "general", message: errorMsg }]
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } catch (err) {
+    console.error("Create error:", err);
+    setValidationPopup({
+      show: true,
+      errors: [{ field: "general", message: "Error: " + err.message }]
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
-  // ============================================================
-  // UPDATE LEAD
-  // ============================================================
-  const handleUpdateLead = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields(true)) {
-      return;
-    }
-    
-    setIsSubmitting(true);
+ const handleUpdateLead = async (e) => {
+  e.preventDefault();
+  
+  if (!validateAllFields(true)) {
+    return;
+  }
+  
+  setIsSubmitting(true);
 
-    const submitData = new FormData();
-    
-    submitData.append("name", editLead?.name || formData.name);
-    submitData.append("email", editLead?.email || formData.email);
-    submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
-    submitData.append("gender", editLead?.gender || formData.gender);
-    submitData.append("source", editLead?.source || formData.source);
-    submitData.append("remarks", editLead?.remarks || formData.remarks);
-    submitData.append("lob", editLead?.lob || formData.lob);
-    submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
-    submitData.append("state", editLead?.state || formData.state);
-    submitData.append("city", editLead?.city || formData.city);
-    submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
-    submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
-    submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
-    submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
-    
-    submitData.append("status", workflowDetails.status);
-    submitData.append("workflowDetails", JSON.stringify(workflowDetails));
-    
-    if (showHealthSection) {
+  const submitData = new FormData();
+  
+  submitData.append("name", editLead?.name || formData.name);
+  submitData.append("email", editLead?.email || formData.email);
+  submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
+  submitData.append("gender", editLead?.gender || formData.gender);
+  submitData.append("source", editLead?.source || formData.source);
+  submitData.append("remarks", editLead?.remarks || formData.remarks);
+  submitData.append("lob", editLead?.lob || formData.lob);
+  submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
+  submitData.append("state", editLead?.state || formData.state);
+  submitData.append("city", editLead?.city || formData.city);
+  submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
+  submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
+  submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
+  submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
+  
+  submitData.append("status", workflowDetails.status);
+  submitData.append("workflowDetails", JSON.stringify(workflowDetails));
+  
+  // Health Section - with cleanup
+  if (showHealthSection) {
+    const hasHealthData = healthDetails.policyType || 
+                          healthDetails.hasPreviousPolicy === "Yes" ||
+                          healthDetails.proposerDOB ||
+                          healthDetails.nomineeName;
+
+    if (hasHealthData) {
       const healthData = { ...healthDetails };
       healthData.proposerName = formData.name;
+
+      // ✅ Remove File objects
+      delete healthData.aadhaarFile;
+      delete healthData.panFile;
+      if (healthData.renewalDetails) {
+        delete healthData.renewalDetails.uploadPolicy;
+      }
+      if (healthData.portabilityDetails) {
+        healthData.portabilityDetails = healthData.portabilityDetails.map(
+          ({ uploadPYP, ...rest }) => rest
+        );
+      }
       if (healthData.members) {
-        healthData.members = healthData.members.map(member => ({
-          ...member,
-          riderDetails: member.riderDetails || {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          }
-        }));
+        healthData.members = healthData.members.map(
+          ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => rest
+        );
       }
-      submitData.append("healthDetails", JSON.stringify(healthData));
-    }
 
-    if (showMotorSection) {
-      submitData.append("motorDetails", JSON.stringify(motorDetails));
-    }
+      // ✅ Remove empty-string enum fields
+      if (!healthData.policyType) delete healthData.policyType;
+      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+      if (!healthData.proposerDOB) delete healthData.proposerDOB;
+      if (!healthData.nomineeName) delete healthData.nomineeName;
+      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+      if (!healthData.panNumber) delete healthData.panNumber;
+      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
 
-    if (showElectronicSection) {
-      submitData.append("electronicDetails", JSON.stringify(electronicDetails));
-    }
-
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
-      });
-
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-        setShowEditModal(false);
-        setEditLead(null);
-        alert("Lead updated successfully!");
-      } else {
-        const error = await res.json();
-        setValidationPopup({
-          show: true,
-          errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
-        });
+      if (Object.keys(healthData).length > 0) {
+        submitData.append("healthDetails", JSON.stringify(healthData));
       }
-    } catch (err) {
-      console.error("Update error:", err);
+    }
+  }
+
+  // Motor Section - with cleanup
+  if (showMotorSection) {
+    const hasMotorData = motorDetails.vehicleType || 
+                         motorDetails.previousInsuranceStatus ||
+                         motorDetails.registrationNumber ||
+                         motorDetails.insuranceType;
+    
+    if (hasMotorData) {
+      const motorData = { ...motorDetails };
+      
+      if (!motorData.vehicleType) delete motorData.vehicleType;
+      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+      if (!motorData.registrationNumber) delete motorData.registrationNumber;
+      if (!motorData.insuranceType) delete motorData.insuranceType;
+      if (!motorData.claimTaken) delete motorData.claimTaken;
+      if (!motorData.addOnRequired) delete motorData.addOnRequired;
+      
+      if (Object.keys(motorData).length > 0) {
+        submitData.append("motorDetails", JSON.stringify(motorData));
+      }
+    }
+    
+    if (motorDetails.pypFile) {
+      submitData.append("pypFile", motorDetails.pypFile);
+    }
+    if (motorDetails.rcFrontFile) {
+      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+    }
+    if (motorDetails.rcBackFile) {
+      submitData.append("rcBackFile", motorDetails.rcBackFile);
+    }
+    if (motorDetails.chesisPhoto) {
+      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+    }
+    if (motorDetails.invoiceCopy) {
+      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+    }
+  }
+
+  // Electronic Section - with cleanup
+  if (showElectronicSection) {
+    const hasElectronicData = electronicDetails.deviceType || 
+                              electronicDetails.dateOfPurchase || 
+                              electronicDetails.purchaseValue;
+    
+    if (hasElectronicData) {
+      const electronicData = { ...electronicDetails };
+      
+      delete electronicData.aadhaarFile;
+      delete electronicData.panFile;
+      
+      if (!electronicData.deviceType) delete electronicData.deviceType;
+      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+      
+      if (Object.keys(electronicData).length > 0) {
+        submitData.append("electronicDetails", JSON.stringify(electronicData));
+      }
+    }
+  }
+
+  const token = localStorage.getItem("token");
+  try {
+    const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: submitData,
+    });
+
+    if (res.ok) {
+      const updatedLead = await res.json();
+      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+      setShowEditModal(false);
+      setEditLead(null);
+      alert("Lead updated successfully!");
+    } else {
+      const error = await res.json();
       setValidationPopup({
         show: true,
-        errors: [{ field: "general", message: "Error: " + err.message }]
+        errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } catch (err) {
+    console.error("Update error:", err);
+    setValidationPopup({
+      show: true,
+      errors: [{ field: "general", message: "Error: " + err.message }]
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ============================================================
   // OPEN EDIT MODAL
