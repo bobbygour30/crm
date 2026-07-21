@@ -410,60 +410,57 @@ function LeadTable() {
     seniorOneDOB: "",
   });
 
-  // Motor Insurance - Updated with new requirements
-  const [motorDetails, setMotorDetails] = useState({
-    // Basic Details
-    vehicleType: "",
-    previousInsuranceStatus: "",
-    
-    // New Vehicle Details
-    manufacturer: "",
-    model: "",
-    rtoCode: "",
-    chesisNo: "",
-    yearOfManufacturing: "",
-    monthOfManufacturing: "",
-    idvAsPerInvoice: "",
-    
-    // Insurance Type
-    insuranceType: "",
-    
-    // For Active Policy
-    odDueDate: "",
-    tpDueDate: "",
-    policyNo: "",
-    previousInsurerName: "",
-    idvAsPerPYP: "",
-    
-    // SAOD Specific
-    saodOdDueDate: "",
-    saodTpDueDate: "",
-    saodPolicyNo: "",
-    saodPreviousInsurerName: "",
-    saodIdvAsPerPYP: "",
-    
-    // TP Specific
-    tpDueDate: "",
-    
-    // Registration & RTO
-    registrationNumber: "",
-    autoRtoCode: "",
-    
-    // Claim & NCB
-    claimTaken: "",
-    ncb: "",
-    
-    // Add-On
-    addOnRequired: "",
-    selectedAddOns: [],
-    
-    // Uploads
-    pypFile: null,
-    rcFrontFile: null,
-    rcBackFile: null,
-    chesisPhoto: null,
-    invoiceCopy: null,
-  });
+ // Motor Insurance - Updated with new requirements
+const [motorDetails, setMotorDetails] = useState({
+  // Basic Details
+  vehicleType: "",
+  previousInsuranceStatus: "",
+  
+  // New Vehicle Details
+  manufacturer: "",
+  model: "",
+  rtoCode: "",
+  chesisNo: "",
+  yearOfManufacturing: "",
+  monthOfManufacturing: "",
+  idvAsPerInvoice: "",
+  
+  // Insurance Type
+  insuranceType: "",
+  
+  // For Active Policy
+  odDueDate: "",
+  tpDueDate: "",  // This is for Active Policy TP Due Date
+  
+  // SAOD Specific
+  saodOdDueDate: "",
+  saodTpDueDate: "",
+  saodPolicyNo: "",
+  saodPreviousInsurerName: "",
+  saodIdvAsPerPYP: "",
+  
+  // TP Specific - Renamed to avoid duplicate key
+  tpInsuranceDueDate: "",  // Changed from tpDueDate to tpInsuranceDueDate
+  
+  // Registration & RTO
+  registrationNumber: "",
+  autoRtoCode: "",
+  
+  // Claim & NCB
+  claimTaken: "",
+  ncb: "",
+  
+  // Add-On
+  addOnRequired: "",
+  selectedAddOns: [],
+  
+  // Uploads
+  pypFile: null,
+  rcFrontFile: null,
+  rcBackFile: null,
+  chesisPhoto: null,
+  invoiceCopy: null,
+});
 
   // Electronic Insurance
   const [electronicDetails, setElectronicDetails] = useState({
@@ -1389,13 +1386,13 @@ function LeadTable() {
         }
       }
       
-      // TP Insurance validation
-      if (motorDetails.insuranceType === "TP (Third Party)") {
-        if (!motorDetails.tpDueDate) {
-          errors.tpDueDate = "TP Due Date is required for TP Insurance";
-          errorList.push({ field: "tpDueDate", message: "TP Due Date is required for TP Insurance" });
-        }
-      }
+     // TP Insurance validation
+if (motorDetails.insuranceType === "TP (Third Party)") {
+  if (!motorDetails.tpInsuranceDueDate) {
+    errors.tpInsuranceDueDate = "TP Due Date is required for TP Insurance";
+    errorList.push({ field: "tpInsuranceDueDate", message: "TP Due Date is required for TP Insurance" });
+  }
+}
       
       // Add-On validation
       if (motorDetails.insuranceType !== "TP (Third Party)") {
@@ -1797,40 +1794,40 @@ function LeadTable() {
       proposerIsMember: "",
       seniorOneDOB: "",
     });
-    setMotorDetails({
-      vehicleType: "",
-      previousInsuranceStatus: "",
-      manufacturer: "",
-      model: "",
-      rtoCode: "",
-      chesisNo: "",
-      yearOfManufacturing: "",
-      monthOfManufacturing: "",
-      idvAsPerInvoice: "",
-      insuranceType: "",
-      odDueDate: "",
-      tpDueDate: "",
-      policyNo: "",
-      previousInsurerName: "",
-      idvAsPerPYP: "",
-      saodOdDueDate: "",
-      saodTpDueDate: "",
-      saodPolicyNo: "",
-      saodPreviousInsurerName: "",
-      saodIdvAsPerPYP: "",
-      tpDueDate: "",
-      registrationNumber: "",
-      autoRtoCode: "",
-      claimTaken: "",
-      ncb: "",
-      addOnRequired: "",
-      selectedAddOns: [],
-      pypFile: null,
-      rcFrontFile: null,
-      rcBackFile: null,
-      chesisPhoto: null,
-      invoiceCopy: null,
-    });
+   setMotorDetails({
+  vehicleType: "",
+  previousInsuranceStatus: "",
+  manufacturer: "",
+  model: "",
+  rtoCode: "",
+  chesisNo: "",
+  yearOfManufacturing: "",
+  monthOfManufacturing: "",
+  idvAsPerInvoice: "",
+  insuranceType: "",
+  odDueDate: "",
+  tpDueDate: "",
+  policyNo: "",
+  previousInsurerName: "",
+  idvAsPerPYP: "",
+  saodOdDueDate: "",
+  saodTpDueDate: "",
+  saodPolicyNo: "",
+  saodPreviousInsurerName: "",
+  saodIdvAsPerPYP: "",
+  tpInsuranceDueDate: "",  // Changed from tpDueDate
+  registrationNumber: "",
+  autoRtoCode: "",
+  claimTaken: "",
+  ncb: "",
+  addOnRequired: "",
+  selectedAddOns: [],
+  pypFile: null,
+  rcFrontFile: null,
+  rcBackFile: null,
+  chesisPhoto: null,
+  invoiceCopy: null,
+});
     setElectronicDetails({
       deviceType: "",
       otherDeviceType: "",
@@ -3687,25 +3684,25 @@ function LeadTable() {
           </div>
         )}
 
-        {/* TP Insurance Fields */}
-        {showTPFields && (
-          <div className="mt-4 border-t border-orange-200 pt-4">
-            <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
-                <input
-                  data-field="tpDueDate"
-                  type="date"
-                  value={motorDetails.tpDueDate}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, tpDueDate: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.tpDueDate ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {validationErrors.tpDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpDueDate}</p>}
-              </div>
-            </div>
-          </div>
-        )}
+      
+{showTPFields && (
+  <div className="mt-4 border-t border-orange-200 pt-4">
+    <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
+        <input
+          data-field="tpInsuranceDueDate"
+          type="date"
+          value={motorDetails.tpInsuranceDueDate}
+          onChange={(e) => setMotorDetails(prev => ({ ...prev, tpInsuranceDueDate: e.target.value }))}
+          className={`w-full p-2 border rounded-lg ${validationErrors.tpInsuranceDueDate ? 'border-red-500' : 'border-gray-300'}`}
+        />
+        {validationErrors.tpInsuranceDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpInsuranceDueDate}</p>}
+      </div>
+    </div>
+  </div>
+)}
 
         {/* Add-On Section - For all types except TP */}
         {!isTP && (
@@ -4048,10 +4045,13 @@ function LeadTable() {
     );
   };
 
-  // ============================================================
-  // RENDER: WORKFLOW FORM (Edit Modal)
-  // ============================================================
-  const renderWorkflowForm = () => (
+// ============================================================
+// RENDER: WORKFLOW FORM (Edit Modal) - UPDATED
+// ============================================================
+const renderWorkflowForm = () => {
+  const isPolicyIssued = workflowDetails.status === "Policy Issued";
+  
+  return (
     <div className="border-t-2 border-indigo-200 pt-4 mt-4">
       <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
         <FaEdit /> Workflow Management (Admin Only)
@@ -4066,99 +4066,188 @@ function LeadTable() {
               setWorkflowDetails(prev => ({ ...prev, status: e.target.value }));
               setShowInsurerQuotes(e.target.value === "Quotation Generated");
             }}
-            className="w-full p-2 border border-gray-300 rounded-lg"
+            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+            disabled={isPolicyIssued}
           >
             {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
+          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
         </div>
 
-        {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
-          <>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Quote Number</label>
-              <input
-                type="text"
-                value={workflowDetails.quoteNumber}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, quoteNumber: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div className="lg:col-span-3">
-              <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto">
-                {INSURER_OPTIONS.slice(0, 10).map(ins => (
-                  <label key={ins} className="flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={workflowDetails.selectedInsurers?.includes(ins) || false}
-                      onChange={(e) => {
-                        const current = workflowDetails.selectedInsurers || [];
-                        let updated;
-                        if (e.target.checked) {
-                          updated = [...current, ins];
-                        } else {
-                          updated = current.filter(i => i !== ins);
-                        }
-                        setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
-                      }}
-                    />
-                    {ins}
-                  </label>
-                ))}
+       {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
+  <>
+    <div className="lg:col-span-3">
+      <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
+      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+        {INSURER_OPTIONS.slice(0, 10).map(ins => (
+          <label key={ins} className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={workflowDetails.selectedInsurers?.includes(ins) || false}
+              onChange={(e) => {
+                if (isPolicyIssued) return;
+                const current = workflowDetails.selectedInsurers || [];
+                let updated;
+                if (e.target.checked) {
+                  updated = [...current, ins];
+                } else {
+                  updated = current.filter(i => i !== ins);
+                }
+                setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
+              }}
+              className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
+              disabled={isPolicyIssued}
+            />
+            {ins}
+          </label>
+        ))}
+      </div>
+      {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
+    </div>
+    {workflowDetails.selectedInsurers?.length > 0 && (
+      <div className="lg:col-span-3">
+        <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
+        {workflowDetails.selectedInsurers.map((insurer, idx) => (
+          <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+            <h6 className="font-medium text-indigo-600">{insurer}</h6>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+              <div>
+                <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
+                <input 
+                  type="text" 
+                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  placeholder="Enter quote number"
+                  value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
+                  onChange={(e) => {
+                    if (isPolicyIssued) return;
+                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                    if (!updatedQuotes[idx]) {
+                      updatedQuotes[idx] = { insurerName: insurer };
+                    }
+                    updatedQuotes[idx].quoteNumber = e.target.value;
+                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                <input 
+                  type="file" 
+                  accept=".pdf,.jpg,.jpeg" 
+                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  onChange={(e) => {
+                    if (isPolicyIssued) return;
+                    const file = e.target.files[0];
+                    if (file) {
+                      const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                      if (!updatedQuotes[idx]) {
+                        updatedQuotes[idx] = { insurerName: insurer };
+                      }
+                      updatedQuotes[idx].quoteUpload = file.name;
+                      setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                    }
+                  }}
+                />
+                {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
+                  <p className="text-xs text-green-500 mt-1">✓ {workflowDetails.insurerQuotes[idx].quoteUpload}</p>
+                )}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">Premium Amount</label>
+                <input 
+                  type="number" 
+                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  placeholder="Enter amount"
+                  value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
+                  onChange={(e) => {
+                    if (isPolicyIssued) return;
+                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                    if (!updatedQuotes[idx]) {
+                      updatedQuotes[idx] = { insurerName: insurer };
+                    }
+                    updatedQuotes[idx].premiumAmount = e.target.value;
+                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                <select 
+                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
+                  onChange={(e) => {
+                    if (isPolicyIssued) return;
+                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                    if (!updatedQuotes[idx]) {
+                      updatedQuotes[idx] = { insurerName: insurer };
+                    }
+                    updatedQuotes[idx].paymentMode = e.target.value;
+                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                  }}
+                >
+                  <option value="">Select</option>
+                  <option value="Monthly">Monthly</option>
+                  <option value="Quarterly">Quarterly</option>
+                  <option value="Half Quarterly">Half Quarterly</option>
+                  <option value="Half Yearly">Half Yearly</option>
+                  <option value="Yearly">Yearly</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                <input 
+                  type="number" 
+                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  placeholder="Enter discount"
+                  value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
+                  onChange={(e) => {
+                    if (isPolicyIssued) return;
+                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                    if (!updatedQuotes[idx]) {
+                      updatedQuotes[idx] = { insurerName: insurer };
+                    }
+                    updatedQuotes[idx].finalDiscount = e.target.value;
+                    const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
+                    const discount = parseFloat(e.target.value) || 0;
+                    updatedQuotes[idx].payableAmount = premium - discount;
+                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                  }}
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">Payable Amount</label>
+                <input 
+                  type="text" 
+                  readOnly 
+                  className="w-full p-1 border rounded bg-gray-100 text-sm"
+                  value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
+                />
               </div>
             </div>
-            {workflowDetails.selectedInsurers?.length > 0 && (
-              <div className="lg:col-span-3">
-                <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
-                {workflowDetails.selectedInsurers.map((insurer, idx) => (
-                  <div key={idx} className="border rounded-lg p-3 mb-3 bg-gray-50">
-                    <h6 className="font-medium text-indigo-600">{insurer}</h6>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                      <div>
-                        <label className="text-xs font-medium text-gray-700">Upload Quote</label>
-                        <input type="file" accept=".pdf,.jpg,.jpeg" className="w-full p-1 border rounded text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700">Premium Amount</label>
-                        <input type="number" className="w-full p-1 border rounded text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700">Payment Mode</label>
-                        <select className="w-full p-1 border rounded text-sm">
-                          <option value="">Select</option>
-                          <option value="Monthly">Monthly</option>
-                          <option value="Quarterly">Quarterly</option>
-                          <option value="Half Quarterly">Half Quarterly</option>
-                          <option value="Half Yearly">Half Yearly</option>
-                          <option value="Yearly">Yearly</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700">Final Discount</label>
-                        <input type="number" className="w-full p-1 border rounded text-sm" />
-                      </div>
-                      <div>
-                        <label className="text-xs font-medium text-gray-700">Payable Amount</label>
-                        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </>
-        )}
+          </div>
+        ))}
+      </div>
+    )}
+  </>
+)}
 
         <div>
           <label className="text-sm font-medium text-gray-700">Payment Status</label>
           <select
             value={workflowDetails.paymentStatus}
             onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
+            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+            disabled={isPolicyIssued}
           >
             <option value="">Select</option>
             {PAYMENT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
           </select>
+          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment status is locked when Policy Issued</p>}
         </div>
 
         {workflowDetails.paymentStatus === "URL Shared" && (
@@ -4169,16 +4258,18 @@ function LeadTable() {
                 type="url"
                 value={workflowDetails.paymentUrl}
                 onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentUrl: e.target.value }))}
-                className="flex-1 p-2 border border-gray-300 rounded-lg"
+                className={`flex-1 p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                disabled={isPolicyIssued}
                 placeholder="https://payment.link/..."
               />
-              {workflowDetails.paymentUrl && (
+              {workflowDetails.paymentUrl && !isPolicyIssued && (
                 <a href={workflowDetails.paymentUrl} target="_blank" rel="noopener noreferrer" 
                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
                   <FaLink /> Open
                 </a>
               )}
             </div>
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment URL is locked when Policy Issued</p>}
           </div>
         )}
 
@@ -4190,7 +4281,8 @@ function LeadTable() {
                 type="text"
                 value={workflowDetails.utrNumber}
                 onChange={(e) => setWorkflowDetails(prev => ({ ...prev, utrNumber: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                disabled={isPolicyIssued}
               />
             </div>
             <div>
@@ -4199,13 +4291,15 @@ function LeadTable() {
                 type="file"
                 accept=".pdf,.jpg,.jpeg"
                 onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
+                className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                disabled={isPolicyIssued}
               />
+              {workflowDetails.paymentSnapshot && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
             </div>
           </>
         )}
 
-        {workflowDetails.paymentStatus === "Policy Issued" && (
+        {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
           <>
             <div>
               <label className="text-sm font-medium text-gray-700">Policy Number</label>
@@ -4251,6 +4345,7 @@ function LeadTable() {
                 onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
+              {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
             </div>
           </>
         )}
@@ -4260,13 +4355,16 @@ function LeadTable() {
           <textarea
             value={workflowDetails.remarks}
             onChange={(e) => setWorkflowDetails(prev => ({ ...prev, remarks: e.target.value }))}
-            className="w-full p-2 border border-gray-300 rounded-lg"
+            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
             rows="3"
+            disabled={isPolicyIssued}
           />
+          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Remarks are locked when Policy Issued</p>}
         </div>
       </div>
     </div>
   );
+};
 
   // ============================================================
   // RENDER: LEAD FORM MODAL
