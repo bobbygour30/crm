@@ -510,11 +510,39 @@ const [motorDetails, setMotorDetails] = useState({
   const [showRenewalFields, setShowRenewalFields] = useState(false);
   const [showFreshCaseFields, setShowFreshCaseFields] = useState(false);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
+  const [employees, setEmployees] = useState([]);
+
 
   const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
   const errorRefs = useRef({});
+
+
+  // Add this function after fetchLeads
+const fetchEmployees = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const employeeList = data.filter(user => 
+        user.userType === "Employee" || user.role === "Employee"
+      );
+      setEmployees(employeeList);
+    }
+  } catch (err) {
+    console.error("Fetch employees error:", err);
+  }
+};
+
+// Add this useEffect to fetch employees when component mounts
+useEffect(() => {
+  fetchEmployees();
+}, []);
 
   // ============================================================
   // EFFECTS
@@ -4547,18 +4575,34 @@ const renderWorkflowForm = () => {
                 </select>
               </div>
 
-              {sourceDependentField && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-                  <input
-                    type="text"
-                    value={formData.sourceDependentValue}
-                    onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-              )}
-
+          
+{sourceDependentField && (
+  <div>
+    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+    {formData.source === "Employee" ? (
+      <select
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+      >
+        <option value="">Select Employee</option>
+        {employees.map((emp) => (
+          <option key={emp._id} value={emp.fullName || emp.username}>
+            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        type="text"
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+        placeholder={`Enter ${sourceDependentField}`}
+      />
+    )}
+  </div>
+)}
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
                 <textarea
@@ -4788,17 +4832,34 @@ const renderWorkflowForm = () => {
                 </select>
               </div>
 
-              {sourceDependentField && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-                  <input
-                    type="text"
-                    value={formData.sourceDependentValue}
-                    onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                    className="w-full p-2 border border-gray-300 rounded-lg"
-                  />
-                </div>
-              )}
+            
+{sourceDependentField && (
+  <div>
+    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+    {formData.source === "Employee" ? (
+      <select
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+      >
+        <option value="">Select Employee</option>
+        {employees.map((emp) => (
+          <option key={emp._id} value={emp.fullName || emp.username}>
+            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        type="text"
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+        placeholder={`Enter ${sourceDependentField}`}
+      />
+    )}
+  </div>
+)}
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
