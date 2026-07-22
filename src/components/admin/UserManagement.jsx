@@ -25,6 +25,7 @@ import {
   FaFilePdf,
   FaFileImage,
   FaExclamationCircle,
+  FaUniversity,
 } from "react-icons/fa";
 import { useState, useEffect } from "react";
 import axios from "axios";
@@ -125,59 +126,65 @@ function UserManagement() {
     "Other Insurance",
   ];
 
-  // User Types
-  const USER_TYPES = ["Employee", "Vendor", "Store", "Channel Partner", "Admin"];
+  // User Types - Removed Vendor and Store
+  const USER_TYPES = ["Employee", "Channel Partner", "Admin"];
 
-  // New User State - Employee
+  // New User State
   const [newUser, setNewUser] = useState({
     // User Type
     userType: "Employee",
     
-    // Personal Information (Employee)
+    // Personal Information (Employee & Channel Partner)
     fullName: "",
     fathersName: "",
     mothersName: "",
     dateOfBirth: "",
     
-    // Educational Qualification (Employee)
+    // Educational Qualification (Employee & Channel Partner)
     qualification: "",
     otherQualification: "",
     
-    // KYC & Document Upload (Employee)
+    // KYC & Document Upload (Employee & Channel Partner)
     aadhaarNumber: "",
     aadhaarFile: null,
     panNumber: "",
     panFile: null,
     
-    // Educational Documents (Employee)
+    // Educational Documents (Employee & Channel Partner)
     tenthMarksheet: null,
     twelfthMarksheet: null,
     ugMarksheet: null,
     pgMarksheet: null,
     
-    // Address Details (Employee)
+    // Address Details (Employee & Channel Partner)
     pinCode: "",
     state: "",
     city: "",
     village: "",
     block: "",
     
-    // Official Details (Employee)
+    // Official Details (Employee ONLY)
     department: "",
     designation: "",
     
-    // Contact Details (Employee)
+    // Contact Details (Employee & Channel Partner)
     mobileNumber: "",
     alternateMobile: "",
     personalEmail: "",
     officialEmail: "",
     emergencyContact: "",
     
-    // Employment Details (Employee)
+    // Employment Details (Employee ONLY)
     dateOfJoining: "",
     employeeId: "",
     
-    // Vendor/Store/Channel Partner Details
+    // Bank Details (Employee & Channel Partner)
+    bankName: "",
+    bankAccountNumber: "",
+    ifscCode: "",
+    bankBranch: "",
+    
+    // Organization Details (Channel Partner ONLY)
     organizationName: "",
     gstNumber: "",
     contactPersonName: "",
@@ -186,7 +193,10 @@ function UserManagement() {
     address: "",
     interestedLobs: [],
     
-    // Auto Generated Code
+    // Cancel Check (Employee & Channel Partner)
+    cancelCheck: null,
+    
+    // Auto Generated Code (Channel Partner ONLY)
     generatedCode: "",
     
     // Password
@@ -201,14 +211,12 @@ function UserManagement() {
     pan: "",
     storeName: "",
     ownerName: "",
-    cancelCheck: null,
     gstCertificate: null,
     aadharCard: null,
     assignedSalesperson: "",
   });
 
   const [editUserState, setEditUserState] = useState({
-    // Same structure as newUser for editing
     userType: "Employee",
     fullName: "",
     fathersName: "",
@@ -238,6 +246,10 @@ function UserManagement() {
     emergencyContact: "",
     dateOfJoining: "",
     employeeId: "",
+    bankName: "",
+    bankAccountNumber: "",
+    ifscCode: "",
+    bankBranch: "",
     organizationName: "",
     gstNumber: "",
     contactPersonName: "",
@@ -246,6 +258,7 @@ function UserManagement() {
     address: "",
     interestedLobs: [],
     generatedCode: "",
+    cancelCheck: null,
     password: "",
     username: "",
     email: "",
@@ -255,7 +268,6 @@ function UserManagement() {
     pan: "",
     storeName: "",
     ownerName: "",
-    cancelCheck: null,
     gstCertificate: null,
     aadharCard: null,
     assignedSalesperson: "",
@@ -268,9 +280,10 @@ function UserManagement() {
   const validatePIN = (pin) => /^[0-9]{6}$/.test(pin);
   const validateMobile = (mobile) => /^[0-9]{10}$/.test(mobile);
   const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validateIFSC = (ifsc) => /^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc);
+  const validateBankAccount = (acc) => /^[0-9]{9,18}$/.test(acc);
 
   const generateEmployeeId = (users) => {
-    // Find the highest employee ID number
     let maxNumber = 0;
     users.forEach(user => {
       if (user.employeeId && user.employeeId.startsWith('ARS')) {
@@ -284,8 +297,8 @@ function UserManagement() {
     return `ARS${String(newNumber).padStart(4, '0')}`;
   };
 
-  const generateVendorCode = (users, type) => {
-    const prefix = type === 'Vendor' ? 'CP' : type === 'Channel Partner' ? 'CP' : 'STR';
+  const generateChannelPartnerCode = (users) => {
+    const prefix = 'CP';
     let maxNumber = 0;
     users.forEach(user => {
       if (user.generatedCode && user.generatedCode.startsWith(prefix)) {
@@ -404,8 +417,8 @@ function UserManagement() {
     if (newUser.userType === "Employee" && !newUser.employeeId) {
       const id = generateEmployeeId(users);
       setNewUser(prev => ({ ...prev, employeeId: id }));
-    } else if (["Vendor", "Store", "Channel Partner"].includes(newUser.userType) && !newUser.generatedCode) {
-      const code = generateVendorCode(users, newUser.userType);
+    } else if (newUser.userType === "Channel Partner" && !newUser.generatedCode) {
+      const code = generateChannelPartnerCode(users);
       setNewUser(prev => ({ ...prev, generatedCode: code }));
     }
   }, [newUser.userType, users]);
@@ -445,8 +458,8 @@ function UserManagement() {
       if (type === "Employee") {
         const id = generateEmployeeId(users);
         setNewUser(prev => ({ ...prev, employeeId: id }));
-      } else if (["Vendor", "Store", "Channel Partner"].includes(type)) {
-        const code = generateVendorCode(users, type);
+      } else if (type === "Channel Partner") {
+        const code = generateChannelPartnerCode(users);
         setNewUser(prev => ({ ...prev, generatedCode: code }));
       }
     }
@@ -488,7 +501,11 @@ function UserManagement() {
     const errors = {};
     const errorList = [];
 
-    if (userData.userType === "Employee") {
+    const isEmployee = userData.userType === "Employee";
+    const isChannelPartner = userData.userType === "Channel Partner";
+
+    // Common validations for Employee & Channel Partner
+    if (isEmployee || isChannelPartner) {
       // Personal Information
       if (!userData.fullName) {
         errors.fullName = "Full Name is required";
@@ -547,16 +564,6 @@ function UserManagement() {
         errorList.push({ field: "block", message: "Block is required" });
       }
 
-      // Official Details
-      if (!userData.department) {
-        errors.department = "Department is required";
-        errorList.push({ field: "department", message: "Department is required" });
-      }
-      if (!userData.designation) {
-        errors.designation = "Designation is required";
-        errorList.push({ field: "designation", message: "Designation is required" });
-      }
-
       // Contact Details
       if (!userData.mobileNumber) {
         errors.mobileNumber = "Mobile Number is required";
@@ -570,6 +577,53 @@ function UserManagement() {
         errors.personalEmail = "Invalid email format";
         errorList.push({ field: "personalEmail", message: "Invalid email format" });
       }
+
+      // Bank Details - Required for both Employee and Channel Partner
+      if (!userData.bankName) {
+        errors.bankName = "Bank Name is required";
+        errorList.push({ field: "bankName", message: "Bank Name is required" });
+      }
+      if (!userData.bankAccountNumber) {
+        errors.bankAccountNumber = "Bank Account Number is required";
+        errorList.push({ field: "bankAccountNumber", message: "Bank Account Number is required" });
+      }
+      if (userData.bankAccountNumber && !validateBankAccount(userData.bankAccountNumber)) {
+        errors.bankAccountNumber = "Enter valid bank account number (9-18 digits)";
+        errorList.push({ field: "bankAccountNumber", message: "Enter valid bank account number (9-18 digits)" });
+      }
+      if (!userData.ifscCode) {
+        errors.ifscCode = "IFSC Code is required";
+        errorList.push({ field: "ifscCode", message: "IFSC Code is required" });
+      }
+      if (userData.ifscCode && !validateIFSC(userData.ifscCode)) {
+        errors.ifscCode = "Invalid IFSC Code format (e.g., SBIN0001234)";
+        errorList.push({ field: "ifscCode", message: "Invalid IFSC Code format (e.g., SBIN0001234)" });
+      }
+      if (!userData.bankBranch) {
+        errors.bankBranch = "Bank Branch is required";
+        errorList.push({ field: "bankBranch", message: "Bank Branch is required" });
+      }
+
+      // Cancel Check - Required for both Employee and Channel Partner
+      if (!isEdit && !userData.cancelCheck) {
+        errors.cancelCheck = "Cancel Check image is required";
+        errorList.push({ field: "cancelCheck", message: "Cancel Check image is required" });
+      }
+    }
+
+    // Employee-only validations
+    if (isEmployee) {
+      // Official Details
+      if (!userData.department) {
+        errors.department = "Department is required";
+        errorList.push({ field: "department", message: "Department is required" });
+      }
+      if (!userData.designation) {
+        errors.designation = "Designation is required";
+        errorList.push({ field: "designation", message: "Designation is required" });
+      }
+
+      // Official Email (Employee only)
       if (userData.officialEmail && !validateEmail(userData.officialEmail)) {
         errors.officialEmail = "Invalid email format";
         errorList.push({ field: "officialEmail", message: "Invalid email format" });
@@ -580,16 +634,10 @@ function UserManagement() {
         errors.dateOfJoining = "Date of Joining is required";
         errorList.push({ field: "dateOfJoining", message: "Date of Joining is required" });
       }
-
-      // Password for new user
-      if (!isEdit && !userData.password) {
-        errors.password = "Password is required";
-        errorList.push({ field: "password", message: "Password is required" });
-      }
     }
 
-    // Vendor/Store/Channel Partner validation
-    if (["Vendor", "Store", "Channel Partner"].includes(userData.userType)) {
+    // Channel Partner validations
+    if (isChannelPartner) {
       if (!userData.organizationName) {
         errors.organizationName = "Organization Name is required";
         errorList.push({ field: "organizationName", message: "Organization Name is required" });
@@ -614,10 +662,12 @@ function UserManagement() {
         errors.address = "Address is required";
         errorList.push({ field: "address", message: "Address is required" });
       }
-      if (!isEdit && !userData.password) {
-        errors.password = "Password is required";
-        errorList.push({ field: "password", message: "Password is required" });
-      }
+    }
+
+    // Password for new user
+    if (!isEdit && !userData.password) {
+      errors.password = "Password is required";
+      errorList.push({ field: "password", message: "Password is required" });
     }
 
     setValidationErrors(errors);
@@ -655,7 +705,6 @@ function UserManagement() {
   const handleAddUser = async (e) => {
     e.preventDefault();
     
-    // Validate based on user type
     if (!validateAllFields(newUser, false)) {
       return;
     }
@@ -663,7 +712,6 @@ function UserManagement() {
     setIsLoading(true);
     const formData = new FormData();
     
-    // Append all fields
     Object.keys(newUser).forEach((key) => {
       if (newUser[key] !== null && newUser[key] !== undefined) {
         if (key === 'interestedLobs') {
@@ -742,6 +790,10 @@ function UserManagement() {
       emergencyContact: "",
       dateOfJoining: "",
       employeeId: generateEmployeeId(users),
+      bankName: "",
+      bankAccountNumber: "",
+      ifscCode: "",
+      bankBranch: "",
       organizationName: "",
       gstNumber: "",
       contactPersonName: "",
@@ -750,6 +802,7 @@ function UserManagement() {
       address: "",
       interestedLobs: [],
       generatedCode: "",
+      cancelCheck: null,
       password: "",
       username: "",
       email: "",
@@ -759,7 +812,6 @@ function UserManagement() {
       pan: "",
       storeName: "",
       ownerName: "",
-      cancelCheck: null,
       gstCertificate: null,
       aadharCard: null,
       assignedSalesperson: "",
@@ -800,6 +852,10 @@ function UserManagement() {
       emergencyContact: user.emergencyContact || "",
       dateOfJoining: user.dateOfJoining || "",
       employeeId: user.employeeId || "",
+      bankName: user.bankName || "",
+      bankAccountNumber: user.bankAccountNumber || "",
+      ifscCode: user.ifscCode || "",
+      bankBranch: user.bankBranch || "",
       organizationName: user.organizationName || user.storeName || "",
       gstNumber: user.gstNumber || user.gst || "",
       contactPersonName: user.contactPersonName || user.ownerName || "",
@@ -808,6 +864,7 @@ function UserManagement() {
       address: user.address || "",
       interestedLobs: user.interestedLobs || [],
       generatedCode: user.generatedCode || "",
+      cancelCheck: null,
       password: "",
       username: user.username || "",
       email: user.email || "",
@@ -817,7 +874,6 @@ function UserManagement() {
       pan: user.pan || "",
       storeName: user.storeName || "",
       ownerName: user.ownerName || "",
-      cancelCheck: null,
       gstCertificate: null,
       aadharCard: null,
       assignedSalesperson: user.assignedSalesperson || "",
@@ -828,7 +884,6 @@ function UserManagement() {
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     
-    // Validate based on user type
     if (!validateAllFields(editUserState, true)) {
       return;
     }
@@ -899,6 +954,10 @@ function UserManagement() {
         emergencyContact: "",
         dateOfJoining: "",
         employeeId: "",
+        bankName: "",
+        bankAccountNumber: "",
+        ifscCode: "",
+        bankBranch: "",
         organizationName: "",
         gstNumber: "",
         contactPersonName: "",
@@ -907,6 +966,7 @@ function UserManagement() {
         address: "",
         interestedLobs: [],
         generatedCode: "",
+        cancelCheck: null,
         password: "",
         username: "",
         email: "",
@@ -916,7 +976,6 @@ function UserManagement() {
         pan: "",
         storeName: "",
         ownerName: "",
-        cancelCheck: null,
         gstCertificate: null,
         aadharCard: null,
         assignedSalesperson: "",
@@ -981,6 +1040,10 @@ function UserManagement() {
       emergencyContact: "",
       dateOfJoining: "",
       employeeId: "",
+      bankName: "",
+      bankAccountNumber: "",
+      ifscCode: "",
+      bankBranch: "",
       organizationName: "",
       gstNumber: "",
       contactPersonName: "",
@@ -989,6 +1052,7 @@ function UserManagement() {
       address: "",
       interestedLobs: [],
       generatedCode: "",
+      cancelCheck: null,
       password: "",
       username: "",
       email: "",
@@ -998,7 +1062,6 @@ function UserManagement() {
       pan: "",
       storeName: "",
       ownerName: "",
-      cancelCheck: null,
       gstCertificate: null,
       aadharCard: null,
       assignedSalesperson: "",
@@ -1085,8 +1148,6 @@ function UserManagement() {
       }
       return files;
     };
-
-    const prefix = isEdit ? "edit" : "";
 
     return (
       <div className="space-y-6">
@@ -1358,7 +1419,7 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Official Details */}
+        {/* Official Details - Employee ONLY */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaBriefcase className="text-indigo-600" /> Official Details
@@ -1475,7 +1536,7 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Employment Details */}
+        {/* Employment Details - Employee ONLY */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaCalendarAlt className="text-indigo-600" /> Employment Details
@@ -1504,15 +1565,379 @@ function UserManagement() {
             </div>
           </div>
         </div>
+
+        {/* Bank Details - Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaUniversity className="text-indigo-600" /> Bank Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Name <span className="text-red-500">*</span></label>
+              <input
+                name="bankName"
+                type="text"
+                value={formData.bankName}
+                onChange={(e) => setFormData({ ...formData, bankName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.bankName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter bank name"
+              />
+              {validationErrors.bankName && <p className="text-red-500 text-xs mt-1">{validationErrors.bankName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Account Number <span className="text-red-500">*</span></label>
+              <input
+                name="bankAccountNumber"
+                type="text"
+                value={formData.bankAccountNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 18) setFormData({ ...formData, bankAccountNumber: val });
+                }}
+                maxLength="18"
+                className={`w-full p-2 border rounded-lg ${validationErrors.bankAccountNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter account number"
+              />
+              {validationErrors.bankAccountNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.bankAccountNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">IFSC Code <span className="text-red-500">*</span></label>
+              <input
+                name="ifscCode"
+                type="text"
+                value={formData.ifscCode}
+                onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.ifscCode ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="e.g., SBIN0001234"
+              />
+              {validationErrors.ifscCode && <p className="text-red-500 text-xs mt-1">{validationErrors.ifscCode}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Branch <span className="text-red-500">*</span></label>
+              <input
+                name="bankBranch"
+                type="text"
+                value={formData.bankBranch}
+                onChange={(e) => setFormData({ ...formData, bankBranch: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.bankBranch ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter branch name"
+              />
+              {validationErrors.bankBranch && <p className="text-red-500 text-xs mt-1">{validationErrors.bankBranch}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Cancel Check - Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaFileImage className="text-indigo-600" /> Cancel Check
+          </h4>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload Cancel Check <span className="text-red-500">*</span></label>
+            <input
+              name="cancelCheck"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFormData({ ...formData, cancelCheck: e.target.files[0] })}
+              className={`w-full p-2 border rounded-lg ${validationErrors.cancelCheck ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {formData.cancelCheck && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            {validationErrors.cancelCheck && <p className="text-red-500 text-xs mt-1">{validationErrors.cancelCheck}</p>}
+          </div>
+        </div>
       </div>
     );
   };
 
-  // Render Vendor/Store/Channel Partner Form
-  const renderVendorForm = (formData, setFormData, isEdit = false) => {
+  // Render Channel Partner Form
+  const renderChannelPartnerForm = (formData, setFormData, isEdit = false) => {
     return (
       <div className="space-y-6">
-        {/* Organization Details */}
+        {/* Personal Information - Same as Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaUser className="text-indigo-600" /> Personal Information
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Full Name <span className="text-red-500">*</span></label>
+              <input
+                name="fullName"
+                type="text"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.fullName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter full name"
+              />
+              {validationErrors.fullName && <p className="text-red-500 text-xs mt-1">{validationErrors.fullName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Father's Name <span className="text-red-500">*</span></label>
+              <input
+                name="fathersName"
+                type="text"
+                value={formData.fathersName}
+                onChange={(e) => setFormData({ ...formData, fathersName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.fathersName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter father's name"
+              />
+              {validationErrors.fathersName && <p className="text-red-500 text-xs mt-1">{validationErrors.fathersName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mother's Name <span className="text-red-500">*</span></label>
+              <input
+                name="mothersName"
+                type="text"
+                value={formData.mothersName}
+                onChange={(e) => setFormData({ ...formData, mothersName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.mothersName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter mother's name"
+              />
+              {validationErrors.mothersName && <p className="text-red-500 text-xs mt-1">{validationErrors.mothersName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Date of Birth <span className="text-red-500">*</span></label>
+              <input
+                name="dateOfBirth"
+                type="date"
+                value={formData.dateOfBirth}
+                onChange={(e) => setFormData({ ...formData, dateOfBirth: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.dateOfBirth ? 'border-red-500' : 'border-gray-300'}`}
+                max={new Date().toISOString().split('T')[0]}
+              />
+              {validationErrors.dateOfBirth && <p className="text-red-500 text-xs mt-1">{validationErrors.dateOfBirth}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Educational Qualification - Same as Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaGraduationCap className="text-indigo-600" /> Educational Qualification
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Qualification <span className="text-red-500">*</span></label>
+              <select
+                name="qualification"
+                value={formData.qualification}
+                onChange={(e) => setFormData({ ...formData, qualification: e.target.value, otherQualification: "" })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.qualification ? 'border-red-500' : 'border-gray-300'}`}
+              >
+                <option value="">Select Qualification</option>
+                {QUALIFICATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              </select>
+              {validationErrors.qualification && <p className="text-red-500 text-xs mt-1">{validationErrors.qualification}</p>}
+            </div>
+            {formData.qualification === "Others" && (
+              <div>
+                <label className="text-sm font-medium text-gray-700">Specify Qualification <span className="text-red-500">*</span></label>
+                <input
+                  name="otherQualification"
+                  type="text"
+                  value={formData.otherQualification}
+                  onChange={(e) => setFormData({ ...formData, otherQualification: e.target.value })}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.otherQualification ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Specify your qualification"
+                />
+                {validationErrors.otherQualification && <p className="text-red-500 text-xs mt-1">{validationErrors.otherQualification}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* Educational Documents Upload - Dynamic */}
+          {formData.qualification && formData.qualification !== "Others" && (
+            <div className="mt-3">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">Upload Educational Documents</label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {(() => {
+                  const qual = formData.qualification;
+                  const files = [];
+                  if (qual === "Matriculation" || qual === "Intermediate" || qual === "Under Graduate" || qual === "Post Graduate") {
+                    files.push({ key: "tenthMarksheet", label: "10th Marksheet" });
+                  }
+                  if (qual === "Intermediate" || qual === "Under Graduate" || qual === "Post Graduate") {
+                    files.push({ key: "twelfthMarksheet", label: "12th Marksheet" });
+                  }
+                  if (qual === "Under Graduate" || qual === "Post Graduate") {
+                    files.push({ key: "ugMarksheet", label: "UG Marksheet" });
+                  }
+                  if (qual === "Post Graduate") {
+                    files.push({ key: "pgMarksheet", label: "PG Marksheet" });
+                  }
+                  return files.map((file) => (
+                    <div key={file.key}>
+                      <label className="text-xs font-medium text-gray-600">{file.label}</label>
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg"
+                        onChange={(e) => setFormData({ ...formData, [file.key]: e.target.files[0] })}
+                        className="w-full p-1 border border-gray-300 rounded-lg text-sm"
+                      />
+                      {formData[file.key] && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* KYC & Document Upload - Same as Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaIdCard className="text-indigo-600" /> KYC & Document Upload
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
+              <input
+                name="aadhaarNumber"
+                type="text"
+                value={formData.aadhaarNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 12) setFormData({ ...formData, aadhaarNumber: val });
+                }}
+                maxLength="12"
+                className={`w-full p-2 border rounded-lg ${validationErrors.aadhaarNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter 12 digits only"
+              />
+              {formData.aadhaarNumber && formData.aadhaarNumber.length > 0 && !validateAadhaar(formData.aadhaarNumber) && (
+                <p className="text-red-500 text-xs mt-1">Enter exactly 12 digits</p>
+              )}
+              {validationErrors.aadhaarNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.aadhaarNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg"
+                onChange={(e) => setFormData({ ...formData, aadhaarFile: e.target.files[0] })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {formData.aadhaarFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">PAN Number</label>
+              <input
+                name="panNumber"
+                type="text"
+                value={formData.panNumber}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  if (val.length <= 10) setFormData({ ...formData, panNumber: val });
+                }}
+                maxLength="10"
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.panNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="ABCDE1234F"
+              />
+              {formData.panNumber && formData.panNumber.length > 0 && !validatePAN(formData.panNumber) && (
+                <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F (5 letters, 4 digits, 1 letter)</p>
+              )}
+              {validationErrors.panNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.panNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg"
+                onChange={(e) => setFormData({ ...formData, panFile: e.target.files[0] })}
+                className="w-full p-2 border border-gray-300 rounded-lg"
+              />
+              {formData.panFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Address Details - Same as Employee */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaMapMarkerAlt className="text-indigo-600" /> Address Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">PIN/ZIP Code <span className="text-red-500">*</span></label>
+              <div className="relative">
+                <input
+                  name="pinCode"
+                  type="text"
+                  value={formData.pinCode}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val.length <= 6) {
+                      setFormData({ ...formData, pinCode: val });
+                      if (val.length < 6) {
+                        setFormData(prev => ({ ...prev, state: "", city: "" }));
+                      }
+                    }
+                  }}
+                  maxLength="6"
+                  className={`w-full p-2 border rounded-lg pr-10 ${validationErrors.pinCode ? 'border-red-500' : 'border-gray-300'}`}
+                  placeholder="Enter 6 digit PIN code"
+                />
+                {isFetchingPin && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                    <FaSpinner className="animate-spin text-indigo-500 h-5 w-5" />
+                  </div>
+                )}
+              </div>
+              {formData.pinCode && !validatePIN(formData.pinCode) && formData.pinCode.length === 6 && (
+                <p className="text-red-500 text-xs mt-1">{pinFetchError || "Invalid PIN code"}</p>
+              )}
+              {formData.pinCode && validatePIN(formData.pinCode) && formData.state && (
+                <p className="text-green-500 text-xs mt-1 flex items-center gap-1">
+                  <FaCheck className="h-3 w-3" /> {formData.city}, {formData.state}
+                </p>
+              )}
+              {validationErrors.pinCode && <p className="text-red-500 text-xs mt-1">{validationErrors.pinCode}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">State</label>
+              <input
+                type="text"
+                value={formData.state}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">City/District</label>
+              <input
+                type="text"
+                value={formData.city}
+                readOnly
+                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Village <span className="text-red-500">*</span></label>
+              <input
+                name="village"
+                type="text"
+                value={formData.village}
+                onChange={(e) => setFormData({ ...formData, village: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.village ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter village name"
+              />
+              {validationErrors.village && <p className="text-red-500 text-xs mt-1">{validationErrors.village}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Block <span className="text-red-500">*</span></label>
+              <input
+                name="block"
+                type="text"
+                value={formData.block}
+                onChange={(e) => setFormData({ ...formData, block: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.block ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter block name"
+              />
+              {validationErrors.block && <p className="text-red-500 text-xs mt-1">{validationErrors.block}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Organization Details - Channel Partner ONLY */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaBuilding className="text-indigo-600" /> Organization Details
@@ -1596,7 +2021,154 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Interested LOB Selection */}
+        {/* Contact Details - Channel Partner */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaPhone className="text-indigo-600" /> Contact Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Mobile Number <span className="text-red-500">*</span></label>
+              <input
+                name="mobileNumber"
+                type="text"
+                value={formData.mobileNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, mobileNumber: val });
+                }}
+                maxLength="10"
+                className={`w-full p-2 border rounded-lg ${validationErrors.mobileNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter 10 digit mobile number"
+              />
+              {validationErrors.mobileNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.mobileNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Alternate Mobile Number</label>
+              <input
+                name="alternateMobile"
+                type="text"
+                value={formData.alternateMobile}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, alternateMobile: val });
+                }}
+                maxLength="10"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="Enter alternate mobile number"
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Personal Email ID</label>
+              <input
+                name="personalEmail"
+                type="email"
+                value={formData.personalEmail}
+                onChange={(e) => setFormData({ ...formData, personalEmail: e.target.value })}
+                className={`w-full p-2 border rounded-lg ${validationErrors.personalEmail ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter personal email"
+              />
+              {validationErrors.personalEmail && <p className="text-red-500 text-xs mt-1">{validationErrors.personalEmail}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Emergency Contact Number</label>
+              <input
+                name="emergencyContact"
+                type="text"
+                value={formData.emergencyContact}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 10) setFormData({ ...formData, emergencyContact: val });
+                }}
+                maxLength="10"
+                className="w-full p-2 border border-gray-300 rounded-lg"
+                placeholder="Enter emergency contact"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Bank Details - Channel Partner */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaUniversity className="text-indigo-600" /> Bank Details
+          </h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Name <span className="text-red-500">*</span></label>
+              <input
+                name="bankName"
+                type="text"
+                value={formData.bankName}
+                onChange={(e) => setFormData({ ...formData, bankName: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.bankName ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter bank name"
+              />
+              {validationErrors.bankName && <p className="text-red-500 text-xs mt-1">{validationErrors.bankName}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Account Number <span className="text-red-500">*</span></label>
+              <input
+                name="bankAccountNumber"
+                type="text"
+                value={formData.bankAccountNumber}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val.length <= 18) setFormData({ ...formData, bankAccountNumber: val });
+                }}
+                maxLength="18"
+                className={`w-full p-2 border rounded-lg ${validationErrors.bankAccountNumber ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter account number"
+              />
+              {validationErrors.bankAccountNumber && <p className="text-red-500 text-xs mt-1">{validationErrors.bankAccountNumber}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">IFSC Code <span className="text-red-500">*</span></label>
+              <input
+                name="ifscCode"
+                type="text"
+                value={formData.ifscCode}
+                onChange={(e) => setFormData({ ...formData, ifscCode: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.ifscCode ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="e.g., SBIN0001234"
+              />
+              {validationErrors.ifscCode && <p className="text-red-500 text-xs mt-1">{validationErrors.ifscCode}</p>}
+            </div>
+            <div>
+              <label className="text-sm font-medium text-gray-700">Bank Branch <span className="text-red-500">*</span></label>
+              <input
+                name="bankBranch"
+                type="text"
+                value={formData.bankBranch}
+                onChange={(e) => setFormData({ ...formData, bankBranch: e.target.value.toUpperCase() })}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.bankBranch ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="Enter branch name"
+              />
+              {validationErrors.bankBranch && <p className="text-red-500 text-xs mt-1">{validationErrors.bankBranch}</p>}
+            </div>
+          </div>
+        </div>
+
+        {/* Cancel Check - Channel Partner */}
+        <div className="bg-gray-50 p-4 rounded-lg">
+          <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
+            <FaFileImage className="text-indigo-600" /> Cancel Check
+          </h4>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Upload Cancel Check <span className="text-red-500">*</span></label>
+            <input
+              name="cancelCheck"
+              type="file"
+              accept="image/*"
+              onChange={(e) => setFormData({ ...formData, cancelCheck: e.target.files[0] })}
+              className={`w-full p-2 border rounded-lg ${validationErrors.cancelCheck ? 'border-red-500' : 'border-gray-300'}`}
+            />
+            {formData.cancelCheck && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            {validationErrors.cancelCheck && <p className="text-red-500 text-xs mt-1">{validationErrors.cancelCheck}</p>}
+          </div>
+        </div>
+
+        {/* Interested LOB Selection - Channel Partner ONLY */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaFileAlt className="text-indigo-600" /> Interested LOB Selection
@@ -1635,7 +2207,7 @@ function UserManagement() {
           )}
         </div>
 
-        {/* Auto Generated Code */}
+        {/* Auto Generated Code - Channel Partner ONLY */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
@@ -1656,7 +2228,7 @@ function UserManagement() {
   // Render Add/Edit Form
   const renderUserForm = (formData, setFormData, isEdit = false) => {
     const isEmployee = formData.userType === "Employee";
-    const isVendor = ["Vendor", "Store", "Channel Partner"].includes(formData.userType);
+    const isChannelPartner = formData.userType === "Channel Partner";
 
     return (
       <div className="space-y-4">
@@ -1675,8 +2247,8 @@ function UserManagement() {
         {/* Employee Form */}
         {isEmployee && renderEmployeeForm(formData, setFormData, isEdit)}
 
-        {/* Vendor/Store/Channel Partner Form */}
-        {isVendor && renderVendorForm(formData, setFormData, isEdit)}
+        {/* Channel Partner Form */}
+        {isChannelPartner && renderChannelPartnerForm(formData, setFormData, isEdit)}
 
         {/* Password - Common for all */}
         <div className="bg-gray-50 p-4 rounded-lg">
@@ -1795,8 +2367,6 @@ function UserManagement() {
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       user.userType === "Admin" ? "bg-purple-100 text-purple-800" :
                       user.userType === "Employee" ? "bg-blue-100 text-blue-800" :
-                      user.userType === "Vendor" ? "bg-green-100 text-green-800" :
-                      user.userType === "Store" ? "bg-yellow-100 text-yellow-800" :
                       user.userType === "Channel Partner" ? "bg-orange-100 text-orange-800" :
                       "bg-gray-100 text-gray-800"
                     }`}>
