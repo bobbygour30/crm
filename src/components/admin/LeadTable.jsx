@@ -125,14 +125,13 @@ function LeadTable() {
   ];
   
   const RELATIONSHIP_OPTIONS = [
-    "Self", "Spouse", "Child", "Parent", "Sibling", "Other"
+    "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"
   ];
   
   const YES_NO_OPTIONS = ["Yes", "No"];
   
   const NCB_OPTIONS = ["0%", "20%", "25%", "35%", "45%", "50%"];
   
-  // Updated Vehicle Type Options
   const VEHICLE_TYPE_OPTIONS = [
     "Two Wheeler",
     "Private Car",
@@ -144,11 +143,20 @@ function LeadTable() {
     "Tractor",
     "Commercial Vehicle"
   ];
+
+  const FUEL_TYPE_OPTIONS = [
+    "Petrol",
+    "Diesel",
+    "CNG",
+    "LPG",
+    "Electric",
+    "Hybrid",
+    "Ethanol",
+    "Bio-Diesel"
+  ];
   
-  // Previous Insurance Status Options
   const PREVIOUS_INSURANCE_STATUS_OPTIONS = ["Active", "Expired", "New"];
   
-  // Insurance Type Options
   const INSURANCE_TYPE_OPTIONS = [
     "Bundle Package (1 Yr OD + 1 Yr TP)",
     "Bundle Package (1 Yr OD + 3 Yr TP)",
@@ -193,7 +201,6 @@ function LeadTable() {
     "Bajaj Allianz Life Insurance",
   ];
 
-  // Manufacturer Options for Motor Insurance
   const MANUFACTURER_OPTIONS = [
     "Maruti Suzuki",
     "Hyundai",
@@ -271,7 +278,6 @@ function LeadTable() {
   const PREVIOUS_POLICY_CASE_OPTIONS = ["Renew Case", "Portability Case", "Fresh Case"];
   const EXPERIENCE_YEARS_OPTIONS = Array.from({ length: 20 }, (_, i) => i + 1);
 
-  // Add-On options for Motor Insurance
   const ADD_ON_OPTIONS = [
     "Zero Depreciation",
     "Engine Protection",
@@ -315,12 +321,10 @@ function LeadTable() {
     return `LEAD-${String(newNumber).padStart(5, "0")}`;
   };
 
-  // Get date restrictions
   const getMaxDate = () => {
     return new Date().toISOString().split('T')[0];
   };
 
-  // Get date restrictions for OD Due Date (90 days before, 60 days after)
   const getODDueDateRestrictions = () => {
     const today = new Date();
     const minDate = new Date(today);
@@ -359,7 +363,6 @@ function LeadTable() {
   const [validationErrors, setValidationErrors] = useState({});
   const [validationPopup, setValidationPopup] = useState({ show: false, errors: [] });
 
-  // Form States
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -377,95 +380,75 @@ function LeadTable() {
     sumInsured: "",
   });
 
-const [healthDetails, setHealthDetails] = useState({
-  policyType: "",
-  numberOfAdults: 0,
-  numberOfChildren: 0,
-  familyIncome: "",
-  height: "",
-  weight: "",
-  qualification: "",
-  occupation: "",
-  nomineeName: "",
-  nomineeDOB: "",
-  nomineeRelationship: "",
-  aadhaarNumber: "",
-  aadhaarFile: null,
-  panNumber: "",
-  panFile: null,
-  hasPreviousPolicy: "",
-  previousPolicyCase: "",
-  experienceYears: "",
-  proposerDOB: "",          // ✅ ADDED
-  renewalDetails: {
-    insurerName: "",
-    policyNumber: "",
-    policyDueDate: "",
-    uploadPolicy: null,
-  },
-  portabilityDetails: [],
-  medicalRemarks: "",
-  members: [],
-  proposerIsMember: "",
-  seniorOneDOB: "",
-});
+  const [healthDetails, setHealthDetails] = useState({
+    policyType: "",
+    numberOfAdults: 0,
+    numberOfChildren: 0,
+    familyIncome: "",
+    height: "",
+    weight: "",
+    qualification: "",
+    occupation: "",
+    nomineeName: "",
+    nomineeDOB: "",
+    nomineeRelationship: "",
+    aadhaarNumber: "",
+    aadhaarFile: null,
+    panNumber: "",
+    panFile: null,
+    hasPreviousPolicy: "",
+    previousPolicyCase: "",
+    experienceYears: "",
+    proposerDOB: "",
+    renewalDetails: {
+      insurerName: "",
+      policyNumber: "",
+      policyDueDate: "",
+      uploadPolicy: null,
+    },
+    portabilityDetails: [],
+    medicalRemarks: "",
+    members: [],
+    proposerIsMember: "",
+    seniorOneDOB: "",
+  });
 
-// Motor Insurance - Updated with new requirements
-const [motorDetails, setMotorDetails] = useState({
-  // Basic Details
-  vehicleType: "",
-  previousInsuranceStatus: "",
-  
-  // New Vehicle Details
-  manufacturer: "",
-  model: "",
-  rtoCode: "",
-  chesisNo: "",
-  yearOfManufacturing: "",
-  monthOfManufacturing: "",
-  idvAsPerInvoice: "",
-  
-  // Insurance Type
-  insuranceType: "",
-  
-  // For Active Policy
-  odDueDate: "",
-  tpDueDate: "",
-  policyNo: "",            // ✅ ADDED
-  previousInsurerName: "", // ✅ ADDED
-  idvAsPerPYP: "",         // ✅ ADDED
-  
-  // SAOD Specific
-  saodOdDueDate: "",
-  saodTpDueDate: "",
-  saodPolicyNo: "",
-  saodPreviousInsurerName: "",
-  saodIdvAsPerPYP: "",
-  
-  // TP Specific
-  tpInsuranceDueDate: "",
-  
-  // Registration & RTO
-  registrationNumber: "",
-  autoRtoCode: "",
-  
-  // Claim & NCB
-  claimTaken: "",
-  ncb: "",
-  
-  // Add-On
-  addOnRequired: "",
-  selectedAddOns: [],
-  
-  // Uploads
-  pypFile: null,
-  rcFrontFile: null,
-  rcBackFile: null,
-  chesisPhoto: null,
-  invoiceCopy: null,
-});
+  const [motorDetails, setMotorDetails] = useState({
+    vehicleType: "",
+    previousInsuranceStatus: "",
+    manufacturer: "",
+    model: "",
+    fuelType: "",
+    rtoCode: "",
+    chesisNo: "",
+    yearOfManufacturing: "",
+    monthOfManufacturing: "",
+    idvAsPerInvoice: "",
+    insuranceType: "",
+    odDueDate: "",
+    tpDueDate: "",
+    policyNo: "",
+    previousInsurerName: "",
+    idvAsPerPYP: "",
+    saodOdDueDate: "",
+    saodTpDueDate: "",
+    saodPolicyNo: "",
+    saodPreviousInsurerName: "",
+    saodIdvAsPerPYP: "",
+    tpInsuranceDueDate: "",
+    registrationNumber: "",
+    autoRtoCode: "",
+    claimTaken: "",
+    ncb: "",
+    addOnRequired: "",
+    selectedAddOns: [],
+    pypFile: null,
+    rcFrontFile: null,
+    rcBackFile: null,
+    chesisPhoto: null,
+    invoiceCopy: null,
+  });
 
-  // Electronic Insurance
   const [electronicDetails, setElectronicDetails] = useState({
     deviceType: "",
     otherDeviceType: "",
@@ -481,7 +464,6 @@ const [motorDetails, setMotorDetails] = useState({
     purchaseInvoice: null,
   });
 
-  // Workflow (for edit modal)
   const [workflowDetails, setWorkflowDetails] = useState({
     status: "Open",
     quoteNumber: "",
@@ -499,7 +481,6 @@ const [motorDetails, setMotorDetails] = useState({
     remarks: "",
   });
 
-  // UI States
   const [showHealthSection, setShowHealthSection] = useState(false);
   const [showMotorSection, setShowMotorSection] = useState(false);
   const [showElectronicSection, setShowElectronicSection] = useState(false);
@@ -515,37 +496,36 @@ const [motorDetails, setMotorDetails] = useState({
   const [showAddOnModal, setShowAddOnModal] = useState(false);
   const [employees, setEmployees] = useState([]);
 
-
   const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
   const errorRefs = useRef({});
 
-
-  // Add this function after fetchLeads
-const fetchEmployees = async () => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-  try {
-    const res = await fetch(`${API_BASE}/api/auth/users`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const employeeList = data.filter(user => 
-        user.userType === "Employee" || user.role === "Employee"
-      );
-      setEmployees(employeeList);
+  // ============================================================
+  // FETCH EMPLOYEES
+  // ============================================================
+  const fetchEmployees = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/users`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const employeeList = data.filter(user => 
+          user.userType === "Employee" || user.role === "Employee"
+        );
+        setEmployees(employeeList);
+      }
+    } catch (err) {
+      console.error("Fetch employees error:", err);
     }
-  } catch (err) {
-    console.error("Fetch employees error:", err);
-  }
-};
+  };
 
-// Add this useEffect to fetch employees when component mounts
-useEffect(() => {
-  fetchEmployees();
-}, []);
+  useEffect(() => {
+    fetchEmployees();
+  }, []);
 
   // ============================================================
   // EFFECTS
@@ -615,11 +595,11 @@ useEffect(() => {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Auto-fetch RTO from Registration Number
+  // Auto-fetch RTO from Registration Number (only for non-New vehicles)
   useEffect(() => {
-    if (motorDetails.registrationNumber && motorDetails.registrationNumber.length >= 4) {
+    const isNewVehicle = motorDetails.previousInsuranceStatus === "New";
+    if (!isNewVehicle && motorDetails.registrationNumber && motorDetails.registrationNumber.length >= 4) {
       const reg = motorDetails.registrationNumber.toUpperCase();
-      // Extract RTO code: first 2 alphabets + numbers before next alphabet
       const rtoMatch = reg.match(/^([A-Z]{2}[0-9]+)/);
       if (rtoMatch) {
         setMotorDetails(prev => ({ ...prev, autoRtoCode: rtoMatch[1] }));
@@ -627,7 +607,7 @@ useEffect(() => {
     } else {
       setMotorDetails(prev => ({ ...prev, autoRtoCode: "" }));
     }
-  }, [motorDetails.registrationNumber]);
+  }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
 
   // ============================================================
   // API CALLS
@@ -649,9 +629,6 @@ useEffect(() => {
     }
   };
 
-  // ============================================================
-  // PIN CODE AUTO-FETCH
-  // ============================================================
   const fetchCityState = async (pinCode) => {
     setIsFetchingPin(true);
     setPinFetchError("");
@@ -769,7 +746,7 @@ useEffect(() => {
   };
 
   // ============================================================
-  // FLOATER MEMBERS - Auto adjust when Proposer is Member
+  // FLOATER MEMBERS
   // ============================================================
   const generateFloaterMembers = () => {
     let adults = parseInt(healthDetails.numberOfAdults) || 0;
@@ -1169,7 +1146,7 @@ useEffect(() => {
   };
 
   // ============================================================
-  // VALIDATE ALL FIELDS BEFORE SUBMIT
+  // VALIDATE ALL FIELDS
   // ============================================================
   const validateAllFields = (isEdit = false) => {
     const errors = {};
@@ -1325,138 +1302,196 @@ useEffect(() => {
       }
     }
     
-    // Motor validation - Updated
-    if (showMotorSection) {
-      if (!motorDetails.vehicleType) {
-        errors.vehicleType = "Vehicle type is required";
-        errorList.push({ field: "vehicleType", message: "Vehicle type is required" });
-      }
-      
-      if (!motorDetails.previousInsuranceStatus) {
-        errors.previousInsuranceStatus = "Previous Insurance Status is required";
-        errorList.push({ field: "previousInsuranceStatus", message: "Previous Insurance Status is required" });
-      }
-      
-      if (!motorDetails.registrationNumber) {
-        errors.registration = "Registration number is required";
-        errorList.push({ field: "registrationNumber", message: "Registration number is required" });
-      }
-      
-      if (!motorDetails.insuranceType) {
-        errors.insuranceType = "Insurance type is required";
-        errorList.push({ field: "insuranceType", message: "Insurance type is required" });
-      }
-      
-      // New Vehicle Details validation
-      if (motorDetails.previousInsuranceStatus === "New") {
-        if (!motorDetails.manufacturer) {
-          errors.manufacturer = "Manufacturer is required for New Vehicle";
-          errorList.push({ field: "manufacturer", message: "Manufacturer is required for New Vehicle" });
-        }
-        if (!motorDetails.model) {
-          errors.model = "Model is required for New Vehicle";
-          errorList.push({ field: "model", message: "Model is required for New Vehicle" });
-        }
-        if (!motorDetails.rtoCode) {
-          errors.rtoCode = "RTO Code is required for New Vehicle";
-          errorList.push({ field: "rtoCode", message: "RTO Code is required for New Vehicle" });
-        }
-        if (!motorDetails.chesisNo) {
-          errors.chesisNo = "Chesis No. is required for New Vehicle";
-          errorList.push({ field: "chesisNo", message: "Chesis No. is required for New Vehicle" });
-        }
-        if (!motorDetails.yearOfManufacturing) {
-          errors.yearOfManufacturing = "Year of Manufacturing is required for New Vehicle";
-          errorList.push({ field: "yearOfManufacturing", message: "Year of Manufacturing is required for New Vehicle" });
-        }
-        if (!motorDetails.monthOfManufacturing) {
-          errors.monthOfManufacturing = "Month of Manufacturing is required for New Vehicle";
-          errorList.push({ field: "monthOfManufacturing", message: "Month of Manufacturing is required for New Vehicle" });
-        }
-        if (!motorDetails.idvAsPerInvoice) {
-          errors.idvAsPerInvoice = "IDV (As per Invoice) is required for New Vehicle";
-          errorList.push({ field: "idvAsPerInvoice", message: "IDV (As per Invoice) is required for New Vehicle" });
-        }
-      }
-      
-      // Active Policy validations
-      if (motorDetails.previousInsuranceStatus === "Active") {
-        // For Comprehensive or SAOD, OD Due Date and TP Due Date are required
-        if (motorDetails.insuranceType === "Comprehensive (OD+TP)" || motorDetails.insuranceType === "SAOD (On Damage)") {
-          if (!motorDetails.odDueDate) {
-            errors.odDueDate = "OD Due Date is required for Active Policy";
-            errorList.push({ field: "odDueDate", message: "OD Due Date is required for Active Policy" });
-          }
-          if (!motorDetails.tpDueDate) {
-            errors.tpDueDate = "TP Due Date is required for Active Policy";
-            errorList.push({ field: "tpDueDate", message: "TP Due Date is required for Active Policy" });
-          }
-        }
-        
-        if (!motorDetails.policyNo) {
-          errors.policyNo = "Policy No. is required for Active Policy";
-          errorList.push({ field: "policyNo", message: "Policy No. is required for Active Policy" });
-        }
-        if (!motorDetails.previousInsurerName) {
-          errors.previousInsurerName = "Previous Insurer Name is required for Active Policy";
-          errorList.push({ field: "previousInsurerName", message: "Previous Insurer Name is required for Active Policy" });
-        }
-        if (!motorDetails.idvAsPerPYP) {
-          errors.idvAsPerPYP = "IDV (As per PYP) is required for Active Policy";
-          errorList.push({ field: "idvAsPerPYP", message: "IDV (As per PYP) is required for Active Policy" });
-        }
-        
-        // Claim and NCB validation
-        if (!motorDetails.claimTaken) {
-          errors.claimTaken = "Claim Taken is required for Active Policy";
-          errorList.push({ field: "claimTaken", message: "Claim Taken is required for Active Policy" });
-        }
-        if (motorDetails.claimTaken === "No" && !motorDetails.ncb) {
-          errors.ncb = "NCB selection is required when Claim Taken is No";
-          errorList.push({ field: "ncb", message: "NCB selection is required when Claim Taken is No" });
-        }
-      }
-      
-     // TP Insurance validation
-if (motorDetails.insuranceType === "TP (Third Party)") {
-  if (!motorDetails.tpInsuranceDueDate) {
-    errors.tpInsuranceDueDate = "TP Due Date is required for TP Insurance";
-    errorList.push({ field: "tpInsuranceDueDate", message: "TP Due Date is required for TP Insurance" });
+   // Motor validation - Updated with all new fields and uploads
+if (showMotorSection) {
+  // Basic required fields
+  if (!motorDetails.vehicleType) {
+    errors.vehicleType = "Vehicle type is required";
+    errorList.push({ field: "vehicleType", message: "Vehicle type is required" });
   }
-}
-      
-      // Add-On validation
-      if (motorDetails.insuranceType !== "TP (Third Party)") {
-        if (!motorDetails.addOnRequired) {
-          errors.addOnRequired = "Add-On selection is required";
-          errorList.push({ field: "addOnRequired", message: "Add-On selection is required" });
-        }
-        if (motorDetails.addOnRequired === "Yes" && (!motorDetails.selectedAddOns || motorDetails.selectedAddOns.length === 0)) {
-          errors.selectedAddOns = "Please select at least one Add-On";
-          errorList.push({ field: "selectedAddOns", message: "Please select at least one Add-On" });
-        }
+  
+  if (!motorDetails.previousInsuranceStatus) {
+    errors.previousInsuranceStatus = "Previous Insurance Status is required";
+    errorList.push({ field: "previousInsuranceStatus", message: "Previous Insurance Status is required" });
+  }
+  
+  // Registration Number is only required for non-New vehicles
+  const isNewVehicle = motorDetails.previousInsuranceStatus === "New";
+  if (!isNewVehicle && !motorDetails.registrationNumber) {
+    errors.registration = "Registration number is required";
+    errorList.push({ field: "registrationNumber", message: "Registration number is required" });
+  }
+  
+  if (!motorDetails.insuranceType) {
+    errors.insuranceType = "Insurance type is required";
+    errorList.push({ field: "insuranceType", message: "Insurance type is required" });
+  }
+  
+  // ============================================
+  // NEW VEHICLE DETAILS VALIDATION
+  // ============================================
+  if (motorDetails.previousInsuranceStatus === "New") {
+    if (!motorDetails.manufacturer) {
+      errors.manufacturer = "Manufacturer is required for New Vehicle";
+      errorList.push({ field: "manufacturer", message: "Manufacturer is required for New Vehicle" });
+    }
+    if (!motorDetails.model) {
+      errors.model = "Model is required for New Vehicle";
+      errorList.push({ field: "model", message: "Model is required for New Vehicle" });
+    }
+    if (!motorDetails.fuelType) {
+      errors.fuelType = "Fuel Type is required for New Vehicle";
+      errorList.push({ field: "fuelType", message: "Fuel Type is required for New Vehicle" });
+    }
+    if (!motorDetails.rtoCode) {
+      errors.rtoCode = "RTO Code is required for New Vehicle";
+      errorList.push({ field: "rtoCode", message: "RTO Code is required for New Vehicle" });
+    }
+    if (!motorDetails.chesisNo) {
+      errors.chesisNo = "Chesis No. is required for New Vehicle";
+      errorList.push({ field: "chesisNo", message: "Chesis No. is required for New Vehicle" });
+    }
+    if (!motorDetails.yearOfManufacturing) {
+      errors.yearOfManufacturing = "Year of Manufacturing is required for New Vehicle";
+      errorList.push({ field: "yearOfManufacturing", message: "Year of Manufacturing is required for New Vehicle" });
+    }
+    if (!motorDetails.monthOfManufacturing) {
+      errors.monthOfManufacturing = "Month of Manufacturing is required for New Vehicle";
+      errorList.push({ field: "monthOfManufacturing", message: "Month of Manufacturing is required for New Vehicle" });
+    }
+    if (!motorDetails.idvAsPerInvoice) {
+      errors.idvAsPerInvoice = "IDV (As per Invoice) is required for New Vehicle";
+      errorList.push({ field: "idvAsPerInvoice", message: "IDV (As per Invoice) is required for New Vehicle" });
+    }
+    if (!motorDetails.invoiceCopy) {
+      errors.invoiceCopy = "Invoice Copy is required for New Vehicle";
+      errorList.push({ field: "invoiceCopy", message: "Invoice Copy is required for New Vehicle" });
+    }
+  }
+  
+  // ============================================
+  // ACTIVE POLICY VALIDATIONS
+  // ============================================
+  if (motorDetails.previousInsuranceStatus === "Active") {
+    // OD & TP Due Dates for Comprehensive or SAOD
+    if (motorDetails.insuranceType === "Comprehensive (OD+TP)" || motorDetails.insuranceType === "SAOD (On Damage)") {
+      if (!motorDetails.odDueDate) {
+        errors.odDueDate = "OD Due Date is required for Active Policy";
+        errorList.push({ field: "odDueDate", message: "OD Due Date is required for Active Policy" });
       }
-      
-      // PYP Upload validation - Only for Active Policy
-      if (motorDetails.previousInsuranceStatus === "Active") {
-        if (!motorDetails.pypFile) {
-          errors.pypFile = "Upload PYP is required for Active Policy";
-          errorList.push({ field: "pypFile", message: "Upload PYP is required for Active Policy" });
-        }
-      }
-      
-      // RC Upload validation - Except for New Vehicle
-      if (motorDetails.previousInsuranceStatus !== "New") {
-        if (!motorDetails.rcFrontFile) {
-          errors.rcFrontFile = "RC Front Upload is required";
-          errorList.push({ field: "rcFrontFile", message: "RC Front Upload is required" });
-        }
-        if (!motorDetails.rcBackFile) {
-          errors.rcBackFile = "RC Back Upload is required";
-          errorList.push({ field: "rcBackFile", message: "RC Back Upload is required" });
-        }
+      if (!motorDetails.tpDueDate) {
+        errors.tpDueDate = "TP Due Date is required for Active Policy";
+        errorList.push({ field: "tpDueDate", message: "TP Due Date is required for Active Policy" });
       }
     }
+    
+    // Common Active Policy fields
+    if (!motorDetails.policyNo) {
+      errors.policyNo = "Policy No. is required for Active Policy";
+      errorList.push({ field: "policyNo", message: "Policy No. is required for Active Policy" });
+    }
+    if (!motorDetails.previousInsurerName) {
+      errors.previousInsurerName = "Previous Insurer Name is required for Active Policy";
+      errorList.push({ field: "previousInsurerName", message: "Previous Insurer Name is required for Active Policy" });
+    }
+    if (!motorDetails.idvAsPerPYP) {
+      errors.idvAsPerPYP = "IDV (As per PYP) is required for Active Policy";
+      errorList.push({ field: "idvAsPerPYP", message: "IDV (As per PYP) is required for Active Policy" });
+    }
+    
+    // Claim & NCB
+    if (!motorDetails.claimTaken) {
+      errors.claimTaken = "Claim Taken is required for Active Policy";
+      errorList.push({ field: "claimTaken", message: "Claim Taken is required for Active Policy" });
+    }
+    if (motorDetails.claimTaken === "No" && !motorDetails.ncb) {
+      errors.ncb = "NCB selection is required when Claim Taken is No";
+      errorList.push({ field: "ncb", message: "NCB selection is required when Claim Taken is No" });
+    }
+    
+    // SAOD Specific Fields
+    if (motorDetails.insuranceType === "SAOD (On Damage)") {
+      if (!motorDetails.saodOdDueDate) {
+        errors.saodOdDueDate = "OD Due Date is required for SAOD";
+        errorList.push({ field: "saodOdDueDate", message: "OD Due Date is required for SAOD" });
+      }
+      if (!motorDetails.saodTpDueDate) {
+        errors.saodTpDueDate = "TP Due Date is required for SAOD";
+        errorList.push({ field: "saodTpDueDate", message: "TP Due Date is required for SAOD" });
+      }
+      if (!motorDetails.saodPolicyNo) {
+        errors.saodPolicyNo = "Previous Policy No. is required for SAOD";
+        errorList.push({ field: "saodPolicyNo", message: "Previous Policy No. is required for SAOD" });
+      }
+      if (!motorDetails.saodPreviousInsurerName) {
+        errors.saodPreviousInsurerName = "Previous Insurer Name is required for SAOD";
+        errorList.push({ field: "saodPreviousInsurerName", message: "Previous Insurer Name is required for SAOD" });
+      }
+      if (!motorDetails.saodIdvAsPerPYP) {
+        errors.saodIdvAsPerPYP = "IDV (As per PYP) is required for SAOD";
+        errorList.push({ field: "saodIdvAsPerPYP", message: "IDV (As per PYP) is required for SAOD" });
+      }
+    }
+  }
+  
+  // ============================================
+  // TP INSURANCE VALIDATION
+  // ============================================
+  if (motorDetails.insuranceType === "TP (Third Party)") {
+    if (!motorDetails.tpInsuranceDueDate) {
+      errors.tpInsuranceDueDate = "TP Due Date is required for TP Insurance";
+      errorList.push({ field: "tpInsuranceDueDate", message: "TP Due Date is required for TP Insurance" });
+    }
+  }
+  
+  // ============================================
+  // ADD-ON VALIDATION
+  // ============================================
+  if (motorDetails.insuranceType !== "TP (Third Party)") {
+    if (!motorDetails.addOnRequired) {
+      errors.addOnRequired = "Add-On selection is required";
+      errorList.push({ field: "addOnRequired", message: "Add-On selection is required" });
+    }
+    if (motorDetails.addOnRequired === "Yes" && (!motorDetails.selectedAddOns || motorDetails.selectedAddOns.length === 0)) {
+      errors.selectedAddOns = "Please select at least one Add-On";
+      errorList.push({ field: "selectedAddOns", message: "Please select at least one Add-On" });
+    }
+  }
+  
+  // ============================================
+  // UPLOAD DOCUMENTS VALIDATION - UPDATED
+  // ============================================
+  
+  // PYP Upload - Required ONLY for Active Policy
+  // Optional for Expired and New
+  if (motorDetails.previousInsuranceStatus === "Active") {
+    if (!motorDetails.pypFile) {
+      errors.pypFile = "Upload PYP is required for Active Policy";
+      errorList.push({ field: "pypFile", message: "Upload PYP is required for Active Policy" });
+    }
+  }
+  
+  // RC Upload - Required for Active and Expired
+  // Optional for New Vehicle
+  if (motorDetails.previousInsuranceStatus !== "New") {
+    if (!motorDetails.rcFrontFile) {
+      errors.rcFrontFile = "RC Front Upload is required";
+      errorList.push({ field: "rcFrontFile", message: "RC Front Upload is required" });
+    }
+    if (!motorDetails.rcBackFile) {
+      errors.rcBackFile = "RC Back Upload is required";
+      errorList.push({ field: "rcBackFile", message: "RC Back Upload is required" });
+    }
+  }
+  
+  // Invoice Copy - Required ONLY for New Vehicle
+  if (motorDetails.previousInsuranceStatus === "New") {
+    if (!motorDetails.invoiceCopy) {
+      errors.invoiceCopy = "Invoice Copy is required for New Vehicle";
+      errorList.push({ field: "invoiceCopy", message: "Invoice Copy is required for New Vehicle" });
+    }
+  }
+}
     
     // Electronic validation
     if (showElectronicSection) {
@@ -1492,9 +1527,6 @@ if (motorDetails.insuranceType === "TP (Third Party)") {
     return true;
   };
 
-  // ============================================================
-  // SCROLL TO ERROR FIELD
-  // ============================================================
   const scrollToError = (fieldName) => {
     setValidationPopup({ show: false, errors: [] });
     
@@ -1517,379 +1549,360 @@ if (motorDetails.insuranceType === "TP (Third Party)") {
     }
   };
 
-const handleCreateLead = async (e) => {
-  e.preventDefault();
-  
-  if (!validateAllFields(false)) {
-    return;
-  }
-  
-  setIsSubmitting(true);
+  // ============================================================
+  // CREATE LEAD
+  // ============================================================
+  const handleCreateLead = async (e) => {
+    e.preventDefault();
+    
+    if (!validateAllFields(false)) {
+      return;
+    }
+    
+    setIsSubmitting(true);
 
-  const submitData = new FormData();
-  
-  // Basic fields
-  submitData.append("name", formData.name);
-  submitData.append("email", formData.email);
-  submitData.append("mobileNo", formData.mobileNo);
-  submitData.append("gender", formData.gender);
-  submitData.append("source", formData.source);
-  submitData.append("remarks", formData.remarks);
-  submitData.append("lob", formData.lob);
-  submitData.append("pinCode", formData.pinCode);
-  submitData.append("state", formData.state);
-  submitData.append("city", formData.city);
-  submitData.append("sourceDependentValue", formData.sourceDependentValue);
-  submitData.append("status", "Open");
-  submitData.append("policyTenure", formData.policyTenure);
-  submitData.append("paymentTerm", formData.paymentTerm);
-  submitData.append("sumInsured", formData.sumInsured);
-  
-  // Health Section - ONLY if Health LOB is selected
-  if (showHealthSection) {
-    const hasHealthData = healthDetails.policyType || 
-                          healthDetails.hasPreviousPolicy === "Yes" ||
-                          healthDetails.proposerDOB ||
-                          healthDetails.nomineeName;
+    const submitData = new FormData();
+    
+    submitData.append("name", formData.name);
+    submitData.append("email", formData.email);
+    submitData.append("mobileNo", formData.mobileNo);
+    submitData.append("gender", formData.gender);
+    submitData.append("source", formData.source);
+    submitData.append("remarks", formData.remarks);
+    submitData.append("lob", formData.lob);
+    submitData.append("pinCode", formData.pinCode);
+    submitData.append("state", formData.state);
+    submitData.append("city", formData.city);
+    submitData.append("sourceDependentValue", formData.sourceDependentValue);
+    submitData.append("status", "Open");
+    submitData.append("policyTenure", formData.policyTenure);
+    submitData.append("paymentTerm", formData.paymentTerm);
+    submitData.append("sumInsured", formData.sumInsured);
+    
+    if (showHealthSection) {
+      const hasHealthData = healthDetails.policyType || 
+                            healthDetails.hasPreviousPolicy === "Yes" ||
+                            healthDetails.proposerDOB ||
+                            healthDetails.nomineeName;
 
-    if (hasHealthData) {
-      const healthData = { ...healthDetails };
-      healthData.proposerName = formData.name;
+      if (hasHealthData) {
+        const healthData = { ...healthDetails };
+        healthData.proposerName = formData.name;
 
-      // ✅ Remove File objects — they can't be JSON.stringify'd meaningfully
-      delete healthData.aadhaarFile;
-      delete healthData.panFile;
-      if (healthData.renewalDetails) {
-        delete healthData.renewalDetails.uploadPolicy;
+        delete healthData.aadhaarFile;
+        delete healthData.panFile;
+        if (healthData.renewalDetails) {
+          delete healthData.renewalDetails.uploadPolicy;
+        }
+        if (healthData.portabilityDetails) {
+          healthData.portabilityDetails = healthData.portabilityDetails.map(
+            ({ uploadPYP, ...rest }) => rest
+          );
+        }
+        if (healthData.members) {
+          healthData.members = healthData.members.map(
+            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
+              const member = { ...rest };
+              if (!member.wantRider) delete member.wantRider;
+              if (!member.selectedRider) delete member.selectedRider;
+              if (member.riderDetails) {
+                const rd = { ...member.riderDetails };
+                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+                  if (!rd[k]) delete rd[k];
+                });
+                member.riderDetails = rd;
+              }
+              return member;
+            }
+          );
+        }
+
+        if (!healthData.policyType) delete healthData.policyType;
+        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+        if (!healthData.proposerDOB) delete healthData.proposerDOB;
+        if (!healthData.nomineeName) delete healthData.nomineeName;
+        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+        if (!healthData.panNumber) delete healthData.panNumber;
+        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
+
+        if (Object.keys(healthData).length > 0) {
+          submitData.append("healthDetails", JSON.stringify(healthData));
+        }
       }
-      if (healthData.portabilityDetails) {
-        healthData.portabilityDetails = healthData.portabilityDetails.map(
-          ({ uploadPYP, ...rest }) => rest
-        );
+    }
+
+    if (showMotorSection) {
+      const hasMotorData = motorDetails.vehicleType || 
+                           motorDetails.previousInsuranceStatus ||
+                           motorDetails.registrationNumber ||
+                           motorDetails.insuranceType;
+      
+      if (hasMotorData) {
+        const motorData = { ...motorDetails };
+        
+        if (!motorData.vehicleType) delete motorData.vehicleType;
+        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+        if (!motorData.registrationNumber) delete motorData.registrationNumber;
+        if (!motorData.insuranceType) delete motorData.insuranceType;
+        if (!motorData.claimTaken) delete motorData.claimTaken;
+        if (!motorData.addOnRequired) delete motorData.addOnRequired;
+        
+        if (Object.keys(motorData).length > 0) {
+          submitData.append("motorDetails", JSON.stringify(motorData));
+        }
       }
-      if (healthData.members) {
-  healthData.members = healthData.members.map(
-    ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-      const member = { ...rest };
+      
+      if (motorDetails.pypFile) {
+        submitData.append("pypFile", motorDetails.pypFile);
+      }
+      if (motorDetails.rcFrontFile) {
+        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+      }
+      if (motorDetails.rcBackFile) {
+        submitData.append("rcBackFile", motorDetails.rcBackFile);
+      }
+      if (motorDetails.chesisPhoto) {
+        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+      }
+      if (motorDetails.invoiceCopy) {
+        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+      }
+    }
 
-      // Strip empty enum fields
-      if (!member.wantRider) delete member.wantRider;
-      if (!member.selectedRider) delete member.selectedRider;
+    if (showElectronicSection) {
+      const hasElectronicData = electronicDetails.deviceType || 
+                                electronicDetails.dateOfPurchase || 
+                                electronicDetails.purchaseValue;
+      
+      if (hasElectronicData) {
+        const electronicData = { ...electronicDetails };
+        
+        delete electronicData.aadhaarFile;
+        delete electronicData.panFile;
+        
+        if (!electronicData.deviceType) delete electronicData.deviceType;
+        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+        
+        if (Object.keys(electronicData).length > 0) {
+          submitData.append("electronicDetails", JSON.stringify(electronicData));
+        }
+      }
+    }
 
-      if (member.riderDetails) {
-        const rd = { ...member.riderDetails };
-        ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-          if (!rd[k]) delete rd[k];
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+        body: submitData,
+      });
+
+      if (res.ok) {
+        const savedLead = await res.json();
+        setLeads((prev) => [savedLead, ...prev]);
+        resetForm();
+        setShowLeadForm(false);
+        alert("Lead created successfully!");
+      } else {
+        const error = await res.json();
+        const errorMsg = error.error || error.message || "Unknown error";
+        setValidationPopup({
+          show: true,
+          errors: [{ field: "general", message: errorMsg }]
         });
-        member.riderDetails = rd;
       }
-
-      return member;
-    }
-  );
-}
-
-      // ✅ Remove empty-string enum fields (schema has no '' option)
-      if (!healthData.policyType) delete healthData.policyType;
-      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-      if (!healthData.proposerDOB) delete healthData.proposerDOB;
-      if (!healthData.nomineeName) delete healthData.nomineeName;
-      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-      if (!healthData.panNumber) delete healthData.panNumber;
-      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-      if (Object.keys(healthData).length > 0) {
-        submitData.append("healthDetails", JSON.stringify(healthData));
-      }
-    }
-  }
-
-  // Motor Section - ONLY if Motor LOB is selected
-  if (showMotorSection) {
-    const hasMotorData = motorDetails.vehicleType || 
-                         motorDetails.previousInsuranceStatus ||
-                         motorDetails.registrationNumber ||
-                         motorDetails.insuranceType;
-    
-    if (hasMotorData) {
-      const motorData = { ...motorDetails };
-      
-      // Clean up empty values
-      if (!motorData.vehicleType) delete motorData.vehicleType;
-      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-      if (!motorData.registrationNumber) delete motorData.registrationNumber;
-      if (!motorData.insuranceType) delete motorData.insuranceType;
-      
-      // Remove empty enum fields
-      if (!motorData.claimTaken) delete motorData.claimTaken;
-      if (!motorData.addOnRequired) delete motorData.addOnRequired;
-      
-      if (Object.keys(motorData).length > 0) {
-        submitData.append("motorDetails", JSON.stringify(motorData));
-      }
-    }
-    
-    // Motor Files - Only append if they exist
-    if (motorDetails.pypFile) {
-      submitData.append("pypFile", motorDetails.pypFile);
-    }
-    if (motorDetails.rcFrontFile) {
-      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-    }
-    if (motorDetails.rcBackFile) {
-      submitData.append("rcBackFile", motorDetails.rcBackFile);
-    }
-    if (motorDetails.chesisPhoto) {
-      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-    }
-    if (motorDetails.invoiceCopy) {
-      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-    }
-  }
-
-  // Electronic Section - ONLY if Electronic LOB is selected
-  if (showElectronicSection) {
-    const hasElectronicData = electronicDetails.deviceType || 
-                              electronicDetails.dateOfPurchase || 
-                              electronicDetails.purchaseValue;
-    
-    if (hasElectronicData) {
-      const electronicData = { ...electronicDetails };
-      
-      // ✅ Remove File objects
-      delete electronicData.aadhaarFile;
-      delete electronicData.panFile;
-      
-      // Clean up empty values
-      if (!electronicData.deviceType) delete electronicData.deviceType;
-      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-      
-      if (Object.keys(electronicData).length > 0) {
-        submitData.append("electronicDetails", JSON.stringify(electronicData));
-      }
-    }
-  }
-
-  const token = localStorage.getItem("token");
-  try {
-    const res = await fetch(`${API_BASE}/api/leads`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
-      body: submitData,
-    });
-
-    if (res.ok) {
-      const savedLead = await res.json();
-      setLeads((prev) => [savedLead, ...prev]);
-      resetForm();
-      setShowLeadForm(false);
-      alert("Lead created successfully!");
-    } else {
-      const error = await res.json();
-      const errorMsg = error.error || error.message || "Unknown error";
+    } catch (err) {
+      console.error("Create error:", err);
       setValidationPopup({
         show: true,
-        errors: [{ field: "general", message: errorMsg }]
+        errors: [{ field: "general", message: "Error: " + err.message }]
       });
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (err) {
-    console.error("Create error:", err);
-    setValidationPopup({
-      show: true,
-      errors: [{ field: "general", message: "Error: " + err.message }]
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
- const handleUpdateLead = async (e) => {
-  e.preventDefault();
-  
-  if (!validateAllFields(true)) {
-    return;
-  }
-  
-  setIsSubmitting(true);
+  // ============================================================
+  // UPDATE LEAD
+  // ============================================================
+  const handleUpdateLead = async (e) => {
+    e.preventDefault();
+    
+    if (!validateAllFields(true)) {
+      return;
+    }
+    
+    setIsSubmitting(true);
 
-  const submitData = new FormData();
-  
-  submitData.append("name", editLead?.name || formData.name);
-  submitData.append("email", editLead?.email || formData.email);
-  submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
-  submitData.append("gender", editLead?.gender || formData.gender);
-  submitData.append("source", editLead?.source || formData.source);
-  submitData.append("remarks", editLead?.remarks || formData.remarks);
-  submitData.append("lob", editLead?.lob || formData.lob);
-  submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
-  submitData.append("state", editLead?.state || formData.state);
-  submitData.append("city", editLead?.city || formData.city);
-  submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
-  submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
-  submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
-  submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
-  
-  submitData.append("status", workflowDetails.status);
-  submitData.append("workflowDetails", JSON.stringify(workflowDetails));
-  
-  // Health Section - with cleanup
-  if (showHealthSection) {
-    const hasHealthData = healthDetails.policyType || 
-                          healthDetails.hasPreviousPolicy === "Yes" ||
-                          healthDetails.proposerDOB ||
-                          healthDetails.nomineeName;
+    const submitData = new FormData();
+    
+    submitData.append("name", editLead?.name || formData.name);
+    submitData.append("email", editLead?.email || formData.email);
+    submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
+    submitData.append("gender", editLead?.gender || formData.gender);
+    submitData.append("source", editLead?.source || formData.source);
+    submitData.append("remarks", editLead?.remarks || formData.remarks);
+    submitData.append("lob", editLead?.lob || formData.lob);
+    submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
+    submitData.append("state", editLead?.state || formData.state);
+    submitData.append("city", editLead?.city || formData.city);
+    submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
+    submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
+    submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
+    submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
+    
+    submitData.append("status", workflowDetails.status);
+    submitData.append("workflowDetails", JSON.stringify(workflowDetails));
+    
+    if (showHealthSection) {
+      const hasHealthData = healthDetails.policyType || 
+                            healthDetails.hasPreviousPolicy === "Yes" ||
+                            healthDetails.proposerDOB ||
+                            healthDetails.nomineeName;
 
-    if (hasHealthData) {
-      const healthData = { ...healthDetails };
-      healthData.proposerName = formData.name;
+      if (hasHealthData) {
+        const healthData = { ...healthDetails };
+        healthData.proposerName = formData.name;
 
-      // ✅ Remove File objects
-      delete healthData.aadhaarFile;
-      delete healthData.panFile;
-      if (healthData.renewalDetails) {
-        delete healthData.renewalDetails.uploadPolicy;
+        delete healthData.aadhaarFile;
+        delete healthData.panFile;
+        if (healthData.renewalDetails) {
+          delete healthData.renewalDetails.uploadPolicy;
+        }
+        if (healthData.portabilityDetails) {
+          healthData.portabilityDetails = healthData.portabilityDetails.map(
+            ({ uploadPYP, ...rest }) => rest
+          );
+        }
+        if (healthData.members) {
+          healthData.members = healthData.members.map(
+            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
+              const member = { ...rest };
+              if (!member.wantRider) delete member.wantRider;
+              if (!member.selectedRider) delete member.selectedRider;
+              if (member.riderDetails) {
+                const rd = { ...member.riderDetails };
+                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+                  if (!rd[k]) delete rd[k];
+                });
+                member.riderDetails = rd;
+              }
+              return member;
+            }
+          );
+        }
+
+        if (!healthData.policyType) delete healthData.policyType;
+        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+        if (!healthData.proposerDOB) delete healthData.proposerDOB;
+        if (!healthData.nomineeName) delete healthData.nomineeName;
+        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+        if (!healthData.panNumber) delete healthData.panNumber;
+        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
+
+        if (Object.keys(healthData).length > 0) {
+          submitData.append("healthDetails", JSON.stringify(healthData));
+        }
       }
-      if (healthData.portabilityDetails) {
-        healthData.portabilityDetails = healthData.portabilityDetails.map(
-          ({ uploadPYP, ...rest }) => rest
-        );
+    }
+
+    if (showMotorSection) {
+      const hasMotorData = motorDetails.vehicleType || 
+                           motorDetails.previousInsuranceStatus ||
+                           motorDetails.registrationNumber ||
+                           motorDetails.insuranceType;
+      
+      if (hasMotorData) {
+        const motorData = { ...motorDetails };
+        
+        if (!motorData.vehicleType) delete motorData.vehicleType;
+        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+        if (!motorData.registrationNumber) delete motorData.registrationNumber;
+        if (!motorData.insuranceType) delete motorData.insuranceType;
+        if (!motorData.claimTaken) delete motorData.claimTaken;
+        if (!motorData.addOnRequired) delete motorData.addOnRequired;
+        
+        if (Object.keys(motorData).length > 0) {
+          submitData.append("motorDetails", JSON.stringify(motorData));
+        }
       }
-     if (healthData.members) {
-  healthData.members = healthData.members.map(
-    ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-      const member = { ...rest };
+      
+      if (motorDetails.pypFile) {
+        submitData.append("pypFile", motorDetails.pypFile);
+      }
+      if (motorDetails.rcFrontFile) {
+        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+      }
+      if (motorDetails.rcBackFile) {
+        submitData.append("rcBackFile", motorDetails.rcBackFile);
+      }
+      if (motorDetails.chesisPhoto) {
+        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+      }
+      if (motorDetails.invoiceCopy) {
+        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+      }
+    }
 
-      // Strip empty enum fields
-      if (!member.wantRider) delete member.wantRider;
-      if (!member.selectedRider) delete member.selectedRider;
+    if (showElectronicSection) {
+      const hasElectronicData = electronicDetails.deviceType || 
+                                electronicDetails.dateOfPurchase || 
+                                electronicDetails.purchaseValue;
+      
+      if (hasElectronicData) {
+        const electronicData = { ...electronicDetails };
+        
+        delete electronicData.aadhaarFile;
+        delete electronicData.panFile;
+        
+        if (!electronicData.deviceType) delete electronicData.deviceType;
+        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+        
+        if (Object.keys(electronicData).length > 0) {
+          submitData.append("electronicDetails", JSON.stringify(electronicData));
+        }
+      }
+    }
 
-      if (member.riderDetails) {
-        const rd = { ...member.riderDetails };
-        ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-          if (!rd[k]) delete rd[k];
+    const token = localStorage.getItem("token");
+    try {
+      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: submitData,
+      });
+
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+        setShowEditModal(false);
+        setEditLead(null);
+        alert("Lead updated successfully!");
+      } else {
+        const error = await res.json();
+        setValidationPopup({
+          show: true,
+          errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
         });
-        member.riderDetails = rd;
       }
-
-      return member;
-    }
-  );
-}
-
-      // ✅ Remove empty-string enum fields
-      if (!healthData.policyType) delete healthData.policyType;
-      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-      if (!healthData.proposerDOB) delete healthData.proposerDOB;
-      if (!healthData.nomineeName) delete healthData.nomineeName;
-      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-      if (!healthData.panNumber) delete healthData.panNumber;
-      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-      if (Object.keys(healthData).length > 0) {
-        submitData.append("healthDetails", JSON.stringify(healthData));
-      }
-    }
-  }
-
-  // Motor Section - with cleanup
-  if (showMotorSection) {
-    const hasMotorData = motorDetails.vehicleType || 
-                         motorDetails.previousInsuranceStatus ||
-                         motorDetails.registrationNumber ||
-                         motorDetails.insuranceType;
-    
-    if (hasMotorData) {
-      const motorData = { ...motorDetails };
-      
-      if (!motorData.vehicleType) delete motorData.vehicleType;
-      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-      if (!motorData.registrationNumber) delete motorData.registrationNumber;
-      if (!motorData.insuranceType) delete motorData.insuranceType;
-      if (!motorData.claimTaken) delete motorData.claimTaken;
-      if (!motorData.addOnRequired) delete motorData.addOnRequired;
-      
-      if (Object.keys(motorData).length > 0) {
-        submitData.append("motorDetails", JSON.stringify(motorData));
-      }
-    }
-    
-    if (motorDetails.pypFile) {
-      submitData.append("pypFile", motorDetails.pypFile);
-    }
-    if (motorDetails.rcFrontFile) {
-      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-    }
-    if (motorDetails.rcBackFile) {
-      submitData.append("rcBackFile", motorDetails.rcBackFile);
-    }
-    if (motorDetails.chesisPhoto) {
-      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-    }
-    if (motorDetails.invoiceCopy) {
-      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-    }
-  }
-
-  // Electronic Section - with cleanup
-  if (showElectronicSection) {
-    const hasElectronicData = electronicDetails.deviceType || 
-                              electronicDetails.dateOfPurchase || 
-                              electronicDetails.purchaseValue;
-    
-    if (hasElectronicData) {
-      const electronicData = { ...electronicDetails };
-      
-      delete electronicData.aadhaarFile;
-      delete electronicData.panFile;
-      
-      if (!electronicData.deviceType) delete electronicData.deviceType;
-      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-      
-      if (Object.keys(electronicData).length > 0) {
-        submitData.append("electronicDetails", JSON.stringify(electronicData));
-      }
-    }
-  }
-
-  const token = localStorage.getItem("token");
-  try {
-    const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
-      body: submitData,
-    });
-
-    if (res.ok) {
-      const updatedLead = await res.json();
-      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-      setShowEditModal(false);
-      setEditLead(null);
-      alert("Lead updated successfully!");
-    } else {
-      const error = await res.json();
+    } catch (err) {
+      console.error("Update error:", err);
       setValidationPopup({
         show: true,
-        errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
+        errors: [{ field: "general", message: "Error: " + err.message }]
       });
+    } finally {
+      setIsSubmitting(false);
     }
-  } catch (err) {
-    console.error("Update error:", err);
-    setValidationPopup({
-      show: true,
-      errors: [{ field: "general", message: "Error: " + err.message }]
-    });
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+  };
 
   // ============================================================
   // OPEN EDIT MODAL
@@ -2020,40 +2033,41 @@ const handleCreateLead = async (e) => {
       proposerIsMember: "",
       seniorOneDOB: "",
     });
-   setMotorDetails({
-  vehicleType: "",
-  previousInsuranceStatus: "",
-  manufacturer: "",
-  model: "",
-  rtoCode: "",
-  chesisNo: "",
-  yearOfManufacturing: "",
-  monthOfManufacturing: "",
-  idvAsPerInvoice: "",
-  insuranceType: "",
-  odDueDate: "",
-  tpDueDate: "",
-  policyNo: "",
-  previousInsurerName: "",
-  idvAsPerPYP: "",
-  saodOdDueDate: "",
-  saodTpDueDate: "",
-  saodPolicyNo: "",
-  saodPreviousInsurerName: "",
-  saodIdvAsPerPYP: "",
-  tpInsuranceDueDate: "",  // Changed from tpDueDate
-  registrationNumber: "",
-  autoRtoCode: "",
-  claimTaken: "",
-  ncb: "",
-  addOnRequired: "",
-  selectedAddOns: [],
-  pypFile: null,
-  rcFrontFile: null,
-  rcBackFile: null,
-  chesisPhoto: null,
-  invoiceCopy: null,
-});
+    setMotorDetails({
+      vehicleType: "",
+      previousInsuranceStatus: "",
+      manufacturer: "",
+      model: "",
+      fuelType: "",
+      rtoCode: "",
+      chesisNo: "",
+      yearOfManufacturing: "",
+      monthOfManufacturing: "",
+      idvAsPerInvoice: "",
+      insuranceType: "",
+      odDueDate: "",
+      tpDueDate: "",
+      policyNo: "",
+      previousInsurerName: "",
+      idvAsPerPYP: "",
+      saodOdDueDate: "",
+      saodTpDueDate: "",
+      saodPolicyNo: "",
+      saodPreviousInsurerName: "",
+      saodIdvAsPerPYP: "",
+      tpInsuranceDueDate: "",
+      registrationNumber: "",
+      autoRtoCode: "",
+      claimTaken: "",
+      ncb: "",
+      addOnRequired: "",
+      selectedAddOns: [],
+      pypFile: null,
+      rcFrontFile: null,
+      rcBackFile: null,
+      chesisPhoto: null,
+      invoiceCopy: null,
+    });
     setElectronicDetails({
       deviceType: "",
       otherDeviceType: "",
@@ -2103,7 +2117,7 @@ const handleCreateLead = async (e) => {
   };
 
   // ============================================================
-  // RENDER: ADD-ON MODAL
+  // RENDER FUNCTIONS
   // ============================================================
   const renderAddOnModal = () => {
     if (!showAddOnModal) return null;
@@ -2182,9 +2196,6 @@ const handleCreateLead = async (e) => {
     );
   };
 
-  // ============================================================
-  // RENDER: RENEWAL ALERTS
-  // ============================================================
   const renderRenewalAlerts = () => {
     if (renewalAlerts.length === 0) return null;
 
@@ -2304,9 +2315,6 @@ const handleCreateLead = async (e) => {
     );
   };
 
-  // ============================================================
-  // RENDER: VALIDATION POPUP
-  // ============================================================
   const renderValidationPopup = () => {
     if (!validationPopup.show) return null;
 
@@ -2365,9 +2373,6 @@ const handleCreateLead = async (e) => {
     );
   };
 
-  // ============================================================
-  // RENDER: PREVIOUS POLICY POPUP
-  // ============================================================
   const renderPreviousPolicyPopup = () => {
     if (!showPreviousPolicyPopup) return null;
     
@@ -2410,14 +2415,12 @@ const handleCreateLead = async (e) => {
               {validationErrors.previousPolicyCase && <p className="text-red-500 text-xs mt-1">{validationErrors.previousPolicyCase}</p>}
             </div>
 
-            {/* Fresh Case */}
             {showFreshCaseFields && (
               <div className="p-4 bg-green-50 rounded-lg border border-green-200">
                 <p className="text-green-700 text-sm">✓ Fresh Case selected - No previous policy details required.</p>
               </div>
             )}
 
-            {/* Portability Case */}
             {showPortabilityFields && (
               <div>
                 <div>
@@ -2551,7 +2554,6 @@ const handleCreateLead = async (e) => {
               </div>
             )}
 
-            {/* Renewal Case */}
             {showRenewalFields && (
               <div className="border rounded-lg p-4 bg-gray-50">
                 <h4 className="font-semibold text-indigo-600 mb-3">Renewal Details</h4>
@@ -2644,9 +2646,6 @@ const handleCreateLead = async (e) => {
     );
   };
 
-  // ============================================================
-  // RENDER: HEALTH FORM
-  // ============================================================
   const renderHealthForm = () => {
     const handleMemberRiderChange = (index, field, value) => {
       const newMembers = [...healthDetails.members];
@@ -2668,7 +2667,6 @@ const handleCreateLead = async (e) => {
           <FaHeartbeat /> Health Insurance Details
         </h3>
 
-        {/* ACTIVE PREVIOUS POLICY */}
         <div className="bg-indigo-50 p-4 rounded-lg mb-4 border border-indigo-200">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -3042,7 +3040,6 @@ const handleCreateLead = async (e) => {
           </div>
         </div>
 
-        {/* Floater Members */}
         {showFloaterMembers && healthDetails.members.length > 0 && (
           <div className="mt-4 border-t-2 border-indigo-200 pt-4">
             <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
@@ -3206,7 +3203,6 @@ const handleCreateLead = async (e) => {
                     />
                   </div>
                   
-                  {/* Rider Section */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
                     <select
@@ -3415,49 +3411,26 @@ const handleCreateLead = async (e) => {
     const maxDate = getMaxDate();
     const odRestrictions = getODDueDateRestrictions();
     
-    // Get current year and previous years (up to 20 years back)
     const currentYear = new Date().getFullYear();
     const yearOptions = [];
     for (let i = 0; i <= 20; i++) {
       yearOptions.push(currentYear - i);
     }
     
-    // Month options
     const monthOptions = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
     ];
 
-    // Determine if insurance type is a Bundle Package
     const isBundlePackage = motorDetails.insuranceType?.startsWith("Bundle Package");
-
-    // Determine if insurance type is Comprehensive or SAOD
     const isComprehensiveOrSAOD = 
       motorDetails.insuranceType === "Comprehensive (OD+TP)" || 
       motorDetails.insuranceType === "SAOD (On Damage)";
-
-    // Determine if insurance type is TP
     const isTP = motorDetails.insuranceType === "TP (Third Party)";
-
-    // Determine if showing Active Policy fields
     const showActiveFields = motorDetails.previousInsuranceStatus === "Active";
-
-    // Determine if showing New Vehicle fields
     const showNewVehicleFields = motorDetails.previousInsuranceStatus === "New";
-
-    // Determine if showing SAOD fields
     const showSAODFields = motorDetails.insuranceType === "SAOD (On Damage)";
-
-    // Determine if showing TP fields
     const showTPFields = motorDetails.insuranceType === "TP (Third Party)";
-
-    // Determine NCB display
-    const getNCBDisplay = () => {
-      if (motorDetails.claimTaken === "Yes") {
-        return "0% (Auto - Claim Taken)";
-      }
-      return motorDetails.ncb || "";
-    };
 
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
@@ -3496,22 +3469,24 @@ const handleCreateLead = async (e) => {
             {validationErrors.previousInsuranceStatus && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsuranceStatus}</p>}
           </div>
 
-          {/* Registration Number */}
-          <div>
-            <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
-            <input
-              data-field="registrationNumber"
-              type="text"
-              value={motorDetails.registrationNumber}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, registrationNumber: e.target.value.toUpperCase() }))}
-              className={`w-full p-2 border rounded-lg uppercase ${validationErrors.registration ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder="e.g., BR01AB1234"
-            />
-            {validationErrors.registration && <p className="text-red-500 text-xs mt-1">{validationErrors.registration}</p>}
-          </div>
+          {/* Registration Number - Only for non-New vehicles */}
+          {!showNewVehicleFields && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
+              <input
+                data-field="registrationNumber"
+                type="text"
+                value={motorDetails.registrationNumber}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, registrationNumber: e.target.value.toUpperCase() }))}
+                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.registration ? 'border-red-500' : 'border-gray-300'}`}
+                placeholder="e.g., BR01AB1234"
+              />
+              {validationErrors.registration && <p className="text-red-500 text-xs mt-1">{validationErrors.registration}</p>}
+            </div>
+          )}
 
-          {/* Auto-fetched RTO Code */}
-          {motorDetails.autoRtoCode && (
+          {/* Auto-fetched RTO Code - Only for non-New vehicles */}
+          {!showNewVehicleFields && motorDetails.autoRtoCode && (
             <div>
               <label className="text-sm font-medium text-gray-700">RTO Code (Auto-fetched)</label>
               <input
@@ -3534,7 +3509,6 @@ const handleCreateLead = async (e) => {
                 setMotorDetails(prev => ({ 
                   ...prev, 
                   insuranceType: selectedType,
-                  // Reset dependent fields
                   odDueDate: "",
                   tpDueDate: "",
                   saodOdDueDate: "",
@@ -3591,6 +3565,20 @@ const handleCreateLead = async (e) => {
                   placeholder="Enter model name"
                 />
                 {validationErrors.model && <p className="text-red-500 text-xs mt-1">{validationErrors.model}</p>}
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-700">Fuel Type <span className="text-red-500">*</span></label>
+                <select
+                  data-field="fuelType"
+                  value={motorDetails.fuelType}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, fuelType: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.fuelType ? 'border-red-500' : 'border-gray-300'}`}
+                >
+                  <option value="">Select Fuel Type</option>
+                  {FUEL_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                </select>
+                {validationErrors.fuelType && <p className="text-red-500 text-xs mt-1">{validationErrors.fuelType}</p>}
               </div>
 
               <div>
@@ -3661,6 +3649,19 @@ const handleCreateLead = async (e) => {
               </div>
 
               <div>
+                <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
+                <input
+                  data-field="invoiceCopy"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png"
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.invoiceCopy ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {motorDetails.invoiceCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {validationErrors.invoiceCopy && <p className="text-red-500 text-xs mt-1">{validationErrors.invoiceCopy}</p>}
+              </div>
+
+              <div>
                 <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
                 <input
                   type="file"
@@ -3669,17 +3670,6 @@ const handleCreateLead = async (e) => {
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
                 {motorDetails.chesisPhoto && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Invoice Copy (Not Mandatory)</label>
-                <input
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                />
-                {motorDetails.invoiceCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
               </div>
             </div>
           </div>
@@ -3692,7 +3682,6 @@ const handleCreateLead = async (e) => {
               <FaShieldAlt /> Active Policy Details
             </h4>
             
-            {/* Comprehensive or SAOD - OD Due Date & TP Due Date */}
             {isComprehensiveOrSAOD && (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                 <div>
@@ -3733,7 +3722,6 @@ const handleCreateLead = async (e) => {
               </div>
             )}
 
-            {/* Common Active Policy Fields */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy No. <span className="text-red-500">*</span></label>
@@ -3776,7 +3764,6 @@ const handleCreateLead = async (e) => {
               </div>
             </div>
 
-            {/* Claim & NCB Section - Only for Active Policy */}
             <div className="mt-4 border-t border-gray-200 pt-4">
               <h5 className="text-sm font-semibold text-gray-700 mb-3">Claim & NCB Details</h5>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -3910,25 +3897,25 @@ const handleCreateLead = async (e) => {
           </div>
         )}
 
-      
-{showTPFields && (
-  <div className="mt-4 border-t border-orange-200 pt-4">
-    <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-      <div>
-        <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
-        <input
-          data-field="tpInsuranceDueDate"
-          type="date"
-          value={motorDetails.tpInsuranceDueDate}
-          onChange={(e) => setMotorDetails(prev => ({ ...prev, tpInsuranceDueDate: e.target.value }))}
-          className={`w-full p-2 border rounded-lg ${validationErrors.tpInsuranceDueDate ? 'border-red-500' : 'border-gray-300'}`}
-        />
-        {validationErrors.tpInsuranceDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpInsuranceDueDate}</p>}
-      </div>
-    </div>
-  </div>
-)}
+        {/* TP Insurance Fields */}
+        {showTPFields && (
+          <div className="mt-4 border-t border-orange-200 pt-4">
+            <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
+                <input
+                  data-field="tpInsuranceDueDate"
+                  type="date"
+                  value={motorDetails.tpInsuranceDueDate}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, tpInsuranceDueDate: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.tpInsuranceDueDate ? 'border-red-500' : 'border-gray-300'}`}
+                />
+                {validationErrors.tpInsuranceDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpInsuranceDueDate}</p>}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Add-On Section - For all types except TP */}
         {!isTP && (
@@ -4012,58 +3999,68 @@ const handleCreateLead = async (e) => {
           </div>
         )}
 
-        {/* Uploads Section */}
-        <div className="mt-4 border-t border-gray-200 pt-4">
-          <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* PYP Upload - Only for Active Policy */}
-            {showActiveFields && (
-              <div>
-                <label className="text-sm font-medium text-gray-700">Upload PYP <span className="text-red-500">*</span></label>
-                <input
-                  data-field="pypFile"
-                  type="file"
-                  accept=".pdf"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {motorDetails.pypFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-                {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
-              </div>
-            )}
+       {/* Uploads Section - Updated for all statuses */}
+<div className="mt-4 border-t border-gray-200 pt-4">
+  <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    
+    {/* PYP Upload - Show for ALL statuses (Active, Expired, New) */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        Upload PYP 
+        {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        data-field="pypFile"
+        type="file"
+        accept=".pdf"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.pypFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
+     
+    </div>
 
-            {/* RC Upload - Except for New Vehicle */}
-            {!showNewVehicleFields && (
-              <>
-                <div>
-                  <label className="text-sm font-medium text-gray-700">RC Front Upload <span className="text-red-500">*</span></label>
-                  <input
-                    data-field="rcFrontFile"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg"
-                    onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
-                  />
-                  {motorDetails.rcFrontFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-                  {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
-                </div>
+    {/* RC Front Upload - Show for ALL statuses */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        RC Front Upload
+        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        data-field="rcFrontFile"
+        type="file"
+        accept=".pdf,.jpg,.jpeg"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.rcFrontFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
+    
+    </div>
 
-                <div>
-                  <label className="text-sm font-medium text-gray-700">RC Back Upload <span className="text-red-500">*</span></label>
-                  <input
-                    data-field="rcBackFile"
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg"
-                    onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
-                  />
-                  {motorDetails.rcBackFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-                  {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
-                </div>
-              </>
-            )}
-          </div>
-        </div>
+    {/* RC Back Upload - Show for ALL statuses */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        RC Back Upload
+        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        data-field="rcBackFile"
+        type="file"
+        accept=".pdf,.jpg,.jpeg"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.rcBackFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
+     
+    </div>
+
+   
+  </div>
+</div>
 
         {/* Add-On Modal */}
         {renderAddOnModal()}
@@ -4271,326 +4268,326 @@ const handleCreateLead = async (e) => {
     );
   };
 
-// ============================================================
-// RENDER: WORKFLOW FORM (Edit Modal) - UPDATED
-// ============================================================
-const renderWorkflowForm = () => {
-  const isPolicyIssued = workflowDetails.status === "Policy Issued";
-  
-  return (
-    <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-      <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaEdit /> Workflow Management (Admin Only)
-      </h3>
+  // ============================================================
+  // RENDER: WORKFLOW FORM (Edit Modal)
+  // ============================================================
+  const renderWorkflowForm = () => {
+    const isPolicyIssued = workflowDetails.status === "Policy Issued";
+    
+    return (
+      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+          <FaEdit /> Workflow Management (Admin Only)
+        </h3>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div>
-          <label className="text-sm font-medium text-gray-700">Status</label>
-          <select
-            value={workflowDetails.status}
-            onChange={(e) => {
-              setWorkflowDetails(prev => ({ ...prev, status: e.target.value }));
-              setShowInsurerQuotes(e.target.value === "Quotation Generated");
-            }}
-            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-            disabled={isPolicyIssued}
-          >
-            {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
-        </div>
-
-       {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
-  <>
-    <div className="lg:col-span-3">
-      <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
-      <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
-        {INSURER_OPTIONS.slice(0, 10).map(ins => (
-          <label key={ins} className="flex items-center gap-2 text-sm">
-            <input
-              type="checkbox"
-              checked={workflowDetails.selectedInsurers?.includes(ins) || false}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={workflowDetails.status}
               onChange={(e) => {
-                if (isPolicyIssued) return;
-                const current = workflowDetails.selectedInsurers || [];
-                let updated;
-                if (e.target.checked) {
-                  updated = [...current, ins];
-                } else {
-                  updated = current.filter(i => i !== ins);
-                }
-                setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
+                setWorkflowDetails(prev => ({ ...prev, status: e.target.value }));
+                setShowInsurerQuotes(e.target.value === "Quotation Generated");
               }}
-              className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
               disabled={isPolicyIssued}
-            />
-            {ins}
-          </label>
-        ))}
-      </div>
-      {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
-    </div>
-    {workflowDetails.selectedInsurers?.length > 0 && (
-      <div className="lg:col-span-3">
-        <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
-        {workflowDetails.selectedInsurers.map((insurer, idx) => (
-          <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
-            <h6 className="font-medium text-indigo-600">{insurer}</h6>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-              <div>
-                <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
-                <input 
-                  type="text" 
-                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                  disabled={isPolicyIssued}
-                  placeholder="Enter quote number"
-                  value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
-                  onChange={(e) => {
-                    if (isPolicyIssued) return;
-                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                    if (!updatedQuotes[idx]) {
-                      updatedQuotes[idx] = { insurerName: insurer };
-                    }
-                    updatedQuotes[idx].quoteNumber = e.target.value;
-                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                  }}
-                />
+            >
+              {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
+          </div>
+
+          {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
+            <>
+              <div className="lg:col-span-3">
+                <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
+                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+                  {INSURER_OPTIONS.slice(0, 10).map(ins => (
+                    <label key={ins} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={workflowDetails.selectedInsurers?.includes(ins) || false}
+                        onChange={(e) => {
+                          if (isPolicyIssued) return;
+                          const current = workflowDetails.selectedInsurers || [];
+                          let updated;
+                          if (e.target.checked) {
+                            updated = [...current, ins];
+                          } else {
+                            updated = current.filter(i => i !== ins);
+                          }
+                          setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
+                        }}
+                        className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
+                        disabled={isPolicyIssued}
+                      />
+                      {ins}
+                    </label>
+                  ))}
+                </div>
+                {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Upload Quote</label>
-                <input 
-                  type="file" 
-                  accept=".pdf,.jpg,.jpeg" 
-                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              {workflowDetails.selectedInsurers?.length > 0 && (
+                <div className="lg:col-span-3">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
+                  {workflowDetails.selectedInsurers.map((insurer, idx) => (
+                    <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                      <h6 className="font-medium text-indigo-600">{insurer}</h6>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
+                          <input 
+                            type="text" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter quote number"
+                            value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].quoteNumber = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                          <input 
+                            type="file" 
+                            accept=".pdf,.jpg,.jpeg" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const file = e.target.files[0];
+                              if (file) {
+                                const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                                if (!updatedQuotes[idx]) {
+                                  updatedQuotes[idx] = { insurerName: insurer };
+                                }
+                                updatedQuotes[idx].quoteUpload = file.name;
+                                setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                              }
+                            }}
+                          />
+                          {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
+                            <p className="text-xs text-green-500 mt-1">✓ {workflowDetails.insurerQuotes[idx].quoteUpload}</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Premium Amount</label>
+                          <input 
+                            type="number" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter amount"
+                            value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].premiumAmount = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                          <select 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].paymentMode = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Half Quarterly">Half Quarterly</option>
+                            <option value="Half Yearly">Half Yearly</option>
+                            <option value="Yearly">Yearly</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                          <input 
+                            type="number" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter discount"
+                            value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].finalDiscount = e.target.value;
+                              const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
+                              const discount = parseFloat(e.target.value) || 0;
+                              updatedQuotes[idx].payableAmount = premium - discount;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Payable Amount</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            className="w-full p-1 border rounded bg-gray-100 text-sm"
+                            value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Payment Status</label>
+            <select
+              value={workflowDetails.paymentStatus}
+              onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              disabled={isPolicyIssued}
+            >
+              <option value="">Select</option>
+              {PAYMENT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment status is locked when Policy Issued</p>}
+          </div>
+
+          {workflowDetails.paymentStatus === "URL Shared" && (
+            <div className="lg:col-span-3">
+              <label className="text-sm font-medium text-gray-700">Payment URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={workflowDetails.paymentUrl}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentUrl: e.target.value }))}
+                  className={`flex-1 p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
                   disabled={isPolicyIssued}
-                  onChange={(e) => {
-                    if (isPolicyIssued) return;
-                    const file = e.target.files[0];
-                    if (file) {
-                      const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                      if (!updatedQuotes[idx]) {
-                        updatedQuotes[idx] = { insurerName: insurer };
-                      }
-                      updatedQuotes[idx].quoteUpload = file.name;
-                      setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                    }
-                  }}
+                  placeholder="https://payment.link/..."
                 />
-                {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
-                  <p className="text-xs text-green-500 mt-1">✓ {workflowDetails.insurerQuotes[idx].quoteUpload}</p>
+                {workflowDetails.paymentUrl && !isPolicyIssued && (
+                  <a href={workflowDetails.paymentUrl} target="_blank" rel="noopener noreferrer" 
+                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <FaLink /> Open
+                  </a>
                 )}
               </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Premium Amount</label>
-                <input 
-                  type="number" 
-                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                  disabled={isPolicyIssued}
-                  placeholder="Enter amount"
-                  value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
-                  onChange={(e) => {
-                    if (isPolicyIssued) return;
-                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                    if (!updatedQuotes[idx]) {
-                      updatedQuotes[idx] = { insurerName: insurer };
-                    }
-                    updatedQuotes[idx].premiumAmount = e.target.value;
-                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                  }}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Payment Mode</label>
-                <select 
-                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                  disabled={isPolicyIssued}
-                  value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
-                  onChange={(e) => {
-                    if (isPolicyIssued) return;
-                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                    if (!updatedQuotes[idx]) {
-                      updatedQuotes[idx] = { insurerName: insurer };
-                    }
-                    updatedQuotes[idx].paymentMode = e.target.value;
-                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                  }}
-                >
-                  <option value="">Select</option>
-                  <option value="Monthly">Monthly</option>
-                  <option value="Quarterly">Quarterly</option>
-                  <option value="Half Quarterly">Half Quarterly</option>
-                  <option value="Half Yearly">Half Yearly</option>
-                  <option value="Yearly">Yearly</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Final Discount</label>
-                <input 
-                  type="number" 
-                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                  disabled={isPolicyIssued}
-                  placeholder="Enter discount"
-                  value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
-                  onChange={(e) => {
-                    if (isPolicyIssued) return;
-                    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                    if (!updatedQuotes[idx]) {
-                      updatedQuotes[idx] = { insurerName: insurer };
-                    }
-                    updatedQuotes[idx].finalDiscount = e.target.value;
-                    const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
-                    const discount = parseFloat(e.target.value) || 0;
-                    updatedQuotes[idx].payableAmount = premium - discount;
-                    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                  }}
-                />
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-700">Payable Amount</label>
-                <input 
-                  type="text" 
-                  readOnly 
-                  className="w-full p-1 border rounded bg-gray-100 text-sm"
-                  value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
-                />
-              </div>
+              {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment URL is locked when Policy Issued</p>}
             </div>
-          </div>
-        ))}
-      </div>
-    )}
-  </>
-)}
+          )}
 
-        <div>
-          <label className="text-sm font-medium text-gray-700">Payment Status</label>
-          <select
-            value={workflowDetails.paymentStatus}
-            onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
-            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-            disabled={isPolicyIssued}
-          >
-            <option value="">Select</option>
-            {PAYMENT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-          </select>
-          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment status is locked when Policy Issued</p>}
-        </div>
+          {workflowDetails.paymentStatus === "Payment Done" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">UTR Number</label>
+                <input
+                  type="text"
+                  value={workflowDetails.utrNumber}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, utrNumber: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload Payment Snapshot</label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg"
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                />
+                {workflowDetails.paymentSnapshot && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              </div>
+            </>
+          )}
 
-        {workflowDetails.paymentStatus === "URL Shared" && (
+          {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Number</label>
+                <input
+                  type="text"
+                  value={workflowDetails.policyNumber}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Issued On</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyIssuedOn}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyStartDate}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyExpiryDate}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload Policy Copy</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+                {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              </div>
+            </>
+          )}
+
           <div className="lg:col-span-3">
-            <label className="text-sm font-medium text-gray-700">Payment URL</label>
-            <div className="flex gap-2">
-              <input
-                type="url"
-                value={workflowDetails.paymentUrl}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentUrl: e.target.value }))}
-                className={`flex-1 p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                disabled={isPolicyIssued}
-                placeholder="https://payment.link/..."
-              />
-              {workflowDetails.paymentUrl && !isPolicyIssued && (
-                <a href={workflowDetails.paymentUrl} target="_blank" rel="noopener noreferrer" 
-                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
-                  <FaLink /> Open
-                </a>
-              )}
-            </div>
-            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment URL is locked when Policy Issued</p>}
+            <label className="text-sm font-medium text-gray-700">Remarks</label>
+            <textarea
+              value={workflowDetails.remarks}
+              onChange={(e) => setWorkflowDetails(prev => ({ ...prev, remarks: e.target.value }))}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              rows="3"
+              disabled={isPolicyIssued}
+            />
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Remarks are locked when Policy Issued</p>}
           </div>
-        )}
-
-        {workflowDetails.paymentStatus === "Payment Done" && (
-          <>
-            <div>
-              <label className="text-sm font-medium text-gray-700">UTR Number</label>
-              <input
-                type="text"
-                value={workflowDetails.utrNumber}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, utrNumber: e.target.value }))}
-                className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                disabled={isPolicyIssued}
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Upload Payment Snapshot</label>
-              <input
-                type="file"
-                accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
-                className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                disabled={isPolicyIssued}
-              />
-              {workflowDetails.paymentSnapshot && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-            </div>
-          </>
-        )}
-
-        {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
-          <>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Number</label>
-              <input
-                type="text"
-                value={workflowDetails.policyNumber}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Issued On</label>
-              <input
-                type="date"
-                value={workflowDetails.policyIssuedOn}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
-              <input
-                type="date"
-                value={workflowDetails.policyStartDate}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
-              <input
-                type="date"
-                value={workflowDetails.policyExpiryDate}
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-700">Upload Policy Copy</label>
-              <input
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-              {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-            </div>
-          </>
-        )}
-
-        <div className="lg:col-span-3">
-          <label className="text-sm font-medium text-gray-700">Remarks</label>
-          <textarea
-            value={workflowDetails.remarks}
-            onChange={(e) => setWorkflowDetails(prev => ({ ...prev, remarks: e.target.value }))}
-            className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-            rows="3"
-            disabled={isPolicyIssued}
-          />
-          {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Remarks are locked when Policy Issued</p>}
         </div>
       </div>
-    </div>
-  );
-};
+    );
+  };
 
   // ============================================================
   // RENDER: LEAD FORM MODAL
@@ -4773,34 +4770,33 @@ const renderWorkflowForm = () => {
                 </select>
               </div>
 
-          
-{sourceDependentField && (
-  <div>
-    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-    {formData.source === "Employee" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Employee</option>
-        {employees.map((emp) => (
-          <option key={emp._id} value={emp.fullName || emp.username}>
-            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder={`Enter ${sourceDependentField}`}
-      />
-    )}
-  </div>
-)}
+              {sourceDependentField && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+                  {formData.source === "Employee" ? (
+                    <select
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map((emp) => (
+                        <option key={emp._id} value={emp.fullName || emp.username}>
+                          {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder={`Enter ${sourceDependentField}`}
+                    />
+                  )}
+                </div>
+              )}
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
                 <textarea
@@ -5030,34 +5026,33 @@ const renderWorkflowForm = () => {
                 </select>
               </div>
 
-            
-{sourceDependentField && (
-  <div>
-    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-    {formData.source === "Employee" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Employee</option>
-        {employees.map((emp) => (
-          <option key={emp._id} value={emp.fullName || emp.username}>
-            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder={`Enter ${sourceDependentField}`}
-      />
-    )}
-  </div>
-)}
+              {sourceDependentField && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+                  {formData.source === "Employee" ? (
+                    <select
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map((emp) => (
+                        <option key={emp._id} value={emp.fullName || emp.username}>
+                          {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="text"
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder={`Enter ${sourceDependentField}`}
+                    />
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
