@@ -495,6 +495,7 @@ function LeadTable() {
   const [showFreshCaseFields, setShowFreshCaseFields] = useState(false);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [channelPartners, setChannelPartners] = useState([]);
 
   const filterDropdownRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -526,6 +527,29 @@ function LeadTable() {
   useEffect(() => {
     fetchEmployees();
   }, []);
+
+  const fetchChannelPartners = async () => {
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/users`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const channelPartnerList = data.filter(user => 
+        user.userType === "Channel Partner" || user.role === "Channel Partner"
+      );
+      setChannelPartners(channelPartnerList);
+    }
+  } catch (err) {
+    console.error("Fetch channel partners error:", err);
+  }
+};
+
+useEffect(() => {
+  fetchChannelPartners();
+}, []);
 
   // ============================================================
   // EFFECTS
@@ -559,27 +583,27 @@ function LeadTable() {
     checkRenewalAlerts();
   }, [leads]);
 
-  useEffect(() => {
-    switch (formData.source) {
-      case "Employee":
-        setSourceDependentField("Employee Name");
-        break;
-      case "Channel Partner":
-        setSourceDependentField("Channel Partner Name");
-        break;
-      case "Store":
-        setSourceDependentField("Store Name");
-        break;
-      case "Social Media":
-        setSourceDependentField("Social Media Source");
-        break;
-      case "Other":
-        setSourceDependentField("Other Static List");
-        break;
-      default:
-        setSourceDependentField("");
-    }
-  }, [formData.source]);
+ useEffect(() => {
+  switch (formData.source) {
+    case "Employee":
+      setSourceDependentField("Employee Name");
+      break;
+    case "Channel Partner":
+      setSourceDependentField("Channel Partner Name");
+      break;
+    case "Store":
+      setSourceDependentField("Store Name");
+      break;
+    case "Social Media":
+      setSourceDependentField("Social Media Source");
+      break;
+    case "Other":
+      setSourceDependentField("Other Static List");
+      break;
+    default:
+      setSourceDependentField("");
+  }
+}, [formData.source]);
 
   useEffect(() => {
     setShowSeniorOneDOB(healthDetails.policyType === "Floater");
@@ -4770,33 +4794,46 @@ if (showMotorSection) {
                 </select>
               </div>
 
-              {sourceDependentField && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-                  {formData.source === "Employee" ? (
-                    <select
-                      value={formData.sourceDependentValue}
-                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map((emp) => (
-                        <option key={emp._id} value={emp.fullName || emp.username}>
-                          {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData.sourceDependentValue}
-                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                      placeholder={`Enter ${sourceDependentField}`}
-                    />
-                  )}
-                </div>
-              )}
+            {sourceDependentField && (
+  <div>
+    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+    {formData.source === "Employee" ? (
+      <select
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+      >
+        <option value="">Select Employee</option>
+        {employees.map((emp) => (
+          <option key={emp._id} value={emp.fullName || emp.username}>
+            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+          </option>
+        ))}
+      </select>
+    ) : formData.source === "Channel Partner" ? (
+      <select
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+      >
+        <option value="">Select Channel Partner</option>
+        {channelPartners.map((partner) => (
+          <option key={partner._id} value={partner.fullName || partner.username}>
+            {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
+          </option>
+        ))}
+      </select>
+    ) : (
+      <input
+        type="text"
+        value={formData.sourceDependentValue}
+        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+        className="w-full p-2 border border-gray-300 rounded-lg"
+        placeholder={`Enter ${sourceDependentField}`}
+      />
+    )}
+  </div>
+)}
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
                 <textarea
