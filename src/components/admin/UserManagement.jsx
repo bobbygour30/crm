@@ -126,65 +126,44 @@ function UserManagement() {
     "Other Insurance",
   ];
 
-  // User Types - Removed Vendor and Store
+  // User Types
   const USER_TYPES = ["Employee", "Channel Partner", "Admin"];
 
   // New User State
   const [newUser, setNewUser] = useState({
-    // User Type
     userType: "Employee",
-    
-    // Personal Information (Employee & Channel Partner)
     fullName: "",
     fathersName: "",
     mothersName: "",
     dateOfBirth: "",
-    
-    // Educational Qualification (Employee & Channel Partner)
     qualification: "",
     otherQualification: "",
-    
-    // KYC & Document Upload (Employee & Channel Partner)
     aadhaarNumber: "",
     aadhaarFile: null,
     panNumber: "",
     panFile: null,
-    
-    // Educational Documents (Employee & Channel Partner)
     tenthMarksheet: null,
     twelfthMarksheet: null,
     ugMarksheet: null,
     pgMarksheet: null,
-    
-    // Address Details (Employee & Channel Partner)
     pinCode: "",
     state: "",
     city: "",
     village: "",
     block: "",
-    
-    // Official Details (Employee ONLY)
     department: "",
     designation: "",
-    
-    // Contact Details (Employee & Channel Partner)
     mobileNumber: "",
     alternateMobile: "",
     personalEmail: "",
     officialEmail: "",
     emergencyContact: "",
-    
-    // Employment Details (Employee ONLY)
     dateOfJoining: "",
     employeeId: "",
-    
-    // Bank Details (Employee & Channel Partner)
     bankName: "",
     bankAccountNumber: "",
     ifscCode: "",
     bankBranch: "",
-    
-    // Organization Details (Channel Partner ONLY)
     organizationName: "",
     gstNumber: "",
     contactPersonName: "",
@@ -192,17 +171,9 @@ function UserManagement() {
     contactEmail: "",
     address: "",
     interestedLobs: [],
-    
-    // Cancel Check (Employee & Channel Partner)
-    cancelCheck: null,
-    
-    // Auto Generated Code (Channel Partner ONLY)
     generatedCode: "",
-    
-    // Password
+    cancelCheck: null,
     password: "",
-    
-    // Legacy fields for compatibility
     username: "",
     email: "",
     mobile: "",
@@ -604,10 +575,10 @@ function UserManagement() {
         errorList.push({ field: "bankBranch", message: "Bank Branch is required" });
       }
 
-      // Cancel Check - Required for both Employee and Channel Partner
+      // Cancel Check - Required for both Employee and Channel Partner (New users only)
       if (!isEdit && !userData.cancelCheck) {
-        errors.cancelCheck = "Cancel Check image is required";
-        errorList.push({ field: "cancelCheck", message: "Cancel Check image is required" });
+        errors.cancelCheck = "Cancel Check image/PDF is required";
+        errorList.push({ field: "cancelCheck", message: "Cancel Check image/PDF is required" });
       }
     }
 
@@ -702,6 +673,7 @@ function UserManagement() {
     }
   };
 
+  // FIXED: Handle Add User with better error handling
   const handleAddUser = async (e) => {
     e.preventDefault();
     
@@ -712,20 +684,28 @@ function UserManagement() {
     setIsLoading(true);
     const formData = new FormData();
     
+    // Process all fields properly
     Object.keys(newUser).forEach((key) => {
-      if (newUser[key] !== null && newUser[key] !== undefined) {
-        if (key === 'interestedLobs') {
-          formData.append(key, JSON.stringify(newUser[key]));
-        } else if (key === 'aadhaarFile' || key === 'panFile' || 
-                   key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
-                   key === 'ugMarksheet' || key === 'pgMarksheet' ||
-                   key === 'cancelCheck' || key === 'gstCertificate' || 
-                   key === 'aadharCard') {
+      if (newUser[key] !== null && newUser[key] !== undefined && key !== '') {
+        // Handle file fields
+        if (key === 'aadhaarFile' || key === 'panFile' || 
+            key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
+            key === 'ugMarksheet' || key === 'pgMarksheet' ||
+            key === 'cancelCheck' || key === 'gstCertificate' || 
+            key === 'aadharCard') {
           if (newUser[key] instanceof File) {
             formData.append(key, newUser[key]);
           }
+          // If it's a string URL (existing file), skip it
+        } else if (key === 'interestedLobs') {
+          // Convert array to JSON string
+          if (Array.isArray(newUser[key])) {
+            formData.append(key, JSON.stringify(newUser[key]));
+          }
         } else {
-          formData.append(key, newUser[key]);
+          // Convert all values to string to avoid issues
+          const value = newUser[key] !== null && newUser[key] !== undefined ? String(newUser[key]) : '';
+          formData.append(key, value);
         }
       }
     });
@@ -738,7 +718,7 @@ function UserManagement() {
 
     try {
       const token = localStorage.getItem("token");
-      await axios.post(
+      const response = await axios.post(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/register`,
         formData,
         {
@@ -748,12 +728,24 @@ function UserManagement() {
           },
         }
       );
+      
+      console.log('User added successfully:', response.data);
       fetchUsers();
       resetNewUserForm();
       alert("User added successfully!");
     } catch (err) {
       console.error("Add user error:", err);
-      alert(err.response?.data?.msg || "Error adding user.");
+      
+      // Show detailed error message
+      let errorMsg = "Error adding user.";
+      if (err.response) {
+        if (err.response.data.errors) {
+          errorMsg = err.response.data.errors.join('\n');
+        } else if (err.response.data.msg) {
+          errorMsg = err.response.data.msg;
+        }
+      }
+      alert(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -881,6 +873,7 @@ function UserManagement() {
     setIsModalOpen(true);
   };
 
+  // FIXED: Handle Update User with better error handling
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     
@@ -891,27 +884,33 @@ function UserManagement() {
     setIsLoading(true);
     const formData = new FormData();
     
+    // Process all fields properly
     Object.keys(editUserState).forEach((key) => {
       if (editUserState[key] !== null && editUserState[key] !== undefined && key !== "_id") {
-        if (key === 'interestedLobs') {
-          formData.append(key, JSON.stringify(editUserState[key]));
-        } else if (key === 'aadhaarFile' || key === 'panFile' || 
-                   key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
-                   key === 'ugMarksheet' || key === 'pgMarksheet' ||
-                   key === 'cancelCheck' || key === 'gstCertificate' || 
-                   key === 'aadharCard') {
+        // Handle file fields
+        if (key === 'aadhaarFile' || key === 'panFile' || 
+            key === 'tenthMarksheet' || key === 'twelfthMarksheet' ||
+            key === 'ugMarksheet' || key === 'pgMarksheet' ||
+            key === 'cancelCheck' || key === 'gstCertificate' || 
+            key === 'aadharCard') {
           if (editUserState[key] instanceof File) {
             formData.append(key, editUserState[key]);
           }
+          // If it's a string URL (existing file), skip it
+        } else if (key === 'interestedLobs') {
+          if (Array.isArray(editUserState[key])) {
+            formData.append(key, JSON.stringify(editUserState[key]));
+          }
         } else {
-          formData.append(key, editUserState[key]);
+          const value = editUserState[key] !== null && editUserState[key] !== undefined ? String(editUserState[key]) : '';
+          formData.append(key, value);
         }
       }
     });
 
     try {
       const token = localStorage.getItem("token");
-      await axios.put(
+      const response = await axios.put(
         `${import.meta.env.VITE_BACKEND_URL}/api/auth/users/${editUserState._id}`,
         formData,
         {
@@ -921,6 +920,8 @@ function UserManagement() {
           },
         }
       );
+      
+      console.log('User updated successfully:', response.data);
       fetchUsers();
       setIsModalOpen(false);
       setEditUserState({
@@ -983,7 +984,15 @@ function UserManagement() {
       alert("User updated successfully!");
     } catch (err) {
       console.error("Update user error:", err);
-      alert(err.response?.data?.msg || "Error updating user.");
+      let errorMsg = "Error updating user.";
+      if (err.response) {
+        if (err.response.data.errors) {
+          errorMsg = err.response.data.errors.join('\n');
+        } else if (err.response.data.msg) {
+          errorMsg = err.response.data.msg;
+        }
+      }
+      alert(errorMsg);
     } finally {
       setIsLoading(false);
     }
@@ -1000,6 +1009,7 @@ function UserManagement() {
           }
         );
         fetchUsers();
+        alert("User deleted successfully!");
       } catch (err) {
         console.error("Delete user error:", err);
         alert(err.response?.data?.msg || "Error deleting user.");
@@ -1253,7 +1263,7 @@ function UserManagement() {
                     <label className="text-xs font-medium text-gray-600">{file.label}</label>
                     <input
                       type="file"
-                      accept=".pdf,.jpg,.jpeg"
+                      accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(e) => setFormData({ ...formData, [file.key]: e.target.files[0] })}
                       className="w-full p-1 border border-gray-300 rounded-lg text-sm"
                     />
@@ -1294,7 +1304,7 @@ function UserManagement() {
               <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg"
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setFormData({ ...formData, aadhaarFile: e.target.files[0] })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
@@ -1323,7 +1333,7 @@ function UserManagement() {
               <label className="text-sm font-medium text-gray-700">Upload PAN</label>
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg"
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setFormData({ ...formData, panFile: e.target.files[0] })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
@@ -1627,21 +1637,29 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Cancel Check - Employee */}
+        {/* Cancel Check - Employee - FIXED: Accept images and PDFs */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <FaFileImage className="text-indigo-600" /> Cancel Check
+            <FaFileImage className="text-indigo-600" /> Cancel Check (Bank Passbook)
           </h4>
           <div>
-            <label className="text-sm font-medium text-gray-700">Upload Cancel Check <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700">
+              Upload Cancel Check <span className="text-red-500">*</span>
+              <span className="text-xs text-gray-500 ml-2">(Accepts PDF, JPG, JPEG, PNG, GIF)</span>
+            </label>
             <input
               name="cancelCheck"
               type="file"
-              accept="image/*"
+              accept=".pdf,.jpg,.jpeg,.png,.gif"
               onChange={(e) => setFormData({ ...formData, cancelCheck: e.target.files[0] })}
               className={`w-full p-2 border rounded-lg ${validationErrors.cancelCheck ? 'border-red-500' : 'border-gray-300'}`}
             />
-            {formData.cancelCheck && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            {formData.cancelCheck && (
+              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                <FaCheck className="h-3 w-3" /> 
+                {formData.cancelCheck.name} ({(formData.cancelCheck.size / 1024).toFixed(2)} KB)
+              </p>
+            )}
             {validationErrors.cancelCheck && <p className="text-red-500 text-xs mt-1">{validationErrors.cancelCheck}</p>}
           </div>
         </div>
@@ -1770,7 +1788,7 @@ function UserManagement() {
                       <label className="text-xs font-medium text-gray-600">{file.label}</label>
                       <input
                         type="file"
-                        accept=".pdf,.jpg,.jpeg"
+                        accept=".pdf,.jpg,.jpeg,.png"
                         onChange={(e) => setFormData({ ...formData, [file.key]: e.target.files[0] })}
                         className="w-full p-1 border border-gray-300 rounded-lg text-sm"
                       />
@@ -1812,7 +1830,7 @@ function UserManagement() {
               <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg"
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setFormData({ ...formData, aadhaarFile: e.target.files[0] })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
@@ -1841,7 +1859,7 @@ function UserManagement() {
               <label className="text-sm font-medium text-gray-700">Upload PAN</label>
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg"
+                accept=".pdf,.jpg,.jpeg,.png"
                 onChange={(e) => setFormData({ ...formData, panFile: e.target.files[0] })}
                 className="w-full p-2 border border-gray-300 rounded-lg"
               />
@@ -2149,21 +2167,29 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Cancel Check - Channel Partner */}
+        {/* Cancel Check - Channel Partner - FIXED: Accept images and PDFs */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
-            <FaFileImage className="text-indigo-600" /> Cancel Check
+            <FaFileImage className="text-indigo-600" /> Cancel Check (Bank Passbook)
           </h4>
           <div>
-            <label className="text-sm font-medium text-gray-700">Upload Cancel Check <span className="text-red-500">*</span></label>
+            <label className="text-sm font-medium text-gray-700">
+              Upload Cancel Check <span className="text-red-500">*</span>
+              <span className="text-xs text-gray-500 ml-2">(Accepts PDF, JPG, JPEG, PNG, GIF)</span>
+            </label>
             <input
               name="cancelCheck"
               type="file"
-              accept="image/*"
+              accept=".pdf,.jpg,.jpeg,.png,.gif"
               onChange={(e) => setFormData({ ...formData, cancelCheck: e.target.files[0] })}
               className={`w-full p-2 border rounded-lg ${validationErrors.cancelCheck ? 'border-red-500' : 'border-gray-300'}`}
             />
-            {formData.cancelCheck && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+            {formData.cancelCheck && (
+              <p className="text-xs text-green-500 mt-1 flex items-center gap-1">
+                <FaCheck className="h-3 w-3" /> 
+                {formData.cancelCheck.name} ({(formData.cancelCheck.size / 1024).toFixed(2)} KB)
+              </p>
+            )}
             {validationErrors.cancelCheck && <p className="text-red-500 text-xs mt-1">{validationErrors.cancelCheck}</p>}
           </div>
         </div>
@@ -2207,17 +2233,27 @@ function UserManagement() {
           )}
         </div>
 
-        {/* Auto Generated Code - Channel Partner ONLY */}
+        {/* FIXED: Auto Generated Code - Channel Partner ONLY - Now editable */}
         <div className="bg-gray-50 p-4 rounded-lg">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4">
             <div>
-              <label className="text-sm font-medium text-gray-700">Auto Generated Code</label>
+              <label className="text-sm font-medium text-gray-700">
+                Channel Partner Code 
+                <span className="text-xs text-gray-500 ml-2">(Auto-generated, editable)</span>
+              </label>
               <input
                 type="text"
                 value={formData.generatedCode}
-                readOnly
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-mono text-indigo-600 font-semibold"
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+                  setFormData({ ...formData, generatedCode: val });
+                }}
+                className="w-full p-2 border border-gray-300 rounded-lg font-mono text-indigo-600 font-semibold"
+                placeholder="CP0001"
               />
+              <p className="text-xs text-gray-500 mt-1">
+                You can edit this code manually. Must be unique.
+              </p>
             </div>
           </div>
         </div>
