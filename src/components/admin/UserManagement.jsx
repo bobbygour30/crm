@@ -2347,7 +2347,7 @@ function UserManagement() {
           <table className="w-full table-auto min-w-[800px]">
             <thead>
               <tr className="bg-gray-100 text-left">
-                <th className="p-3 font-medium">User/Org Name</th>
+                <th className="p-3 font-medium">User Name</th>
                 <th className="p-3 font-medium">Type</th>
                 <th className="p-3 font-medium">Contact</th>
                 <th className="p-3 font-medium">Code/ID</th>
