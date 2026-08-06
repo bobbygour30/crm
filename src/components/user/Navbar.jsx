@@ -16,7 +16,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import assets from "../../assets/assets";
 
-function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
+function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -33,6 +33,9 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Get display name from props or user object
+  const displayName = username || user?.username || user?.fullName || user?.name || "Guest";
 
   useEffect(() => {
     const handleResize = () => {
@@ -55,7 +58,9 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username }) {
         {/* Logo and dynamic username */}
         <div className="flex items-center space-x-2 cursor-pointer">
           <img src={assets.logo} className="w-36 rounded-2xl" alt="Logo" />
-          <span className="font-semibold text-lg">{username || "CRM"}</span>
+          <span className="font-semibold text-lg">
+            {displayName !== "Guest" ? `Welcome, ${displayName}` : "CRM"}
+          </span>
         </div>
 
         {/* Desktop Menu */}
