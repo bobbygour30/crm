@@ -2364,9 +2364,9 @@ function UserManagement() {
                   transition={{ duration: 0.3 }}
                   className="border-b hover:bg-gray-50"
                 >
-                  <td className="p-3 font-medium">
-                    {user.userType === "Employee" ? user.fullName || user.username : user.organizationName || user.storeName}
-                  </td>
+                 <td className="p-3 font-medium">
+  {user.fullName || user.username || user.organizationName || user.storeName}
+</td>
                   <td className="p-3">
                     <span className={`px-2 py-1 rounded-full text-xs ${
                       user.userType === "Admin" ? "bg-purple-100 text-purple-800" :
