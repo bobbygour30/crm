@@ -421,11 +421,27 @@ function UserManagement() {
     }
   }, [editUserState.pinCode]);
 
+  // ============================================
+  // FIXED: handleUserTypeChange - Clear stale fields
+  // ============================================
   const handleUserTypeChange = (type, isEdit = false) => {
     if (isEdit) {
-      setEditUserState(prev => ({ ...prev, userType: type }));
+      setEditUserState(prev => ({ 
+        ...prev, 
+        userType: type,
+        employeeId: "",
+        generatedCode: ""
+      }));
     } else {
-      setNewUser(prev => ({ ...prev, userType: type }));
+      // Clear all stale fields first
+      setNewUser(prev => ({ 
+        ...prev, 
+        userType: type, 
+        employeeId: "", 
+        generatedCode: "" 
+      }));
+      
+      // Then set the appropriate code for the selected type
       if (type === "Employee") {
         const id = generateEmployeeId(users);
         setNewUser(prev => ({ ...prev, employeeId: id }));
@@ -673,7 +689,9 @@ function UserManagement() {
     }
   };
 
-  // FIXED: Handle Add User with better error handling
+  // ============================================
+  // FIXED: Handle Add User - Clear stale fields
+  // ============================================
   const handleAddUser = async (e) => {
     e.preventDefault();
     
@@ -751,6 +769,9 @@ function UserManagement() {
     }
   };
 
+  // ============================================
+  // FIXED: resetNewUserForm - Clear all fields properly
+  // ============================================
   const resetNewUserForm = () => {
     setNewUser({
       userType: "Employee",
@@ -924,63 +945,7 @@ function UserManagement() {
       console.log('User updated successfully:', response.data);
       fetchUsers();
       setIsModalOpen(false);
-      setEditUserState({
-        _id: "",
-        userType: "Employee",
-        fullName: "",
-        fathersName: "",
-        mothersName: "",
-        dateOfBirth: "",
-        qualification: "",
-        otherQualification: "",
-        aadhaarNumber: "",
-        aadhaarFile: null,
-        panNumber: "",
-        panFile: null,
-        tenthMarksheet: null,
-        twelfthMarksheet: null,
-        ugMarksheet: null,
-        pgMarksheet: null,
-        pinCode: "",
-        state: "",
-        city: "",
-        village: "",
-        block: "",
-        department: "",
-        designation: "",
-        mobileNumber: "",
-        alternateMobile: "",
-        personalEmail: "",
-        officialEmail: "",
-        emergencyContact: "",
-        dateOfJoining: "",
-        employeeId: "",
-        bankName: "",
-        bankAccountNumber: "",
-        ifscCode: "",
-        bankBranch: "",
-        organizationName: "",
-        gstNumber: "",
-        contactPersonName: "",
-        contactMobile: "",
-        contactEmail: "",
-        address: "",
-        interestedLobs: [],
-        generatedCode: "",
-        cancelCheck: null,
-        password: "",
-        username: "",
-        email: "",
-        mobile: "",
-        role: "Employee",
-        gst: "",
-        pan: "",
-        storeName: "",
-        ownerName: "",
-        gstCertificate: null,
-        aadharCard: null,
-        assignedSalesperson: "",
-      });
+      closeModal();
       alert("User updated successfully!");
     } catch (err) {
       console.error("Update user error:", err);
@@ -1017,6 +982,9 @@ function UserManagement() {
     }
   };
 
+  // ============================================
+  // FIXED: closeModal - Clear all fields properly
+  // ============================================
   const closeModal = () => {
     setIsModalOpen(false);
     setEditUserState({
@@ -1637,7 +1605,7 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Cancel Check - Employee - FIXED: Accept images and PDFs */}
+        {/* Cancel Check - Employee */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaFileImage className="text-indigo-600" /> Cancel Check (Bank Passbook)
@@ -2167,7 +2135,7 @@ function UserManagement() {
           </div>
         </div>
 
-        {/* Cancel Check - Channel Partner - FIXED: Accept images and PDFs */}
+        {/* Cancel Check - Channel Partner */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <h4 className="text-md font-semibold text-gray-700 mb-3 flex items-center gap-2">
             <FaFileImage className="text-indigo-600" /> Cancel Check (Bank Passbook)
@@ -2233,7 +2201,7 @@ function UserManagement() {
           )}
         </div>
 
-        {/* FIXED: Auto Generated Code - Channel Partner ONLY - Now editable */}
+        {/* Auto Generated Code - Channel Partner ONLY - Editable */}
         <div className="bg-gray-50 p-4 rounded-lg">
           <div className="grid grid-cols-1 gap-4">
             <div>
