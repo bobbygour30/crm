@@ -582,6 +582,8 @@ function EmployeeLeads() {
     }
   };
 
+  // FIXED: Do NOT filter out Channel Partners / Admins.
+  // A lead's employeeId can legitimately point to an Employee OR a Channel Partner.
   const fetchEmployees = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -592,10 +594,8 @@ function EmployeeLeads() {
       });
       if (res.ok) {
         const data = await res.json();
-        const employeesOnly = data.filter(user => 
-          user.userType === 'Employee' || user.role === 'Employee'
-        );
-        setEmployees(employeesOnly);
+        // Keep the full list so Channel Partners are available for name lookup
+        setEmployees(data);
       }
     } catch (err) {
       console.error("Error fetching employees:", err);
@@ -922,11 +922,33 @@ function EmployeeLeads() {
     return new Date(dateString).toLocaleDateString("en-IN");
   };
 
+  // FIXED: Prefer the already-populated employeeId object from the lead.
+  // Fallback to employees list + organizationName for Channel Partners.
   const getEmployeeName = (employeeId) => {
     if (!employeeId) return "Unknown";
-    const employeeIdStr = typeof employeeId === 'object' ? employeeId._id : employeeId;
-    const employee = employees.find(e => e._id === employeeIdStr);
-    return employee ? employee.fullName || employee.username || employee.name || employee.email : "Unknown";
+
+    // Preferred path: backend already populated the object
+    if (typeof employeeId === "object") {
+      return (
+        employeeId.fullName ||
+        employeeId.organizationName ||
+        employeeId.username ||
+        employeeId.name ||
+        employeeId.email ||
+        "Unknown"
+      );
+    }
+
+    // Fallback when only an ID string is present
+    const employee = employees.find((e) => e._id === employeeId);
+    return employee
+      ? employee.fullName ||
+          employee.organizationName ||
+          employee.username ||
+          employee.name ||
+          employee.email ||
+          "Unknown"
+      : "Unknown";
   };
 
   const getStatusColor = (status) => {

@@ -125,7 +125,7 @@ function LeadTable() {
   ];
   
   const RELATIONSHIP_OPTIONS = [
-    "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"
+    "Self", "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"
   ];
   
   const YES_NO_OPTIONS = ["Yes", "No"];
@@ -1613,33 +1613,10 @@ if (showMotorSection) {
         const healthData = { ...healthDetails };
         healthData.proposerName = formData.name;
 
-        delete healthData.aadhaarFile;
-        delete healthData.panFile;
-        if (healthData.renewalDetails) {
-          delete healthData.renewalDetails.uploadPolicy;
-        }
-        if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map(
-            ({ uploadPYP, ...rest }) => rest
-          );
-        }
-        if (healthData.members) {
-          healthData.members = healthData.members.map(
-            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-              const member = { ...rest };
-              if (!member.wantRider) delete member.wantRider;
-              if (!member.selectedRider) delete member.selectedRider;
-              if (member.riderDetails) {
-                const rd = { ...member.riderDetails };
-                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-                  if (!rd[k]) delete rd[k];
-                });
-                member.riderDetails = rd;
-              }
-              return member;
-            }
-          );
-        }
+        // REMOVED: delete healthData.aadhaarFile;
+        // REMOVED: delete healthData.panFile;
+        // REMOVED: delete healthData.renewalDetails.uploadPolicy;
+        // REMOVED: strip uploadPYP from portabilityDetails
 
         if (!healthData.policyType) delete healthData.policyType;
         if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
@@ -1704,8 +1681,8 @@ if (showMotorSection) {
       if (hasElectronicData) {
         const electronicData = { ...electronicDetails };
         
-        delete electronicData.aadhaarFile;
-        delete electronicData.panFile;
+        // REMOVED: delete electronicData.aadhaarFile;
+        // REMOVED: delete electronicData.panFile;
         
         if (!electronicData.deviceType) delete electronicData.deviceType;
         if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
@@ -1716,6 +1693,44 @@ if (showMotorSection) {
         }
       }
     }
+
+    // ============================================
+    // NEW FILE APPEND LOGIC (Health, Electronic)
+    // ============================================
+    // ===== HEALTH FILES =====
+    if (healthDetails.aadhaarFile && typeof healthDetails.aadhaarFile !== "string") {
+      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+    }
+    if (healthDetails.panFile && typeof healthDetails.panFile !== "string") {
+      submitData.append("healthPanFile", healthDetails.panFile);
+    }
+    if (healthDetails.renewalDetails?.uploadPolicy && typeof healthDetails.renewalDetails.uploadPolicy !== "string") {
+      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+    }
+    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+      if (detail.uploadPYP && typeof detail.uploadPYP !== "string") {
+        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+      }
+    });
+
+    // ===== ELECTRONIC FILES =====
+    if (electronicDetails.aadhaarFile && typeof electronicDetails.aadhaarFile !== "string") {
+      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+    }
+    if (electronicDetails.panFile && typeof electronicDetails.panFile !== "string") {
+      submitData.append("electronicPanFile", electronicDetails.panFile);
+    }
+    if (electronicDetails.imeiImage && typeof electronicDetails.imeiImage !== "string") {
+      submitData.append("imeiImage", electronicDetails.imeiImage);
+    }
+    if (electronicDetails.purchaseInvoice && typeof electronicDetails.purchaseInvoice !== "string") {
+      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+    }
+    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+      if (photo && typeof photo !== "string") {
+        submitData.append(`devicePhoto_${idx}`, photo);
+      }
+    });
 
     const token = localStorage.getItem("token");
     try {
@@ -1764,20 +1779,20 @@ if (showMotorSection) {
 
     const submitData = new FormData();
     
-    submitData.append("name", editLead?.name || formData.name);
-    submitData.append("email", editLead?.email || formData.email);
-    submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
-    submitData.append("gender", editLead?.gender || formData.gender);
-    submitData.append("source", editLead?.source || formData.source);
-    submitData.append("remarks", editLead?.remarks || formData.remarks);
-    submitData.append("lob", editLead?.lob || formData.lob);
-    submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
-    submitData.append("state", editLead?.state || formData.state);
-    submitData.append("city", editLead?.city || formData.city);
-    submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
-    submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
-    submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
-    submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
+    submitData.append("name", formData.name);
+    submitData.append("email", formData.email);
+    submitData.append("mobileNo", formData.mobileNo);
+    submitData.append("gender", formData.gender);
+    submitData.append("source", formData.source);
+    submitData.append("remarks", formData.remarks);
+    submitData.append("lob", formData.lob);
+    submitData.append("pinCode", formData.pinCode);
+    submitData.append("state", formData.state);
+    submitData.append("city", formData.city);
+    submitData.append("sourceDependentValue", formData.sourceDependentValue);
+    submitData.append("policyTenure", formData.policyTenure);
+    submitData.append("paymentTerm", formData.paymentTerm);
+    submitData.append("sumInsured", formData.sumInsured);
     
     submitData.append("status", workflowDetails.status);
     submitData.append("workflowDetails", JSON.stringify(workflowDetails));
@@ -1792,33 +1807,10 @@ if (showMotorSection) {
         const healthData = { ...healthDetails };
         healthData.proposerName = formData.name;
 
-        delete healthData.aadhaarFile;
-        delete healthData.panFile;
-        if (healthData.renewalDetails) {
-          delete healthData.renewalDetails.uploadPolicy;
-        }
-        if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map(
-            ({ uploadPYP, ...rest }) => rest
-          );
-        }
-        if (healthData.members) {
-          healthData.members = healthData.members.map(
-            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-              const member = { ...rest };
-              if (!member.wantRider) delete member.wantRider;
-              if (!member.selectedRider) delete member.selectedRider;
-              if (member.riderDetails) {
-                const rd = { ...member.riderDetails };
-                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-                  if (!rd[k]) delete rd[k];
-                });
-                member.riderDetails = rd;
-              }
-              return member;
-            }
-          );
-        }
+        // REMOVED: delete healthData.aadhaarFile;
+        // REMOVED: delete healthData.panFile;
+        // REMOVED: delete healthData.renewalDetails.uploadPolicy;
+        // REMOVED: strip uploadPYP from portabilityDetails
 
         if (!healthData.policyType) delete healthData.policyType;
         if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
@@ -1883,8 +1875,8 @@ if (showMotorSection) {
       if (hasElectronicData) {
         const electronicData = { ...electronicDetails };
         
-        delete electronicData.aadhaarFile;
-        delete electronicData.panFile;
+        // REMOVED: delete electronicData.aadhaarFile;
+        // REMOVED: delete electronicData.panFile;
         
         if (!electronicData.deviceType) delete electronicData.deviceType;
         if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
@@ -1895,6 +1887,44 @@ if (showMotorSection) {
         }
       }
     }
+
+    // ============================================
+    // NEW FILE APPEND LOGIC (Health, Electronic)
+    // ============================================
+    // ===== HEALTH FILES =====
+    if (healthDetails.aadhaarFile && typeof healthDetails.aadhaarFile !== "string") {
+      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+    }
+    if (healthDetails.panFile && typeof healthDetails.panFile !== "string") {
+      submitData.append("healthPanFile", healthDetails.panFile);
+    }
+    if (healthDetails.renewalDetails?.uploadPolicy && typeof healthDetails.renewalDetails.uploadPolicy !== "string") {
+      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+    }
+    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+      if (detail.uploadPYP && typeof detail.uploadPYP !== "string") {
+        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+      }
+    });
+
+    // ===== ELECTRONIC FILES =====
+    if (electronicDetails.aadhaarFile && typeof electronicDetails.aadhaarFile !== "string") {
+      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+    }
+    if (electronicDetails.panFile && typeof electronicDetails.panFile !== "string") {
+      submitData.append("electronicPanFile", electronicDetails.panFile);
+    }
+    if (electronicDetails.imeiImage && typeof electronicDetails.imeiImage !== "string") {
+      submitData.append("imeiImage", electronicDetails.imeiImage);
+    }
+    if (electronicDetails.purchaseInvoice && typeof electronicDetails.purchaseInvoice !== "string") {
+      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+    }
+    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+      if (photo && typeof photo !== "string") {
+        submitData.append(`devicePhoto_${idx}`, photo);
+      }
+    });
 
     const token = localStorage.getItem("token");
     try {
@@ -1952,11 +1982,10 @@ if (showMotorSection) {
     });
     
     if (lead.healthDetails) {
+      // Keep file fields as-is (URL or null) - no forced null
       setHealthDetails({
         ...lead.healthDetails,
-        aadhaarFile: null,
-        panFile: null,
-        previousPolicyFile: null,
+        // keep aadhaarFile, panFile, renewalDetails.uploadPolicy, portabilityDetails[].uploadPYP as-is
         members: lead.healthDetails.members || [],
       });
       if (lead.healthDetails.policyType === "Floater") {
@@ -1973,14 +2002,100 @@ if (showMotorSection) {
           setShowFreshCaseFields(true);
         }
       }
+    } else {
+      setHealthDetails({
+        policyType: "",
+        numberOfAdults: 0,
+        numberOfChildren: 0,
+        familyIncome: "",
+        height: "",
+        weight: "",
+        qualification: "",
+        occupation: "",
+        nomineeName: "",
+        nomineeDOB: "",
+        nomineeRelationship: "",
+        aadhaarNumber: "",
+        aadhaarFile: null,
+        panNumber: "",
+        panFile: null,
+        hasPreviousPolicy: "",
+        previousPolicyCase: "",
+        experienceYears: "",
+        proposerDOB: "",
+        renewalDetails: {
+          insurerName: "",
+          policyNumber: "",
+          policyDueDate: "",
+          uploadPolicy: null,
+        },
+        portabilityDetails: [],
+        medicalRemarks: "",
+        members: [],
+        proposerIsMember: "",
+        seniorOneDOB: "",
+      });
     }
     
     if (lead.motorDetails) {
+      // Keep motor file fields as-is (URL or null)
       setMotorDetails(lead.motorDetails);
+    } else {
+      setMotorDetails({
+        vehicleType: "",
+        previousInsuranceStatus: "",
+        manufacturer: "",
+        model: "",
+        fuelType: "",
+        rtoCode: "",
+        chesisNo: "",
+        yearOfManufacturing: "",
+        monthOfManufacturing: "",
+        idvAsPerInvoice: "",
+        insuranceType: "",
+        odDueDate: "",
+        tpDueDate: "",
+        policyNo: "",
+        previousInsurerName: "",
+        idvAsPerPYP: "",
+        saodOdDueDate: "",
+        saodTpDueDate: "",
+        saodPolicyNo: "",
+        saodPreviousInsurerName: "",
+        saodIdvAsPerPYP: "",
+        tpInsuranceDueDate: "",
+        registrationNumber: "",
+        autoRtoCode: "",
+        claimTaken: "",
+        ncb: "",
+        addOnRequired: "",
+        selectedAddOns: [],
+        pypFile: null,
+        rcFrontFile: null,
+        rcBackFile: null,
+        chesisPhoto: null,
+        invoiceCopy: null,
+      });
     }
     
     if (lead.electronicDetails) {
+      // Keep electronic file fields as-is (URL or null)
       setElectronicDetails(lead.electronicDetails);
+    } else {
+      setElectronicDetails({
+        deviceType: "",
+        otherDeviceType: "",
+        dateOfPurchase: "",
+        purchaseValue: "",
+        aadhaarNumber: "",
+        aadhaarFile: null,
+        panNumber: "",
+        panFile: null,
+        imeiNumber: "",
+        imeiImage: null,
+        devicePhotos: [],
+        purchaseInvoice: null,
+      });
     }
     
     detectLOB(lead.lob);
@@ -2561,13 +2676,26 @@ if (showMotorSection) {
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Upload PYP (Mandatory)</label>
+                            {/* --- UPDATED: View current file link + file input --- */}
+                            {typeof detail.uploadPYP === "string" && detail.uploadPYP && (
+                              <div className="mb-1">
+                                <a
+                                  href={detail.uploadPYP}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-indigo-600 underline"
+                                >
+                                  View current PYP file
+                                </a>
+                              </div>
+                            )}
                             <input
                               type="file"
                               accept=".pdf"
                               onChange={(e) => handlePortabilityDetailChange(index, 'uploadPYP', e.target.files[0])}
                               className={`w-full p-2 border rounded-lg text-sm ${validationErrors[`portabilityUpload_${index}`] ? 'border-red-500' : 'border-gray-300'}`}
                             />
-                            {detail.uploadPYP && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                            {detail.uploadPYP && typeof detail.uploadPYP !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                             {validationErrors[`portabilityUpload_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilityUpload_${index}`]}</p>}
                           </div>
                         </div>
@@ -2630,12 +2758,26 @@ if (showMotorSection) {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Upload Policy (Not Mandatory)</label>
+                    {/* --- UPDATED: View current file link + file input --- */}
+                    {typeof healthDetails.renewalDetails.uploadPolicy === "string" && healthDetails.renewalDetails.uploadPolicy && (
+                      <div className="mb-1">
+                        <a
+                          href={healthDetails.renewalDetails.uploadPolicy}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-indigo-600 underline"
+                        >
+                          View current policy file
+                        </a>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept=".pdf"
                       onChange={(e) => handleRenewalDetailChange('uploadPolicy', e.target.files[0])}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
+                    {healthDetails.renewalDetails.uploadPolicy && typeof healthDetails.renewalDetails.uploadPolicy !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                   </div>
                 </div>
               </div>
@@ -2926,13 +3068,14 @@ if (showMotorSection) {
 
           {healthDetails.policyType === "Floater" && (
             <div>
-              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan</label>
+              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan? <span className="text-red-500">*</span></label>
               <select
                 data-field="proposerIsMember"
                 value={healthDetails.proposerIsMember}
                 onChange={(e) => {
                   setHealthDetails(prev => ({ ...prev, proposerIsMember: e.target.value }));
-                  generateFloaterMembers();
+                  // regenerate so Adult count respects Proposer Yes/No rule
+                  setTimeout(() => generateFloaterMembers(), 0);
                 }}
                 className={`w-full p-2 border rounded-lg ${validationErrors.proposerIsMember ? 'border-red-500' : 'border-gray-300'}`}
               >
@@ -2946,18 +3089,18 @@ if (showMotorSection) {
           {healthDetails.policyType === "Individual" && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-700">Nominee Name</label>
+                <label className="text-sm font-medium text-gray-700">Nominee Name <span className="text-red-500">*</span></label>
                 <input
                   data-field="nomineeName"
                   type="text"
                   value={healthDetails.nomineeName}
-                  onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: toUpperCase(e.target.value) }))}
-                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.nomineeName ? 'border-red-500' : 'border-gray-300'}`}
+                  onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.nomineeName ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {validationErrors.nomineeName && <p className="text-red-500 text-xs mt-1">{validationErrors.nomineeName}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Nominee DOB</label>
+                <label className="text-sm font-medium text-gray-700">Nominee DOB <span className="text-red-500">*</span></label>
                 <input
                   data-field="nomineeDOB"
                   type="date"
@@ -2977,7 +3120,7 @@ if (showMotorSection) {
                 {validationErrors.nomineeDOB && <p className="text-red-500 text-xs mt-1">{validationErrors.nomineeDOB}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Relationship</label>
+                <label className="text-sm font-medium text-gray-700">Nominee Relationship <span className="text-red-500">*</span></label>
                 <select
                   data-field="nomineeRelationship"
                   value={healthDetails.nomineeRelationship}
@@ -3006,18 +3149,28 @@ if (showMotorSection) {
               className={`w-full p-2 border rounded-lg ${validationErrors.aadhaar ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="Enter 12 digits only"
             />
-            {healthDetails.aadhaarNumber && healthDetails.aadhaarNumber.length > 0 && !validateAadhaar(healthDetails.aadhaarNumber) && (
-              <p className="text-red-500 text-xs mt-1">Enter exactly 12 digits</p>
-            )}
             {validationErrors.aadhaar && <p className="text-red-500 text-xs mt-1">{validationErrors.aadhaar}</p>}
           </div>
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof healthDetails.aadhaarFile === "string" && healthDetails.aadhaarFile && (
+              <div className="mb-1">
+                <a
+                  href={healthDetails.aadhaarFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current Aadhaar file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -3036,60 +3189,62 @@ if (showMotorSection) {
               className={`w-full p-2 border rounded-lg uppercase ${validationErrors.pan ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="ABCDE1234F"
             />
-            {healthDetails.panNumber && healthDetails.panNumber.length > 0 && !validatePAN(healthDetails.panNumber) && (
-              <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F (5 letters, 4 digits, 1 letter)</p>
-            )}
             {validationErrors.pan && <p className="text-red-500 text-xs mt-1">{validationErrors.pan}</p>}
           </div>
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof healthDetails.panFile === "string" && healthDetails.panFile && (
+              <div className="mb-1">
+                <a
+                  href={healthDetails.panFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current PAN file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div className="lg:col-span-3">
-            <label className="text-sm font-medium text-gray-700">Medical Remarks</label>
-            <textarea
-              value={healthDetails.medicalRemarks}
-              onChange={(e) => setHealthDetails(prev => ({ ...prev, medicalRemarks: e.target.value }))}
-              placeholder="Pre-existing diseases, treatment history, other medical remarks"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              rows="3"
             />
           </div>
         </div>
 
-        {showFloaterMembers && healthDetails.members.length > 0 && (
-          <div className="mt-4 border-t-2 border-indigo-200 pt-4">
-            <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-              <FaFloater /> Floater Members
+        {/* Floater Members Section - shows correct Adult count based on Proposer Is Member */}
+        {showFloaterMembers && healthDetails.members && healthDetails.members.length > 0 && (
+          <div className="mt-6 border-t pt-4">
+            <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <FaUsers /> Family Members ({healthDetails.members.length})
+              {healthDetails.proposerIsMember === "Yes" && (
+                <span className="text-xs font-normal text-green-600 ml-2">
+                  (Proposer included as Self + remaining adults)
+                </span>
+              )}
             </h4>
             {healthDetails.members.map((member, index) => (
-              <div key={member.id} className="border rounded-lg p-4 mb-4 bg-gray-50">
-                <h5 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                  {member.type === 'proposer' ? <FaUserMd className="text-indigo-600" /> : 
-                   member.type === 'adult' ? <FaUser /> : <FaChild />}
-                  {member.type === 'proposer' ? 'Proposer' : 
-                   member.type === 'adult' ? `Adult ${Math.floor(index + 1)}` : 
-                   `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0) + 1}`}
+              <div key={member.id || index} className="border rounded-lg p-4 mb-4 bg-gray-50">
+                <h5 className="font-medium text-gray-700 mb-3 capitalize">
+                  {member.type === 'proposer' ? 'Proposer (Self)' : member.type === 'adult' ? `Adult ${index + (healthDetails.proposerIsMember === "Yes" ? 0 : 1)}` : `Child ${index - (healthDetails.members.filter(m => m.type !== 'child').length) + 1}`}
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-medium text-gray-700">Name</label>
                     <input
                       type="text"
-                      value={member.name}
+                      value={member.name || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
-                        newMembers[index].name = toUpperCase(e.target.value);
+                        newMembers[index].name = e.target.value;
                         setHealthDetails(prev => ({ ...prev, members: newMembers }));
                       }}
-                      className="w-full p-2 border border-gray-300 rounded-lg uppercase text-sm"
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      readOnly={member.type === 'proposer'}
                     />
                   </div>
                   <div>
@@ -3097,14 +3252,8 @@ if (showMotorSection) {
                     <input
                       type="date"
                       max={maxDate}
-                      value={member.dob}
+                      value={member.dob || ''}
                       onChange={(e) => {
-                        const selected = new Date(e.target.value);
-                        const today = new Date();
-                        if (selected > today) {
-                          alert("DOB cannot be in the future");
-                          return;
-                        }
                         const newMembers = [...healthDetails.members];
                         newMembers[index].dob = e.target.value;
                         setHealthDetails(prev => ({ ...prev, members: newMembers }));
@@ -3113,23 +3262,26 @@ if (showMotorSection) {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Monthly Income</label>
-                    <input
-                      type="number"
-                      value={member.monthlyIncome}
+                    <label className="text-xs font-medium text-gray-700">Relationship</label>
+                    <select
+                      value={member.relationship || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
-                        newMembers[index].monthlyIncome = e.target.value;
+                        newMembers[index].relationship = e.target.value;
                         setHealthDetails(prev => ({ ...prev, members: newMembers }));
                       }}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    />
+                      disabled={member.type === 'proposer'}
+                    >
+                      <option value="">Select</option>
+                      {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Height</label>
                     <input
                       type="text"
-                      value={member.height}
+                      value={member.height || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].height = e.target.value;
@@ -3142,7 +3294,7 @@ if (showMotorSection) {
                     <label className="text-xs font-medium text-gray-700">Weight</label>
                     <input
                       type="number"
-                      value={member.weight}
+                      value={member.weight || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].weight = e.target.value;
@@ -3154,7 +3306,7 @@ if (showMotorSection) {
                   <div>
                     <label className="text-xs font-medium text-gray-700">Qualification</label>
                     <select
-                      value={member.qualification}
+                      value={member.qualification || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].qualification = e.target.value;
@@ -3169,7 +3321,7 @@ if (showMotorSection) {
                   <div>
                     <label className="text-xs font-medium text-gray-700">Occupation</label>
                     <select
-                      value={member.occupation}
+                      value={member.occupation || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].occupation = e.target.value;
@@ -3182,25 +3334,10 @@ if (showMotorSection) {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Relationship</label>
-                    <select
-                      value={member.relationship}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].relationship = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    >
-                      <option value="">Select</option>
-                      {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-700">Aadhaar</label>
+                    <label className="text-xs font-medium text-gray-700">Aadhaar Number</label>
                     <input
                       type="text"
-                      value={member.aadhaarNumber}
+                      value={member.aadhaarNumber || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
                         if (val.length <= 12) {
@@ -3214,51 +3351,22 @@ if (showMotorSection) {
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Upload Document</label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].aadhaarFile = e.target.files[0];
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
+                    <label className="text-xs font-medium text-gray-700">Want Rider?</label>
                     <select
-                      value={member.wantRider}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].wantRider = e.target.value;
-                        if (e.target.value === "No") {
-                          newMembers[index].selectedRider = '';
-                          newMembers[index].riderDetails = {
-                            instaShield: '',
-                            asthma: '',
-                            diabetes: '',
-                            hypertension: '',
-                            hyperlipidaemia: '',
-                          };
-                        }
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.wantRider || ''}
+                      onChange={(e) => handleMemberRiderChange(index, 'wantRider', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="">Select</option>
                       {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
-
                   {member.wantRider === "Yes" && (
                     <>
                       <div>
                         <label className="text-xs font-medium text-gray-700">Select Rider</label>
                         <select
-                          value={member.selectedRider}
+                          value={member.selectedRider || ''}
                           onChange={(e) => handleMemberRiderChange(index, 'selectedRider', e.target.value)}
                           className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                         >
@@ -3266,55 +3374,51 @@ if (showMotorSection) {
                           {RIDER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                       </div>
-
                       {member.selectedRider === "Insta Shield" && (
-                        <div className="lg:col-span-3 border-t pt-2 mt-2 border-gray-200">
-                          <h6 className="text-xs font-semibold text-gray-600 mb-2">Insta Shield Details</h6>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">For Asthma</label>
-                              <select
-                                value={member.riderDetails?.asthma || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'asthma', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Diabetes</label>
-                              <select
-                                value={member.riderDetails?.diabetes || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'diabetes', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Hypertension (Blood Pressure)</label>
-                              <select
-                                value={member.riderDetails?.hypertension || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'hypertension', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Hyperlipidaemia</label>
-                              <select
-                                value={member.riderDetails?.hyperlipidaemia || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'hyperlipidaemia', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
+                        <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Asthma</label>
+                            <select
+                              value={member.riderDetails?.asthma || ''}
+                              onChange={(e) => handleMemberRiderDetailChange(index, 'asthma', e.target.value)}
+                              className="w-full p-1 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Diabetes</label>
+                            <select
+                              value={member.riderDetails?.diabetes || ''}
+                              onChange={(e) => handleMemberRiderDetailChange(index, 'diabetes', e.target.value)}
+                              className="w-full p-1 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Hypertension (Blood Pressure)</label>
+                            <select
+                              value={member.riderDetails?.hypertension || ''}
+                              onChange={(e) => handleMemberRiderDetailChange(index, 'hypertension', e.target.value)}
+                              className="w-full p-1 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Hyperlipidaemia</label>
+                            <select
+                              value={member.riderDetails?.hyperlipidaemia || ''}
+                              onChange={(e) => handleMemberRiderDetailChange(index, 'hyperlipidaemia', e.target.value)}
+                              className="w-full p-1 border border-gray-300 rounded text-xs"
+                            >
+                              <option value="">Select</option>
+                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
                           </div>
                         </div>
                       )}
@@ -3409,7 +3513,7 @@ if (showMotorSection) {
                   <div className="lg:col-span-3">
                     <label className="text-xs font-medium text-gray-700">Remarks (PED/Treatment)</label>
                     <textarea
-                      value={member.medicalRemarks}
+                      value={member.medicalRemarks || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].medicalRemarks = e.target.value;
@@ -3674,26 +3778,52 @@ if (showMotorSection) {
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
+                {/* --- UPDATED: View current file link + file input --- */}
+                {typeof motorDetails.invoiceCopy === "string" && motorDetails.invoiceCopy && (
+                  <div className="mb-1">
+                    <a
+                      href={motorDetails.invoiceCopy}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 underline"
+                    >
+                      View current Invoice file
+                    </a>
+                  </div>
+                )}
                 <input
                   data-field="invoiceCopy"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] }))}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] || prev.invoiceCopy }))}
                   className={`w-full p-2 border rounded-lg ${validationErrors.invoiceCopy ? 'border-red-500' : 'border-gray-300'}`}
                 />
-                {motorDetails.invoiceCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {motorDetails.invoiceCopy && typeof motorDetails.invoiceCopy !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                 {validationErrors.invoiceCopy && <p className="text-red-500 text-xs mt-1">{validationErrors.invoiceCopy}</p>}
               </div>
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
+                {/* --- UPDATED: View current file link + file input --- */}
+                {typeof motorDetails.chesisPhoto === "string" && motorDetails.chesisPhoto && (
+                  <div className="mb-1">
+                    <a
+                      href={motorDetails.chesisPhoto}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 underline"
+                    >
+                      View current Chesis photo
+                    </a>
+                  </div>
+                )}
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] }))}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] || prev.chesisPhoto }))}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
-                {motorDetails.chesisPhoto && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {motorDetails.chesisPhoto && typeof motorDetails.chesisPhoto !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
               </div>
             </div>
           </div>
@@ -4034,16 +4164,28 @@ if (showMotorSection) {
         Upload PYP 
         {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
       </label>
+      {/* --- UPDATED: View current file link + file input --- */}
+      {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.pypFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current PYP file
+          </a>
+        </div>
+      )}
       <input
         data-field="pypFile"
         type="file"
         accept=".pdf"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] || prev.pypFile }))}
         className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
       />
-      {motorDetails.pypFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {motorDetails.pypFile && typeof motorDetails.pypFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
       {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
-     
     </div>
 
     {/* RC Front Upload - Show for ALL statuses */}
@@ -4052,16 +4194,28 @@ if (showMotorSection) {
         RC Front Upload
         {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
       </label>
+      {/* --- UPDATED: View current file link + file input --- */}
+      {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.rcFrontFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current RC Front file
+          </a>
+        </div>
+      )}
       <input
         data-field="rcFrontFile"
         type="file"
         accept=".pdf,.jpg,.jpeg"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] || prev.rcFrontFile }))}
         className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
       />
-      {motorDetails.rcFrontFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {motorDetails.rcFrontFile && typeof motorDetails.rcFrontFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
       {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
-    
     </div>
 
     {/* RC Back Upload - Show for ALL statuses */}
@@ -4070,19 +4224,29 @@ if (showMotorSection) {
         RC Back Upload
         {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
       </label>
+      {/* --- UPDATED: View current file link + file input --- */}
+      {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.rcBackFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current RC Back file
+          </a>
+        </div>
+      )}
       <input
         data-field="rcBackFile"
         type="file"
         accept=".pdf,.jpg,.jpeg"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] || prev.rcBackFile }))}
         className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
       />
-      {motorDetails.rcBackFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {motorDetails.rcBackFile && typeof motorDetails.rcBackFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
       {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
-     
     </div>
-
-   
   </div>
 </div>
 
@@ -4197,10 +4361,23 @@ if (showMotorSection) {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof electronicDetails.aadhaarFile === "string" && electronicDetails.aadhaarFile && (
+              <div className="mb-1">
+                <a
+                  href={electronicDetails.aadhaarFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current Aadhaar file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -4227,10 +4404,23 @@ if (showMotorSection) {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof electronicDetails.panFile === "string" && electronicDetails.panFile && (
+              <div className="mb-1">
+                <a
+                  href={electronicDetails.panFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current PAN file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -4254,10 +4444,23 @@ if (showMotorSection) {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof electronicDetails.imeiImage === "string" && electronicDetails.imeiImage && (
+              <div className="mb-1">
+                <a
+                  href={electronicDetails.imeiImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current IMEI image
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] || prev.imeiImage }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -4266,6 +4469,27 @@ if (showMotorSection) {
             <label className="text-sm font-medium text-gray-700">
               Device Photos (3-4 photos from different angles showing IMEI)
             </label>
+            {/* --- UPDATED: View current file links for already uploaded photos --- */}
+            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.length > 0 && (
+              <div className="mb-1 flex flex-wrap gap-2">
+                {electronicDetails.devicePhotos.map((photo, idx) => {
+                  if (typeof photo === "string" && photo) {
+                    return (
+                      <a
+                        key={idx}
+                        href={photo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-600 underline"
+                      >
+                        View current photo {idx + 1}
+                      </a>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            )}
             <input
               type="file"
               accept=".jpg,.jpeg"
@@ -4273,17 +4497,30 @@ if (showMotorSection) {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, devicePhotos: Array.from(e.target.files) }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.devicePhotos.length > 0 && (
-              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.length} photos selected</p>
+            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.some(f => typeof f !== "string") && (
+              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.filter(f => typeof f !== "string").length} new photos selected</p>
             )}
           </div>
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
+            {/* --- UPDATED: View current file link + file input --- */}
+            {typeof electronicDetails.purchaseInvoice === "string" && electronicDetails.purchaseInvoice && (
+              <div className="mb-1">
+                <a
+                  href={electronicDetails.purchaseInvoice}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current invoice
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] || prev.purchaseInvoice }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -5076,6 +5313,19 @@ if (showMotorSection) {
                       {employees.map((emp) => (
                         <option key={emp._id} value={emp.fullName || emp.username}>
                           {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : formData.source === "Channel Partner" ? (
+                    <select
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select Channel Partner</option>
+                      {channelPartners.map((partner) => (
+                        <option key={partner._id} value={partner.fullName || partner.username}>
+                          {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
                         </option>
                       ))}
                     </select>

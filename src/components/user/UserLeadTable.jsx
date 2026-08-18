@@ -4,7 +4,6 @@ import {
   FaEye,
   FaEdit,
   FaTimes,
-  FaTrash,
   FaDownload,
   FaSearch,
   FaUpload,
@@ -372,7 +371,7 @@ function UserLeadTable() {
   const [validationErrors, setValidationErrors] = useState({});
   const [validationPopup, setValidationPopup] = useState({ show: false, errors: [] });
   const [employees, setEmployees] = useState([]);
-const [channelPartners, setChannelPartners] = useState([]);
+  const [channelPartners, setChannelPartners] = useState([]);
 
   const [formData, setFormData] = useState({
     name: "",
@@ -496,57 +495,56 @@ const [channelPartners, setChannelPartners] = useState([]);
   // FETCH EMPLOYEES & CHANNEL PARTNERS
   // ============================================================
 
-
-const fetchEmployees = async () => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-  try {
-    // ✅ Use the new dropdown endpoint
-    const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const employeeList = data.filter(user => 
-        user.userType === "Employee" || user.role === "Employee"
-      );
-      setEmployees(employeeList);
-      console.log("Employees fetched:", employeeList.length);
-    } else {
-      console.error("Failed to fetch employees:", res.status);
+  const fetchEmployees = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      // ✅ Use the new dropdown endpoint
+      const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const employeeList = data.filter(user => 
+          user.userType === "Employee" || user.role === "Employee"
+        );
+        setEmployees(employeeList);
+        console.log("Employees fetched:", employeeList.length);
+      } else {
+        console.error("Failed to fetch employees:", res.status);
+      }
+    } catch (err) {
+      console.error("Fetch employees error:", err);
     }
-  } catch (err) {
-    console.error("Fetch employees error:", err);
-  }
-};
+  };
 
-const fetchChannelPartners = async () => {
-  const token = localStorage.getItem("token");
-  if (!token) return;
-  try {
-    // ✅ Use the new dropdown endpoint
-    const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (res.ok) {
-      const data = await res.json();
-      const channelPartnerList = data.filter(user => 
-        user.userType === "Channel Partner" || user.role === "Channel Partner"
-      );
-      setChannelPartners(channelPartnerList);
-      console.log("Channel Partners fetched:", channelPartnerList.length);
-    } else {
-      console.error("Failed to fetch channel partners:", res.status);
+  const fetchChannelPartners = async () => {
+    const token = localStorage.getItem("token");
+    if (!token) return;
+    try {
+      // ✅ Use the new dropdown endpoint
+      const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const channelPartnerList = data.filter(user => 
+          user.userType === "Channel Partner" || user.role === "Channel Partner"
+        );
+        setChannelPartners(channelPartnerList);
+        console.log("Channel Partners fetched:", channelPartnerList.length);
+      } else {
+        console.error("Failed to fetch channel partners:", res.status);
+      }
+    } catch (err) {
+      console.error("Fetch channel partners error:", err);
     }
-  } catch (err) {
-    console.error("Fetch channel partners error:", err);
-  }
-};
+  };
 
-useEffect(() => {
-  fetchEmployees();
-  fetchChannelPartners(); // ✅ Make sure this is called
-}, []);
+  useEffect(() => {
+    fetchEmployees();
+    fetchChannelPartners(); // ✅ Make sure this is called
+  }, []);
 
   // ============================================================
   // EFFECTS
@@ -1899,33 +1897,6 @@ useEffect(() => {
   };
 
   // ============================================================
-  // DELETE LEAD
-  // ============================================================
-  const handleDeleteLead = async (leadId) => {
-    if (!window.confirm("Are you sure you want to delete this lead?")) return;
-    
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${leadId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      if (res.ok) {
-        setLeads((prev) => prev.filter((l) => l._id !== leadId));
-        setFilteredLeads((prev) => prev.filter((l) => l._id !== leadId));
-        alert("Lead deleted successfully!");
-      } else {
-        const error = await res.json();
-        alert("Delete failed: " + (error.error || "Unknown error"));
-      }
-    } catch (err) {
-      console.error("Delete error:", err);
-      alert("Error deleting lead");
-    }
-  };
-
-  // ============================================================
   // OPEN EDIT MODAL (User Version - No Workflow)
   // ============================================================
   const openEditModal = (lead) => {
@@ -2919,25 +2890,6 @@ useEffect(() => {
             </select>
           </div>
 
-          {healthDetails.policyType === "Floater" && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan</label>
-              <select
-                data-field="proposerIsMember"
-                value={healthDetails.proposerIsMember}
-                onChange={(e) => {
-                  setHealthDetails(prev => ({ ...prev, proposerIsMember: e.target.value }));
-                  generateFloaterMembers();
-                }}
-                className={`w-full p-2 border rounded-lg ${validationErrors.proposerIsMember ? 'border-red-500' : 'border-gray-300'}`}
-              >
-                <option value="">Select</option>
-                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-              </select>
-              {validationErrors.proposerIsMember && <p className="text-red-500 text-xs mt-1">{validationErrors.proposerIsMember}</p>}
-            </div>
-          )}
-
           {healthDetails.policyType === "Individual" && (
             <>
               <div>
@@ -2972,7 +2924,7 @@ useEffect(() => {
                 {validationErrors.nomineeDOB && <p className="text-red-500 text-xs mt-1">{validationErrors.nomineeDOB}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Relationship</label>
+                <label className="text-sm font-medium text-gray-700">Nominee Relationship</label>
                 <select
                   data-field="nomineeRelationship"
                   value={healthDetails.nomineeRelationship}
@@ -5153,9 +5105,6 @@ useEffect(() => {
                     <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
                       <FaEdit className="h-5 w-5" />
                     </button>
-                    <button onClick={() => handleDeleteLead(lead._id)} className="text-red-600 hover:text-red-800">
-                      <FaTrash className="h-5 w-5" />
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -5186,7 +5135,6 @@ useEffect(() => {
                 <div className="pt-2 flex gap-3">
                   <button onClick={() => setSelectedLead(lead)} className="text-indigo-600"><FaEye className="h-5 w-5" /></button>
                   <button onClick={() => openEditModal(lead)} className="text-blue-600"><FaEdit className="h-5 w-5" /></button>
-                  <button onClick={() => handleDeleteLead(lead._id)} className="text-red-600"><FaTrash className="h-5 w-5" /></button>
                 </div>
               </div>
             </div>

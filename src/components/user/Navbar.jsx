@@ -34,8 +34,14 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Get display name from props or user object
-  const displayName = username || user?.username || user?.fullName || user?.name || "Guest";
+  // FIXED: Also check organizationName for Channel Partners
+  const displayName =
+    username ||
+    user?.username ||
+    user?.fullName ||
+    user?.organizationName ||
+    user?.name ||
+    "Guest";
 
   useEffect(() => {
     const handleResize = () => {
