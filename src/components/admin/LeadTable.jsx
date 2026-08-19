@@ -990,6 +990,23 @@ useEffect(() => {
     setHealthDetails(prev => ({ ...prev, portabilityDetails: newDetails }));
   };
 
+  // ============================================================
+// DATE FORMATTING HELPER - FIX FOR EMPTY DATE INPUTS
+// ============================================================
+const formatDateForInput = (dateValue) => {
+  if (!dateValue) return "";
+  try {
+    // Already YYYY-MM-DD
+    if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      return dateValue;
+    }
+    const d = new Date(dateValue);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+};
   const handleRenewalDetailChange = (field, value) => {
     setHealthDetails(prev => ({
       ...prev,
@@ -1765,361 +1782,364 @@ if (showMotorSection) {
     }
   };
 
-  // ============================================================
-  // UPDATE LEAD
-  // ============================================================
-  const handleUpdateLead = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields(true)) {
-      return;
-    }
-    
-    setIsSubmitting(true);
+// ============================================================
+// HANDLE UPDATE LEAD - UPDATED with FormData and file handling
+// ============================================================
+const handleUpdateLead = async (e) => {
+  e.preventDefault();
+  
+  if (!validateAllFields(true)) {
+    return;
+  }
+  
+  setIsSubmitting(true);
 
-    const submitData = new FormData();
-    
-    submitData.append("name", formData.name);
-    submitData.append("email", formData.email);
-    submitData.append("mobileNo", formData.mobileNo);
-    submitData.append("gender", formData.gender);
-    submitData.append("source", formData.source);
-    submitData.append("remarks", formData.remarks);
-    submitData.append("lob", formData.lob);
-    submitData.append("pinCode", formData.pinCode);
-    submitData.append("state", formData.state);
-    submitData.append("city", formData.city);
-    submitData.append("sourceDependentValue", formData.sourceDependentValue);
-    submitData.append("policyTenure", formData.policyTenure);
-    submitData.append("paymentTerm", formData.paymentTerm);
-    submitData.append("sumInsured", formData.sumInsured);
-    
-    submitData.append("status", workflowDetails.status);
-    submitData.append("workflowDetails", JSON.stringify(workflowDetails));
-    
-    if (showHealthSection) {
-      const hasHealthData = healthDetails.policyType || 
-                            healthDetails.hasPreviousPolicy === "Yes" ||
-                            healthDetails.proposerDOB ||
-                            healthDetails.nomineeName;
+  const submitData = new FormData();
+  const token = localStorage.getItem("token");
+  
+  // Basic fields
+  submitData.append("name", formData.name);
+  submitData.append("email", formData.email || "");
+  submitData.append("mobileNo", formData.mobileNo);
+  submitData.append("gender", formData.gender || "");
+  submitData.append("source", formData.source || "");
+  submitData.append("remarks", formData.remarks || "");
+  submitData.append("lob", formData.lob);
+  submitData.append("pinCode", formData.pinCode || "");
+  submitData.append("state", formData.state || "");
+  submitData.append("city", formData.city || "");
+  submitData.append("sourceDependentValue", formData.sourceDependentValue || "");
+  submitData.append("policyTenure", formData.policyTenure || "");
+  submitData.append("paymentTerm", formData.paymentTerm || "");
+  submitData.append("sumInsured", formData.sumInsured || "");
+  submitData.append("status", workflowDetails.status || "Open");
 
-      if (hasHealthData) {
-        const healthData = { ...healthDetails };
-        healthData.proposerName = formData.name;
-
-        // REMOVED: delete healthData.aadhaarFile;
-        // REMOVED: delete healthData.panFile;
-        // REMOVED: delete healthData.renewalDetails.uploadPolicy;
-        // REMOVED: strip uploadPYP from portabilityDetails
-
-        if (!healthData.policyType) delete healthData.policyType;
-        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-        if (!healthData.proposerDOB) delete healthData.proposerDOB;
-        if (!healthData.nomineeName) delete healthData.nomineeName;
-        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-        if (!healthData.panNumber) delete healthData.panNumber;
-        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-        if (Object.keys(healthData).length > 0) {
-          submitData.append("healthDetails", JSON.stringify(healthData));
-        }
-      }
+  // LOB-specific JSON - strip File objects before stringify
+  // Health
+  if (showHealthSection) {
+    const healthData = { ...healthDetails };
+    // Remove File instances - keep URLs as strings
+    if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
+    if (healthData.panFile instanceof File) delete healthData.panFile;
+    if (healthData.renewalDetails?.uploadPolicy instanceof File) {
+      delete healthData.renewalDetails.uploadPolicy;
     }
-
-    if (showMotorSection) {
-      const hasMotorData = motorDetails.vehicleType || 
-                           motorDetails.previousInsuranceStatus ||
-                           motorDetails.registrationNumber ||
-                           motorDetails.insuranceType;
-      
-      if (hasMotorData) {
-        const motorData = { ...motorDetails };
-        
-        if (!motorData.vehicleType) delete motorData.vehicleType;
-        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-        if (!motorData.registrationNumber) delete motorData.registrationNumber;
-        if (!motorData.insuranceType) delete motorData.insuranceType;
-        if (!motorData.claimTaken) delete motorData.claimTaken;
-        if (!motorData.addOnRequired) delete motorData.addOnRequired;
-        
-        if (Object.keys(motorData).length > 0) {
-          submitData.append("motorDetails", JSON.stringify(motorData));
-        }
-      }
-      
-      if (motorDetails.pypFile) {
-        submitData.append("pypFile", motorDetails.pypFile);
-      }
-      if (motorDetails.rcFrontFile) {
-        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-      }
-      if (motorDetails.rcBackFile) {
-        submitData.append("rcBackFile", motorDetails.rcBackFile);
-      }
-      if (motorDetails.chesisPhoto) {
-        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-      }
-      if (motorDetails.invoiceCopy) {
-        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-      }
-    }
-
-    if (showElectronicSection) {
-      const hasElectronicData = electronicDetails.deviceType || 
-                                electronicDetails.dateOfPurchase || 
-                                electronicDetails.purchaseValue;
-      
-      if (hasElectronicData) {
-        const electronicData = { ...electronicDetails };
-        
-        // REMOVED: delete electronicData.aadhaarFile;
-        // REMOVED: delete electronicData.panFile;
-        
-        if (!electronicData.deviceType) delete electronicData.deviceType;
-        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-        
-        if (Object.keys(electronicData).length > 0) {
-          submitData.append("electronicDetails", JSON.stringify(electronicData));
-        }
-      }
-    }
-
-    // ============================================
-    // NEW FILE APPEND LOGIC (Health, Electronic)
-    // ============================================
-    // ===== HEALTH FILES =====
-    if (healthDetails.aadhaarFile && typeof healthDetails.aadhaarFile !== "string") {
-      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
-    }
-    if (healthDetails.panFile && typeof healthDetails.panFile !== "string") {
-      submitData.append("healthPanFile", healthDetails.panFile);
-    }
-    if (healthDetails.renewalDetails?.uploadPolicy && typeof healthDetails.renewalDetails.uploadPolicy !== "string") {
-      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
-    }
-    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
-      if (detail.uploadPYP && typeof detail.uploadPYP !== "string") {
-        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
-      }
-    });
-
-    // ===== ELECTRONIC FILES =====
-    if (electronicDetails.aadhaarFile && typeof electronicDetails.aadhaarFile !== "string") {
-      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
-    }
-    if (electronicDetails.panFile && typeof electronicDetails.panFile !== "string") {
-      submitData.append("electronicPanFile", electronicDetails.panFile);
-    }
-    if (electronicDetails.imeiImage && typeof electronicDetails.imeiImage !== "string") {
-      submitData.append("imeiImage", electronicDetails.imeiImage);
-    }
-    if (electronicDetails.purchaseInvoice && typeof electronicDetails.purchaseInvoice !== "string") {
-      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
-    }
-    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
-      if (photo && typeof photo !== "string") {
-        submitData.append(`devicePhoto_${idx}`, photo);
-      }
-    });
-
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
+    if (healthData.portabilityDetails) {
+      healthData.portabilityDetails = healthData.portabilityDetails.map(p => {
+        const clean = { ...p };
+        if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+        return clean;
       });
+    }
+    submitData.append("healthDetails", JSON.stringify(healthData));
+  }
 
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-        setShowEditModal(false);
-        setEditLead(null);
-        alert("Lead updated successfully!");
-      } else {
-        const error = await res.json();
-        setValidationPopup({
-          show: true,
-          errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
-        });
-      }
-    } catch (err) {
-      console.error("Update error:", err);
+  // Motor
+  if (showMotorSection) {
+    const motorData = { ...motorDetails };
+    ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach(f => {
+      if (motorData[f] instanceof File) delete motorData[f];
+    });
+    submitData.append("motorDetails", JSON.stringify(motorData));
+  }
+
+  // Electronic
+  if (showElectronicSection) {
+    const electronicData = { ...electronicDetails };
+    if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
+    if (electronicData.panFile instanceof File) delete electronicData.panFile;
+    if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
+    if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
+    if (electronicData.devicePhotos) {
+      electronicData.devicePhotos = electronicData.devicePhotos.filter(p => !(p instanceof File));
+    }
+    submitData.append("electronicDetails", JSON.stringify(electronicData));
+  }
+
+  // Workflow - clean empty enums before sending
+  const cleanWorkflow = { ...workflowDetails };
+  // Strip empty strings for enum fields
+  if (!cleanWorkflow.paymentStatus || cleanWorkflow.paymentStatus === "") {
+    delete cleanWorkflow.paymentStatus;
+  }
+  // Remove File objects
+  if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
+  if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
+  submitData.append("workflowDetails", JSON.stringify(cleanWorkflow));
+
+  // ===== ACTUAL FILE UPLOADS =====
+  // Motor
+  if (motorDetails.pypFile instanceof File) submitData.append("pypFile", motorDetails.pypFile);
+  if (motorDetails.rcFrontFile instanceof File) submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+  if (motorDetails.rcBackFile instanceof File) submitData.append("rcBackFile", motorDetails.rcBackFile);
+  if (motorDetails.chesisPhoto instanceof File) submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+  if (motorDetails.invoiceCopy instanceof File) submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+
+  // Health
+  if (healthDetails.aadhaarFile instanceof File) submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+  if (healthDetails.panFile instanceof File) submitData.append("healthPanFile", healthDetails.panFile);
+  if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
+    submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+  }
+  (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+    if (detail.uploadPYP instanceof File) {
+      submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+    }
+  });
+
+  // Electronic
+  if (electronicDetails.aadhaarFile instanceof File) submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+  if (electronicDetails.panFile instanceof File) submitData.append("electronicPanFile", electronicDetails.panFile);
+  if (electronicDetails.imeiImage instanceof File) submitData.append("imeiImage", electronicDetails.imeiImage);
+  if (electronicDetails.purchaseInvoice instanceof File) submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+  (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+    if (photo instanceof File) submitData.append(`devicePhoto_${idx}`, photo);
+  });
+
+  // Workflow files
+  if (workflowDetails.paymentSnapshot instanceof File) submitData.append("paymentSnapshot", workflowDetails.paymentSnapshot);
+  if (workflowDetails.policyCopy instanceof File) submitData.append("policyCopy", workflowDetails.policyCopy);
+
+  try {
+    const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // DO NOT set Content-Type – browser sets multipart boundary
+      },
+      body: submitData,
+    });
+
+    if (res.ok) {
+      const updatedLead = await res.json();
+      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+      setShowEditModal(false);
+      setEditLead(null);
+      alert("Lead updated successfully!");
+    } else {
+      const err = await res.json();
+      console.error(err);
       setValidationPopup({
         show: true,
-        errors: [{ field: "general", message: "Error: " + err.message }]
+        errors: [{ field: "general", message: err.errors ? err.errors.join("\n") : (err.error || "Update failed") }]
       });
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } catch (err) {
+    console.error(err);
+    setValidationPopup({
+      show: true,
+      errors: [{ field: "general", message: "Error: " + err.message }]
+    });
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // ============================================================
   // OPEN EDIT MODAL
   // ============================================================
-  const openEditModal = (lead) => {
-    setEditLead(lead);
-    
-    setFormData({
-      name: lead.name || "",
-      email: lead.email || "",
-      mobileNo: lead.mobileNo || "",
-      gender: lead.gender || "",
-      source: lead.source || "",
-      remarks: lead.remarks || "",
-      lob: lead.lob || "",
-      pinCode: lead.pinCode || "",
-      state: lead.state || "",
-      city: lead.city || "",
-      sourceDependentValue: lead.sourceDependentValue || "",
-      policyTenure: lead.policyTenure || "",
-      paymentTerm: lead.paymentTerm || "",
-      sumInsured: lead.sumInsured || "",
+ // ============================================================
+// OPEN EDIT MODAL - UPDATED with date formatting
+// ============================================================
+const openEditModal = (lead) => {
+  setEditLead(lead);
+  
+  setFormData({
+    name: lead.name || "",
+    email: lead.email || "",
+    mobileNo: lead.mobileNo || "",
+    gender: lead.gender || "",
+    source: lead.source || "",
+    remarks: lead.remarks || "",
+    lob: lead.lob || "",
+    pinCode: lead.pinCode || "",
+    state: lead.state || "",
+    city: lead.city || "",
+    sourceDependentValue: lead.sourceDependentValue || "",
+    policyTenure: lead.policyTenure || "",
+    paymentTerm: lead.paymentTerm || "",
+    sumInsured: lead.sumInsured || "",
+  });
+
+  // Health - with date formatting
+  if (lead.healthDetails) {
+    setHealthDetails({
+      ...lead.healthDetails,
+      nomineeDOB: formatDateForInput(lead.healthDetails.nomineeDOB),
+      proposerDOB: formatDateForInput(lead.healthDetails.proposerDOB),
+      seniorOneDOB: formatDateForInput(lead.healthDetails.seniorOneDOB),
+      renewalDetails: {
+        ...(lead.healthDetails.renewalDetails || {}),
+        policyDueDate: formatDateForInput(lead.healthDetails.renewalDetails?.policyDueDate),
+        // Keep uploadPolicy as-is (URL or null)
+        uploadPolicy: lead.healthDetails.renewalDetails?.uploadPolicy || null,
+      },
+      members: (lead.healthDetails.members || []).map(m => ({
+        ...m,
+        dob: formatDateForInput(m.dob),
+      })),
+      portabilityDetails: (lead.healthDetails.portabilityDetails || []).map(p => ({
+        ...p,
+        policyActiveFrom: formatDateForInput(p.policyActiveFrom),
+        policyTillDate: formatDateForInput(p.policyTillDate),
+        // Keep uploadPYP as-is (URL or null)
+        uploadPYP: p.uploadPYP || null,
+      })),
     });
-    
-    if (lead.healthDetails) {
-      // Keep file fields as-is (URL or null) - no forced null
-      setHealthDetails({
-        ...lead.healthDetails,
-        // keep aadhaarFile, panFile, renewalDetails.uploadPolicy, portabilityDetails[].uploadPYP as-is
-        members: lead.healthDetails.members || [],
-      });
-      if (lead.healthDetails.policyType === "Floater") {
-        setShowFloaterMembers(true);
-        setShowSeniorOneDOB(true);
+    if (lead.healthDetails.policyType === "Floater") {
+      setShowFloaterMembers(true);
+      setShowSeniorOneDOB(true);
+    }
+    if (lead.healthDetails.hasPreviousPolicy === "Yes") {
+      setShowPreviousPolicyPopup(true);
+      if (lead.healthDetails.previousPolicyCase === "Renew Case") {
+        setShowRenewalFields(true);
+      } else if (lead.healthDetails.previousPolicyCase === "Portability Case") {
+        setShowPortabilityFields(true);
+      } else if (lead.healthDetails.previousPolicyCase === "Fresh Case") {
+        setShowFreshCaseFields(true);
       }
-      if (lead.healthDetails.hasPreviousPolicy === "Yes") {
-        setShowPreviousPolicyPopup(true);
-        if (lead.healthDetails.previousPolicyCase === "Renew Case") {
-          setShowRenewalFields(true);
-        } else if (lead.healthDetails.previousPolicyCase === "Portability Case") {
-          setShowPortabilityFields(true);
-        } else if (lead.healthDetails.previousPolicyCase === "Fresh Case") {
-          setShowFreshCaseFields(true);
-        }
-      }
-    } else {
-      setHealthDetails({
-        policyType: "",
-        numberOfAdults: 0,
-        numberOfChildren: 0,
-        familyIncome: "",
-        height: "",
-        weight: "",
-        qualification: "",
-        occupation: "",
-        nomineeName: "",
-        nomineeDOB: "",
-        nomineeRelationship: "",
-        aadhaarNumber: "",
-        aadhaarFile: null,
-        panNumber: "",
-        panFile: null,
-        hasPreviousPolicy: "",
-        previousPolicyCase: "",
-        experienceYears: "",
-        proposerDOB: "",
-        renewalDetails: {
-          insurerName: "",
-          policyNumber: "",
-          policyDueDate: "",
-          uploadPolicy: null,
-        },
-        portabilityDetails: [],
-        medicalRemarks: "",
-        members: [],
-        proposerIsMember: "",
-        seniorOneDOB: "",
-      });
     }
-    
-    if (lead.motorDetails) {
-      // Keep motor file fields as-is (URL or null)
-      setMotorDetails(lead.motorDetails);
-    } else {
-      setMotorDetails({
-        vehicleType: "",
-        previousInsuranceStatus: "",
-        manufacturer: "",
-        model: "",
-        fuelType: "",
-        rtoCode: "",
-        chesisNo: "",
-        yearOfManufacturing: "",
-        monthOfManufacturing: "",
-        idvAsPerInvoice: "",
-        insuranceType: "",
-        odDueDate: "",
-        tpDueDate: "",
-        policyNo: "",
-        previousInsurerName: "",
-        idvAsPerPYP: "",
-        saodOdDueDate: "",
-        saodTpDueDate: "",
-        saodPolicyNo: "",
-        saodPreviousInsurerName: "",
-        saodIdvAsPerPYP: "",
-        tpInsuranceDueDate: "",
-        registrationNumber: "",
-        autoRtoCode: "",
-        claimTaken: "",
-        ncb: "",
-        addOnRequired: "",
-        selectedAddOns: [],
-        pypFile: null,
-        rcFrontFile: null,
-        rcBackFile: null,
-        chesisPhoto: null,
-        invoiceCopy: null,
-      });
-    }
-    
-    if (lead.electronicDetails) {
-      // Keep electronic file fields as-is (URL or null)
-      setElectronicDetails(lead.electronicDetails);
-    } else {
-      setElectronicDetails({
-        deviceType: "",
-        otherDeviceType: "",
-        dateOfPurchase: "",
-        purchaseValue: "",
-        aadhaarNumber: "",
-        aadhaarFile: null,
-        panNumber: "",
-        panFile: null,
-        imeiNumber: "",
-        imeiImage: null,
-        devicePhotos: [],
-        purchaseInvoice: null,
-      });
-    }
-    
-    detectLOB(lead.lob);
-    
-    setWorkflowDetails({
-      status: lead.status || lead.workflowDetails?.status || "Open",
-      quoteNumber: lead.quoteNumber || lead.workflowDetails?.quoteNumber || "",
-      selectedInsurers: lead.selectedInsurers || lead.workflowDetails?.selectedInsurers || [],
-      insurerQuotes: lead.insurerQuotes || lead.workflowDetails?.insurerQuotes || [],
-      paymentStatus: lead.paymentStatus || lead.workflowDetails?.paymentStatus || "",
-      paymentUrl: lead.paymentUrl || lead.workflowDetails?.paymentUrl || "",
-      utrNumber: lead.utrNumber || lead.workflowDetails?.utrNumber || "",
-      paymentSnapshot: lead.paymentSnapshot || lead.workflowDetails?.paymentSnapshot || null,
-      policyNumber: lead.policyNumber || lead.workflowDetails?.policyNumber || "",
-      policyIssuedOn: lead.policyIssuedOn || lead.workflowDetails?.policyIssuedOn || "",
-      policyStartDate: lead.policyStartDate || lead.workflowDetails?.policyStartDate || "",
-      policyExpiryDate: lead.policyExpiryDate || lead.workflowDetails?.policyExpiryDate || "",
-      policyCopy: lead.policyCopy || lead.workflowDetails?.policyCopy || null,
-      remarks: lead.remarks || lead.workflowDetails?.workflowRemarks || "",
+  } else {
+    setHealthDetails({
+      policyType: "",
+      numberOfAdults: 0,
+      numberOfChildren: 0,
+      familyIncome: "",
+      height: "",
+      weight: "",
+      qualification: "",
+      occupation: "",
+      nomineeName: "",
+      nomineeDOB: "",
+      nomineeRelationship: "",
+      aadhaarNumber: "",
+      aadhaarFile: null,
+      panNumber: "",
+      panFile: null,
+      hasPreviousPolicy: "",
+      previousPolicyCase: "",
+      experienceYears: "",
+      proposerDOB: "",
+      renewalDetails: {
+        insurerName: "",
+        policyNumber: "",
+        policyDueDate: "",
+        uploadPolicy: null,
+      },
+      portabilityDetails: [],
+      medicalRemarks: "",
+      members: [],
+      proposerIsMember: "",
+      seniorOneDOB: "",
     });
-    
-    setShowInsurerQuotes(lead.status === "Quotation Generated" || lead.workflowDetails?.status === "Quotation Generated");
-    setShowEditModal(true);
-  };
+  }
+
+  // Motor - with date formatting
+  if (lead.motorDetails) {
+    setMotorDetails({
+      ...lead.motorDetails,
+      odDueDate: formatDateForInput(lead.motorDetails.odDueDate),
+      tpDueDate: formatDateForInput(lead.motorDetails.tpDueDate),
+      saodOdDueDate: formatDateForInput(lead.motorDetails.saodOdDueDate),
+      saodTpDueDate: formatDateForInput(lead.motorDetails.saodTpDueDate),
+      tpInsuranceDueDate: formatDateForInput(lead.motorDetails.tpInsuranceDueDate),
+      // Keep file URLs as-is
+      pypFile: lead.motorDetails.pypFile || null,
+      rcFrontFile: lead.motorDetails.rcFrontFile || null,
+      rcBackFile: lead.motorDetails.rcBackFile || null,
+      chesisPhoto: lead.motorDetails.chesisPhoto || null,
+      invoiceCopy: lead.motorDetails.invoiceCopy || null,
+    });
+  } else {
+    setMotorDetails({
+      vehicleType: "",
+      previousInsuranceStatus: "",
+      manufacturer: "",
+      model: "",
+      fuelType: "",
+      rtoCode: "",
+      chesisNo: "",
+      yearOfManufacturing: "",
+      monthOfManufacturing: "",
+      idvAsPerInvoice: "",
+      insuranceType: "",
+      odDueDate: "",
+      tpDueDate: "",
+      policyNo: "",
+      previousInsurerName: "",
+      idvAsPerPYP: "",
+      saodOdDueDate: "",
+      saodTpDueDate: "",
+      saodPolicyNo: "",
+      saodPreviousInsurerName: "",
+      saodIdvAsPerPYP: "",
+      tpInsuranceDueDate: "",
+      registrationNumber: "",
+      autoRtoCode: "",
+      claimTaken: "",
+      ncb: "",
+      addOnRequired: "",
+      selectedAddOns: [],
+      pypFile: null,
+      rcFrontFile: null,
+      rcBackFile: null,
+      chesisPhoto: null,
+      invoiceCopy: null,
+    });
+  }
+
+  // Electronic - with date formatting
+  if (lead.electronicDetails) {
+    setElectronicDetails({
+      ...lead.electronicDetails,
+      dateOfPurchase: formatDateForInput(lead.electronicDetails.dateOfPurchase),
+      // Keep file URLs as-is
+      aadhaarFile: lead.electronicDetails.aadhaarFile || null,
+      panFile: lead.electronicDetails.panFile || null,
+      imeiImage: lead.electronicDetails.imeiImage || null,
+      purchaseInvoice: lead.electronicDetails.purchaseInvoice || null,
+      devicePhotos: lead.electronicDetails.devicePhotos || [],
+    });
+  } else {
+    setElectronicDetails({
+      deviceType: "",
+      otherDeviceType: "",
+      dateOfPurchase: "",
+      purchaseValue: "",
+      aadhaarNumber: "",
+      aadhaarFile: null,
+      panNumber: "",
+      panFile: null,
+      imeiNumber: "",
+      imeiImage: null,
+      devicePhotos: [],
+      purchaseInvoice: null,
+    });
+  }
+
+  detectLOB(lead.lob);
+  
+  setWorkflowDetails({
+    status: lead.status || lead.workflowDetails?.status || "Open",
+    quoteNumber: lead.quoteNumber || lead.workflowDetails?.quoteNumber || "",
+    selectedInsurers: lead.selectedInsurers || lead.workflowDetails?.selectedInsurers || [],
+    insurerQuotes: lead.insurerQuotes || lead.workflowDetails?.insurerQuotes || [],
+    paymentStatus: lead.paymentStatus || lead.workflowDetails?.paymentStatus || "",
+    paymentUrl: lead.paymentUrl || lead.workflowDetails?.paymentUrl || "",
+    utrNumber: lead.utrNumber || lead.workflowDetails?.utrNumber || "",
+    paymentSnapshot: lead.paymentSnapshot || lead.workflowDetails?.paymentSnapshot || null,
+    policyNumber: lead.policyNumber || lead.workflowDetails?.policyNumber || "",
+    policyIssuedOn: formatDateForInput(lead.policyIssuedOn || lead.workflowDetails?.policyIssuedOn),
+    policyStartDate: formatDateForInput(lead.policyStartDate || lead.workflowDetails?.policyStartDate),
+    policyExpiryDate: formatDateForInput(lead.policyExpiryDate || lead.workflowDetails?.policyExpiryDate),
+    policyCopy: lead.policyCopy || lead.workflowDetails?.policyCopy || null,
+    remarks: lead.remarks || lead.workflowDetails?.workflowRemarks || "",
+  });
+  
+  setShowInsurerQuotes(lead.status === "Quotation Generated" || lead.workflowDetails?.status === "Quotation Generated");
+  setShowEditModal(true);
+};
 
   // ============================================================
   // FORM RESET
