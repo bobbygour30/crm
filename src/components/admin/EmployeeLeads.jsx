@@ -602,6 +602,24 @@ function EmployeeLeads() {
     }
   };
 
+  // ============================================================
+// DATE FORMATTING HELPER - FIX FOR EMPTY DATE INPUTS ON EDIT
+// ============================================================
+const formatDateForInput = (dateValue) => {
+  if (!dateValue) return "";
+  try {
+    // Already YYYY-MM-DD
+    if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+      return dateValue;
+    }
+    const d = new Date(dateValue);
+    if (isNaN(d.getTime())) return "";
+    return d.toISOString().split("T")[0];
+  } catch {
+    return "";
+  }
+};
+
   const fetchCityState = async (pinCode) => {
     setIsFetchingPin(true);
     setPinFetchError("");
@@ -1081,7 +1099,7 @@ function EmployeeLeads() {
             }
             if (!detail.sumAssured) {
               errors[`portabilitySum_${idx}`] = `SUM ASSURED is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilitySum_${idx}`, message: `SUM ASSURED is required for Policy ${idx + 1}` });
+              errorList.push({ field: `portabilitySum_${idx}`, message: `Policy ${idx + 1}` });
             }
             if (!detail.uploadPYP) {
               errors[`portabilityUpload_${idx}`] = `Upload PYP is mandatory for Policy ${idx + 1}`;
@@ -1331,7 +1349,7 @@ function EmployeeLeads() {
   // CRUD OPERATIONS
   // ============================================================
   
-  // Open Edit Modal - Same as LeadTable
+    // Open Edit Modal - Same as LeadTable, WITH date formatting fix
   const handleEdit = (lead) => {
     setEditLead(lead);
     
@@ -1352,13 +1370,32 @@ function EmployeeLeads() {
       sumInsured: lead.sumInsured || "",
     });
     
+    // ✅ FIX: format every date field before it hits a <input type="date">
+    // Keep existing Cloudinary URLs for files (do NOT null them out)
     if (lead.healthDetails) {
       setHealthDetails({
         ...lead.healthDetails,
-        aadhaarFile: null,
-        panFile: null,
+        aadhaarFile: lead.healthDetails.aadhaarFile || null,
+        panFile: lead.healthDetails.panFile || null,
         previousPolicyFile: null,
-        members: lead.healthDetails.members || [],
+        nomineeDOB: formatDateForInput(lead.healthDetails.nomineeDOB),
+        proposerDOB: formatDateForInput(lead.healthDetails.proposerDOB),
+        seniorOneDOB: formatDateForInput(lead.healthDetails.seniorOneDOB),
+        renewalDetails: {
+          ...(lead.healthDetails.renewalDetails || {}),
+          policyDueDate: formatDateForInput(lead.healthDetails.renewalDetails?.policyDueDate),
+          uploadPolicy: lead.healthDetails.renewalDetails?.uploadPolicy || null,
+        },
+        portabilityDetails: (lead.healthDetails.portabilityDetails || []).map((p) => ({
+          ...p,
+          policyActiveFrom: formatDateForInput(p.policyActiveFrom),
+          policyTillDate: formatDateForInput(p.policyTillDate),
+          uploadPYP: p.uploadPYP || null,
+        })),
+        members: (lead.healthDetails.members || []).map((m) => ({
+          ...m,
+          dob: formatDateForInput(m.dob),
+        })),
       });
       if (lead.healthDetails.policyType === "Floater") {
         setShowFloaterMembers(true);
@@ -1376,19 +1413,41 @@ function EmployeeLeads() {
       }
     }
     
+    // ✅ FIX: format every date field on motorDetails too + keep file URLs
     if (lead.motorDetails) {
-      setMotorDetails(lead.motorDetails);
+      setMotorDetails({
+        ...lead.motorDetails,
+        odDueDate: formatDateForInput(lead.motorDetails.odDueDate),
+        tpDueDate: formatDateForInput(lead.motorDetails.tpDueDate),
+        saodOdDueDate: formatDateForInput(lead.motorDetails.saodOdDueDate),
+        saodTpDueDate: formatDateForInput(lead.motorDetails.saodTpDueDate),
+        tpInsuranceDueDate: formatDateForInput(lead.motorDetails.tpInsuranceDueDate),
+        pypFile: lead.motorDetails.pypFile || null,
+        rcFrontFile: lead.motorDetails.rcFrontFile || null,
+        rcBackFile: lead.motorDetails.rcBackFile || null,
+        chesisPhoto: lead.motorDetails.chesisPhoto || null,
+        invoiceCopy: lead.motorDetails.invoiceCopy || null,
+      });
     }
     
+    // ✅ FIX: format dateOfPurchase on electronicDetails too + keep file URLs
     if (lead.electronicDetails) {
-      setElectronicDetails(lead.electronicDetails);
+      setElectronicDetails({
+        ...lead.electronicDetails,
+        dateOfPurchase: formatDateForInput(lead.electronicDetails.dateOfPurchase),
+        aadhaarFile: lead.electronicDetails.aadhaarFile || null,
+        panFile: lead.electronicDetails.panFile || null,
+        imeiImage: lead.electronicDetails.imeiImage || null,
+        purchaseInvoice: lead.electronicDetails.purchaseInvoice || null,
+        devicePhotos: lead.electronicDetails.devicePhotos || [],
+      });
     }
     
     detectLOB(lead.lob);
     setShowEditModal(true);
   };
 
-  // Update Lead - Same as LeadTable (without workflow)
+   // Update Lead - Same as LeadTable (without workflow)
   const handleUpdate = async (e) => {
     e.preventDefault();
     
@@ -1429,32 +1488,40 @@ function EmployeeLeads() {
         const healthData = { ...healthDetails };
         healthData.proposerName = formData.name;
 
-        delete healthData.aadhaarFile;
-        delete healthData.panFile;
-        if (healthData.renewalDetails) {
+        // ✅ FIX: only strip File objects (they can't survive JSON.stringify anyway
+        // and go via FormData appends below). Keep existing URL strings intact so
+        // the backend doesn't wipe out previously-uploaded documents on every save.
+        if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
+        if (healthData.panFile instanceof File) delete healthData.panFile;
+        if (healthData.renewalDetails?.uploadPolicy instanceof File) {
           delete healthData.renewalDetails.uploadPolicy;
         }
         if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map(
-            ({ uploadPYP, ...rest }) => rest
-          );
+          healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
+            const clean = { ...detail };
+            if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+            return clean;
+          });
         }
         if (healthData.members) {
-          healthData.members = healthData.members.map(
-            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-              const member = { ...rest };
-              if (!member.wantRider) delete member.wantRider;
-              if (!member.selectedRider) delete member.selectedRider;
-              if (member.riderDetails) {
-                const rd = { ...member.riderDetails };
-                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-                  if (!rd[k]) delete rd[k];
-                });
-                member.riderDetails = rd;
-              }
-              return member;
+          healthData.members = healthData.members.map((member) => {
+            const clean = { ...member };
+            // ✅ FIX: same pattern — only strip actual File objects, keep any
+            // existing URL strings (member-level file upload wiring TBD server-side)
+            if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+            if (clean.epicFile instanceof File) delete clean.epicFile;
+            if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
+            if (!clean.wantRider) delete clean.wantRider;
+            if (!clean.selectedRider) delete clean.selectedRider;
+            if (clean.riderDetails) {
+              const rd = { ...clean.riderDetails };
+              ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+                if (!rd[k]) delete rd[k];
+              });
+              clean.riderDetails = rd;
             }
-          );
+            return clean;
+          });
         }
 
         if (!healthData.policyType) delete healthData.policyType;
@@ -1483,6 +1550,11 @@ function EmployeeLeads() {
       if (hasMotorData) {
         const motorData = { ...motorDetails };
         
+        // ✅ Only strip actual File objects — keep existing URL strings intact
+        ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
+          if (motorData[f] instanceof File) delete motorData[f];
+        });
+        
         if (!motorData.vehicleType) delete motorData.vehicleType;
         if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
         if (!motorData.registrationNumber) delete motorData.registrationNumber;
@@ -1495,19 +1567,19 @@ function EmployeeLeads() {
         }
       }
       
-      if (motorDetails.pypFile) {
+      if (motorDetails.pypFile instanceof File) {
         submitData.append("pypFile", motorDetails.pypFile);
       }
-      if (motorDetails.rcFrontFile) {
+      if (motorDetails.rcFrontFile instanceof File) {
         submitData.append("rcFrontFile", motorDetails.rcFrontFile);
       }
-      if (motorDetails.rcBackFile) {
+      if (motorDetails.rcBackFile instanceof File) {
         submitData.append("rcBackFile", motorDetails.rcBackFile);
       }
-      if (motorDetails.chesisPhoto) {
+      if (motorDetails.chesisPhoto instanceof File) {
         submitData.append("chesisPhoto", motorDetails.chesisPhoto);
       }
-      if (motorDetails.invoiceCopy) {
+      if (motorDetails.invoiceCopy instanceof File) {
         submitData.append("invoiceCopy", motorDetails.invoiceCopy);
       }
     }
@@ -1520,8 +1592,17 @@ function EmployeeLeads() {
       if (hasElectronicData) {
         const electronicData = { ...electronicDetails };
         
-        delete electronicData.aadhaarFile;
-        delete electronicData.panFile;
+        // ✅ FIX: same as health — only strip actual File objects, keep URL strings
+        if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
+        if (electronicData.panFile instanceof File) delete electronicData.panFile;
+        if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
+        if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
+        if (electronicData.devicePhotos) {
+          // keep existing URL strings, drop File objects (those go via appends below)
+          electronicData.devicePhotos = electronicData.devicePhotos.filter(
+            (p) => typeof p === "string"
+          );
+        }
         
         if (!electronicData.deviceType) delete electronicData.deviceType;
         if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
@@ -1532,6 +1613,41 @@ function EmployeeLeads() {
         }
       }
     }
+
+    // ===== HEALTH FILES =====
+    if (healthDetails.aadhaarFile instanceof File) {
+      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+    }
+    if (healthDetails.panFile instanceof File) {
+      submitData.append("healthPanFile", healthDetails.panFile);
+    }
+    if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
+      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+    }
+    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+      if (detail.uploadPYP instanceof File) {
+        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+      }
+    });
+
+    // ===== ELECTRONIC FILES =====
+    if (electronicDetails.aadhaarFile instanceof File) {
+      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+    }
+    if (electronicDetails.panFile instanceof File) {
+      submitData.append("electronicPanFile", electronicDetails.panFile);
+    }
+    if (electronicDetails.imeiImage instanceof File) {
+      submitData.append("imeiImage", electronicDetails.imeiImage);
+    }
+    if (electronicDetails.purchaseInvoice instanceof File) {
+      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+    }
+    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+      if (photo instanceof File) {
+        submitData.append(`devicePhoto_${idx}`, photo);
+      }
+    });
 
     const token = localStorage.getItem("token");
     if (!token) {
@@ -1994,13 +2110,20 @@ function EmployeeLeads() {
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Upload PYP (Mandatory)</label>
+                            {typeof detail.uploadPYP === "string" && detail.uploadPYP && (
+                              <div className="mb-1">
+                                <a href={detail.uploadPYP} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                                  View current PYP file
+                                </a>
+                              </div>
+                            )}
                             <input
                               type="file"
                               accept=".pdf"
                               onChange={(e) => handlePortabilityDetailChange(index, 'uploadPYP', e.target.files[0])}
                               className={`w-full p-2 border rounded-lg text-sm ${validationErrors[`portabilityUpload_${index}`] ? 'border-red-500' : 'border-gray-300'}`}
                             />
-                            {detail.uploadPYP && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                            {detail.uploadPYP && typeof detail.uploadPYP !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                             {validationErrors[`portabilityUpload_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilityUpload_${index}`]}</p>}
                           </div>
                         </div>
@@ -2063,6 +2186,13 @@ function EmployeeLeads() {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Upload Policy (Not Mandatory)</label>
+                    {typeof healthDetails.renewalDetails.uploadPolicy === "string" && healthDetails.renewalDetails.uploadPolicy && (
+                      <div className="mb-1">
+                        <a href={healthDetails.renewalDetails.uploadPolicy} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                          View current policy file
+                        </a>
+                      </div>
+                    )}
                     <input
                       type="file"
                       accept=".pdf"
@@ -2446,12 +2576,20 @@ function EmployeeLeads() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            {typeof healthDetails.aadhaarFile === "string" && healthDetails.aadhaarFile && (
+              <div className="mb-1">
+                <a href={healthDetails.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current Aadhaar file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {healthDetails.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -2476,12 +2614,20 @@ function EmployeeLeads() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            {typeof healthDetails.panFile === "string" && healthDetails.panFile && (
+              <div className="mb-1">
+                <a href={healthDetails.panFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current PAN file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              onChange={(e) => setHealthDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {healthDetails.panFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div className="lg:col-span-3">
@@ -3098,26 +3244,40 @@ function EmployeeLeads() {
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
+                {typeof motorDetails.invoiceCopy === "string" && motorDetails.invoiceCopy && (
+                  <div className="mb-1">
+                    <a href={motorDetails.invoiceCopy} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                      View current Invoice file
+                    </a>
+                  </div>
+                )}
                 <input
                   data-field="invoiceCopy"
                   type="file"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] }))}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] || prev.invoiceCopy }))}
                   className={`w-full p-2 border rounded-lg ${validationErrors.invoiceCopy ? 'border-red-500' : 'border-gray-300'}`}
                 />
-                {motorDetails.invoiceCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {motorDetails.invoiceCopy instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
                 {validationErrors.invoiceCopy && <p className="text-red-500 text-xs mt-1">{validationErrors.invoiceCopy}</p>}
               </div>
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
+                {typeof motorDetails.chesisPhoto === "string" && motorDetails.chesisPhoto && (
+                  <div className="mb-1">
+                    <a href={motorDetails.chesisPhoto} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                      View current Chesis photo
+                    </a>
+                  </div>
+                )}
                 <input
                   type="file"
                   accept=".jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] }))}
+                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] || prev.chesisPhoto }))}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
-                {motorDetails.chesisPhoto && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {motorDetails.chesisPhoto instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               </div>
             </div>
           </div>
@@ -3450,14 +3610,21 @@ function EmployeeLeads() {
                 Upload PYP 
                 {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
               </label>
+              {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
+                <div className="mb-1">
+                  <a href={motorDetails.pypFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    View current PYP file
+                  </a>
+                </div>
+              )}
               <input
                 data-field="pypFile"
                 type="file"
                 accept=".pdf"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] }))}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] || prev.pypFile }))}
                 className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {motorDetails.pypFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              {motorDetails.pypFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
             </div>
 
@@ -3466,14 +3633,21 @@ function EmployeeLeads() {
                 RC Front Upload
                 {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
               </label>
+              {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
+                <div className="mb-1">
+                  <a href={motorDetails.rcFrontFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    View current RC Front file
+                  </a>
+                </div>
+              )}
               <input
                 data-field="rcFrontFile"
                 type="file"
                 accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] }))}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] || prev.rcFrontFile }))}
                 className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {motorDetails.rcFrontFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              {motorDetails.rcFrontFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
             </div>
 
@@ -3482,14 +3656,21 @@ function EmployeeLeads() {
                 RC Back Upload
                 {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
               </label>
+              {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
+                <div className="mb-1">
+                  <a href={motorDetails.rcBackFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    View current RC Back file
+                  </a>
+                </div>
+              )}
               <input
                 data-field="rcBackFile"
                 type="file"
                 accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] }))}
+                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] || prev.rcBackFile }))}
                 className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
               />
-              {motorDetails.rcBackFile && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              {motorDetails.rcBackFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
             </div>
           </div>
@@ -3603,12 +3784,20 @@ function EmployeeLeads() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
+            {typeof electronicDetails.aadhaarFile === "string" && electronicDetails.aadhaarFile && (
+              <div className="mb-1">
+                <a href={electronicDetails.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current Aadhaar file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {electronicDetails.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -3633,12 +3822,20 @@ function EmployeeLeads() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
+            {typeof electronicDetails.panFile === "string" && electronicDetails.panFile && (
+              <div className="mb-1">
+                <a href={electronicDetails.panFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current PAN file
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {electronicDetails.panFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -3660,18 +3857,35 @@ function EmployeeLeads() {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
+            {typeof electronicDetails.imeiImage === "string" && electronicDetails.imeiImage && (
+              <div className="mb-1">
+                <a href={electronicDetails.imeiImage} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current IMEI image
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] || prev.imeiImage }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {electronicDetails.imeiImage instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div className="lg:col-span-3">
             <label className="text-sm font-medium text-gray-700">
               Device Photos (3-4 photos from different angles showing IMEI)
             </label>
+            {(electronicDetails.devicePhotos || []).map((photo, idx) => (
+              typeof photo === "string" && photo ? (
+                <div key={idx} className="mb-1">
+                  <a href={photo} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    View current device photo {idx + 1}
+                  </a>
+                </div>
+              ) : null
+            ))}
             <input
               type="file"
               accept=".jpg,.jpeg"
@@ -3679,19 +3893,29 @@ function EmployeeLeads() {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, devicePhotos: Array.from(e.target.files) }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.devicePhotos.length > 0 && (
-              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.length} photos selected</p>
+            {electronicDetails.devicePhotos.length > 0 && electronicDetails.devicePhotos.some(p => p instanceof File) && (
+              <p className="text-sm text-green-500 mt-1">
+                {electronicDetails.devicePhotos.filter(p => p instanceof File).length} new photo(s) selected
+              </p>
             )}
           </div>
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
+            {typeof electronicDetails.purchaseInvoice === "string" && electronicDetails.purchaseInvoice && (
+              <div className="mb-1">
+                <a href={electronicDetails.purchaseInvoice} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                  View current Purchase Invoice
+                </a>
+              </div>
+            )}
             <input
               type="file"
               accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] }))}
+              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] || prev.purchaseInvoice }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+            {electronicDetails.purchaseInvoice instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
         </div>
       </div>

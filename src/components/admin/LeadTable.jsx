@@ -637,21 +637,26 @@ useEffect(() => {
   // API CALLS
   // ============================================================
   const fetchLeads = async () => {
-    const token = localStorage.getItem("token");
-    if (!token) return;
-    try {
-      const res = await fetch(`${API_BASE}/api/leads`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setLeads(data);
-        setFilteredLeads(data);
-      }
-    } catch (err) {
-      console.error("Fetch leads error:", err);
+  const token = localStorage.getItem("token");
+  if (!token) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/leads`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (res.ok) {
+      const data = await res.json();
+      // Ensure all _id fields are strings
+      const safeData = data.map(lead => ({
+        ...lead,
+        _id: typeof lead._id === 'string' ? lead._id : (lead._id?.toString ? lead._id.toString() : String(lead._id || '')),
+      }));
+      setLeads(safeData);
+      setFilteredLeads(safeData);
     }
-  };
+  } catch (err) {
+    console.error("Fetch leads error:", err);
+  }
+};
 
   const fetchCityState = async (pinCode) => {
     setIsFetchingPin(true);
@@ -1797,6 +1802,9 @@ const handleUpdateLead = async (e) => {
   const submitData = new FormData();
   const token = localStorage.getItem("token");
   
+  // CRITICAL FIX: Ensure _id is a string
+  const leadId = typeof editLead._id === 'string' ? editLead._id : String(editLead._id || '');
+  
   // Basic fields
   submitData.append("name", formData.name);
   submitData.append("email", formData.email || "");
@@ -1901,7 +1909,8 @@ const handleUpdateLead = async (e) => {
   if (workflowDetails.policyCopy instanceof File) submitData.append("policyCopy", workflowDetails.policyCopy);
 
   try {
-    const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, {
+    // CRITICAL FIX: Use leadId (string) in the URL
+    const res = await fetch(`${API_BASE}/api/leads/${leadId}`, {
       method: "PUT",
       headers: {
         Authorization: `Bearer ${token}`,
@@ -1939,64 +1948,66 @@ const handleUpdateLead = async (e) => {
   // OPEN EDIT MODAL
   // ============================================================
  // ============================================================
-// OPEN EDIT MODAL - UPDATED with date formatting
-// ============================================================
 const openEditModal = (lead) => {
-  setEditLead(lead);
+  // CRITICAL FIX: Ensure _id is a string
+  const safeLead = {
+    ...lead,
+    _id: typeof lead._id === 'string' ? lead._id : (lead._id?.toString ? lead._id.toString() : String(lead._id || '')),
+  };
+  
+  setEditLead(safeLead);
   
   setFormData({
-    name: lead.name || "",
-    email: lead.email || "",
-    mobileNo: lead.mobileNo || "",
-    gender: lead.gender || "",
-    source: lead.source || "",
-    remarks: lead.remarks || "",
-    lob: lead.lob || "",
-    pinCode: lead.pinCode || "",
-    state: lead.state || "",
-    city: lead.city || "",
-    sourceDependentValue: lead.sourceDependentValue || "",
-    policyTenure: lead.policyTenure || "",
-    paymentTerm: lead.paymentTerm || "",
-    sumInsured: lead.sumInsured || "",
+    name: safeLead.name || "",
+    email: safeLead.email || "",
+    mobileNo: safeLead.mobileNo || "",
+    gender: safeLead.gender || "",
+    source: safeLead.source || "",
+    remarks: safeLead.remarks || "",
+    lob: safeLead.lob || "",
+    pinCode: safeLead.pinCode || "",
+    state: safeLead.state || "",
+    city: safeLead.city || "",
+    sourceDependentValue: safeLead.sourceDependentValue || "",
+    policyTenure: safeLead.policyTenure || "",
+    paymentTerm: safeLead.paymentTerm || "",
+    sumInsured: safeLead.sumInsured || "",
   });
 
   // Health - with date formatting
-  if (lead.healthDetails) {
+  if (safeLead.healthDetails) {
     setHealthDetails({
-      ...lead.healthDetails,
-      nomineeDOB: formatDateForInput(lead.healthDetails.nomineeDOB),
-      proposerDOB: formatDateForInput(lead.healthDetails.proposerDOB),
-      seniorOneDOB: formatDateForInput(lead.healthDetails.seniorOneDOB),
+      ...safeLead.healthDetails,
+      nomineeDOB: formatDateForInput(safeLead.healthDetails.nomineeDOB),
+      proposerDOB: formatDateForInput(safeLead.healthDetails.proposerDOB),
+      seniorOneDOB: formatDateForInput(safeLead.healthDetails.seniorOneDOB),
       renewalDetails: {
-        ...(lead.healthDetails.renewalDetails || {}),
-        policyDueDate: formatDateForInput(lead.healthDetails.renewalDetails?.policyDueDate),
-        // Keep uploadPolicy as-is (URL or null)
-        uploadPolicy: lead.healthDetails.renewalDetails?.uploadPolicy || null,
+        ...(safeLead.healthDetails.renewalDetails || {}),
+        policyDueDate: formatDateForInput(safeLead.healthDetails.renewalDetails?.policyDueDate),
+        uploadPolicy: safeLead.healthDetails.renewalDetails?.uploadPolicy || null,
       },
-      members: (lead.healthDetails.members || []).map(m => ({
+      members: (safeLead.healthDetails.members || []).map(m => ({
         ...m,
         dob: formatDateForInput(m.dob),
       })),
-      portabilityDetails: (lead.healthDetails.portabilityDetails || []).map(p => ({
+      portabilityDetails: (safeLead.healthDetails.portabilityDetails || []).map(p => ({
         ...p,
         policyActiveFrom: formatDateForInput(p.policyActiveFrom),
         policyTillDate: formatDateForInput(p.policyTillDate),
-        // Keep uploadPYP as-is (URL or null)
         uploadPYP: p.uploadPYP || null,
       })),
     });
-    if (lead.healthDetails.policyType === "Floater") {
+    if (safeLead.healthDetails.policyType === "Floater") {
       setShowFloaterMembers(true);
       setShowSeniorOneDOB(true);
     }
-    if (lead.healthDetails.hasPreviousPolicy === "Yes") {
+    if (safeLead.healthDetails.hasPreviousPolicy === "Yes") {
       setShowPreviousPolicyPopup(true);
-      if (lead.healthDetails.previousPolicyCase === "Renew Case") {
+      if (safeLead.healthDetails.previousPolicyCase === "Renew Case") {
         setShowRenewalFields(true);
-      } else if (lead.healthDetails.previousPolicyCase === "Portability Case") {
+      } else if (safeLead.healthDetails.previousPolicyCase === "Portability Case") {
         setShowPortabilityFields(true);
-      } else if (lead.healthDetails.previousPolicyCase === "Fresh Case") {
+      } else if (safeLead.healthDetails.previousPolicyCase === "Fresh Case") {
         setShowFreshCaseFields(true);
       }
     }
@@ -2036,20 +2047,19 @@ const openEditModal = (lead) => {
   }
 
   // Motor - with date formatting
-  if (lead.motorDetails) {
+  if (safeLead.motorDetails) {
     setMotorDetails({
-      ...lead.motorDetails,
-      odDueDate: formatDateForInput(lead.motorDetails.odDueDate),
-      tpDueDate: formatDateForInput(lead.motorDetails.tpDueDate),
-      saodOdDueDate: formatDateForInput(lead.motorDetails.saodOdDueDate),
-      saodTpDueDate: formatDateForInput(lead.motorDetails.saodTpDueDate),
-      tpInsuranceDueDate: formatDateForInput(lead.motorDetails.tpInsuranceDueDate),
-      // Keep file URLs as-is
-      pypFile: lead.motorDetails.pypFile || null,
-      rcFrontFile: lead.motorDetails.rcFrontFile || null,
-      rcBackFile: lead.motorDetails.rcBackFile || null,
-      chesisPhoto: lead.motorDetails.chesisPhoto || null,
-      invoiceCopy: lead.motorDetails.invoiceCopy || null,
+      ...safeLead.motorDetails,
+      odDueDate: formatDateForInput(safeLead.motorDetails.odDueDate),
+      tpDueDate: formatDateForInput(safeLead.motorDetails.tpDueDate),
+      saodOdDueDate: formatDateForInput(safeLead.motorDetails.saodOdDueDate),
+      saodTpDueDate: formatDateForInput(safeLead.motorDetails.saodTpDueDate),
+      tpInsuranceDueDate: formatDateForInput(safeLead.motorDetails.tpInsuranceDueDate),
+      pypFile: safeLead.motorDetails.pypFile || null,
+      rcFrontFile: safeLead.motorDetails.rcFrontFile || null,
+      rcBackFile: safeLead.motorDetails.rcBackFile || null,
+      chesisPhoto: safeLead.motorDetails.chesisPhoto || null,
+      invoiceCopy: safeLead.motorDetails.invoiceCopy || null,
     });
   } else {
     setMotorDetails({
@@ -2090,16 +2100,15 @@ const openEditModal = (lead) => {
   }
 
   // Electronic - with date formatting
-  if (lead.electronicDetails) {
+  if (safeLead.electronicDetails) {
     setElectronicDetails({
-      ...lead.electronicDetails,
-      dateOfPurchase: formatDateForInput(lead.electronicDetails.dateOfPurchase),
-      // Keep file URLs as-is
-      aadhaarFile: lead.electronicDetails.aadhaarFile || null,
-      panFile: lead.electronicDetails.panFile || null,
-      imeiImage: lead.electronicDetails.imeiImage || null,
-      purchaseInvoice: lead.electronicDetails.purchaseInvoice || null,
-      devicePhotos: lead.electronicDetails.devicePhotos || [],
+      ...safeLead.electronicDetails,
+      dateOfPurchase: formatDateForInput(safeLead.electronicDetails.dateOfPurchase),
+      aadhaarFile: safeLead.electronicDetails.aadhaarFile || null,
+      panFile: safeLead.electronicDetails.panFile || null,
+      imeiImage: safeLead.electronicDetails.imeiImage || null,
+      purchaseInvoice: safeLead.electronicDetails.purchaseInvoice || null,
+      devicePhotos: safeLead.electronicDetails.devicePhotos || [],
     });
   } else {
     setElectronicDetails({
@@ -2118,26 +2127,26 @@ const openEditModal = (lead) => {
     });
   }
 
-  detectLOB(lead.lob);
+  detectLOB(safeLead.lob);
   
   setWorkflowDetails({
-    status: lead.status || lead.workflowDetails?.status || "Open",
-    quoteNumber: lead.quoteNumber || lead.workflowDetails?.quoteNumber || "",
-    selectedInsurers: lead.selectedInsurers || lead.workflowDetails?.selectedInsurers || [],
-    insurerQuotes: lead.insurerQuotes || lead.workflowDetails?.insurerQuotes || [],
-    paymentStatus: lead.paymentStatus || lead.workflowDetails?.paymentStatus || "",
-    paymentUrl: lead.paymentUrl || lead.workflowDetails?.paymentUrl || "",
-    utrNumber: lead.utrNumber || lead.workflowDetails?.utrNumber || "",
-    paymentSnapshot: lead.paymentSnapshot || lead.workflowDetails?.paymentSnapshot || null,
-    policyNumber: lead.policyNumber || lead.workflowDetails?.policyNumber || "",
-    policyIssuedOn: formatDateForInput(lead.policyIssuedOn || lead.workflowDetails?.policyIssuedOn),
-    policyStartDate: formatDateForInput(lead.policyStartDate || lead.workflowDetails?.policyStartDate),
-    policyExpiryDate: formatDateForInput(lead.policyExpiryDate || lead.workflowDetails?.policyExpiryDate),
-    policyCopy: lead.policyCopy || lead.workflowDetails?.policyCopy || null,
-    remarks: lead.remarks || lead.workflowDetails?.workflowRemarks || "",
+    status: safeLead.status || safeLead.workflowDetails?.status || "Open",
+    quoteNumber: safeLead.quoteNumber || safeLead.workflowDetails?.quoteNumber || "",
+    selectedInsurers: safeLead.selectedInsurers || safeLead.workflowDetails?.selectedInsurers || [],
+    insurerQuotes: safeLead.insurerQuotes || safeLead.workflowDetails?.insurerQuotes || [],
+    paymentStatus: safeLead.paymentStatus || safeLead.workflowDetails?.paymentStatus || "",
+    paymentUrl: safeLead.paymentUrl || safeLead.workflowDetails?.paymentUrl || "",
+    utrNumber: safeLead.utrNumber || safeLead.workflowDetails?.utrNumber || "",
+    paymentSnapshot: safeLead.paymentSnapshot || safeLead.workflowDetails?.paymentSnapshot || null,
+    policyNumber: safeLead.policyNumber || safeLead.workflowDetails?.policyNumber || "",
+    policyIssuedOn: formatDateForInput(safeLead.policyIssuedOn || safeLead.workflowDetails?.policyIssuedOn),
+    policyStartDate: formatDateForInput(safeLead.policyStartDate || safeLead.workflowDetails?.policyStartDate),
+    policyExpiryDate: formatDateForInput(safeLead.policyExpiryDate || safeLead.workflowDetails?.policyExpiryDate),
+    policyCopy: safeLead.policyCopy || safeLead.workflowDetails?.policyCopy || null,
+    remarks: safeLead.remarks || safeLead.workflowDetails?.workflowRemarks || "",
   });
   
-  setShowInsurerQuotes(lead.status === "Quotation Generated" || lead.workflowDetails?.status === "Quotation Generated");
+  setShowInsurerQuotes(safeLead.status === "Quotation Generated" || safeLead.workflowDetails?.status === "Quotation Generated");
   setShowEditModal(true);
 };
 
@@ -5723,9 +5732,20 @@ const openEditModal = (lead) => {
                   <td className="p-3">{lead.policyTenure || "-"}</td>
                   <td className="p-3">{lead.sumInsured || "-"}</td>
                   <td className="p-3 flex gap-2 items-center">
-                    <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
-                      <FaEye className="h-5 w-5" />
-                    </button>
+        
+<button 
+  onClick={() => {
+    // Ensure _id is a string
+    const safeLead = {
+      ...lead,
+      _id: typeof lead._id === 'string' ? lead._id : String(lead._id || '')
+    };
+    setSelectedLead(safeLead);
+  }} 
+  className="text-indigo-600 hover:text-indigo-800"
+>
+  <FaEye className="h-5 w-5" />
+</button>
                     <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
                       <FaEdit className="h-5 w-5" />
                     </button>
