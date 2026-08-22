@@ -33,14 +33,31 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
         body: JSON.stringify({ email: trimmedEmail, password: trimmedPassword }),
       });
       const data = await response.json();
+      
       if (response.ok) {
-        if (!data.token || !data.username) {
+        if (!data.token || !data.user) {
           throw new Error('Invalid response from server');
         }
+
+        // Store user data properly
+        const userData = data.user;
+        
+        // Determine the display name - prioritize fullName for Channel Partners
+        const displayName = userData.fullName || 
+                           userData.name || 
+                           userData.username || 
+                           userData.organizationName || 
+                           'User';
+
         localStorage.setItem('token', data.token);
-        localStorage.setItem('username', data.username);
+        localStorage.setItem('username', displayName);
         localStorage.setItem('isAdmin', data.isAdmin);
-        localStorage.setItem('userId', data.id);
+        localStorage.setItem('userId', data.id || userData.id);
+        localStorage.setItem('userData', JSON.stringify(userData));
+        localStorage.setItem('fullName', userData.fullName || '');
+        localStorage.setItem('organizationName', userData.organizationName || '');
+        localStorage.setItem('userType', userData.userType || userData.role || 'Employee');
+
         setIsAuthenticated(true);
         setIsAdmin(data.isAdmin);
         navigate(data.isAdmin ? '/admin' : '/');
@@ -69,7 +86,7 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
             transition={{ delay: 0.2 }}
             className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full mb-4"
           >
-            <span className="text-white text-2xl font-bold">{localStorage.getItem('username') || 'CRM'}</span>
+            <span className="text-white text-2xl font-bold">CRM</span>
           </motion.div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Welcome Back</h1>
           <p className="text-gray-600 text-sm sm:text-base">Sign in to continue to your dashboard</p>

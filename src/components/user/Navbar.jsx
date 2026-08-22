@@ -34,13 +34,14 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // FIXED: Also check organizationName for Channel Partners
+  // FIXED: Prioritize fullName for Channel Partners over organizationName
+  // The priority order: fullName > username > organizationName > name > Guest
   const displayName =
-    username ||
-    user?.username ||
-    user?.fullName ||
-    user?.organizationName ||
-    user?.name ||
+    user?.fullName ||           // PRIORITY 1: Full name (works for both Employee and Channel Partner)
+    username ||                 // PRIORITY 2: Passed username prop
+    user?.username ||           // PRIORITY 3: User object username
+    user?.organizationName ||   // PRIORITY 4: Organization name (fallback)
+    user?.name ||               // PRIORITY 5: Generic name field
     "Guest";
 
   useEffect(() => {

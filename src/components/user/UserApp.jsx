@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Routes, Route, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import UserDashboard from "./UserDashboard";
@@ -30,12 +30,51 @@ function UserApp({ handleLogout }) {
     priority: "Medium",
   });
   const [campaignList, setCampaignList] = useState(campaigns);
+  const [loggedInUser, setLoggedInUser] = useState(null);
   const navigate = useNavigate();
 
   // ----------------------------------------------------------------------
-  // NEW: read username from localStorage (fallback to generic name)
+  // Get user data from localStorage on component mount
   // ----------------------------------------------------------------------
-  const username = localStorage.getItem('username') || 'User';
+  useEffect(() => {
+    try {
+      const userDataStr = localStorage.getItem('userData');
+      if (userDataStr) {
+        const userData = JSON.parse(userDataStr);
+        setLoggedInUser(userData);
+      }
+    } catch (error) {
+      console.error('Error parsing user data:', error);
+    }
+  }, []);
+
+  // ----------------------------------------------------------------------
+  // Get username with proper priority: fullName > username > organizationName
+  // ----------------------------------------------------------------------
+  const getUserDisplayName = () => {
+    // First try to get from userData object
+    if (loggedInUser) {
+      return loggedInUser.fullName || 
+             loggedInUser.username || 
+             loggedInUser.name || 
+             loggedInUser.organizationName || 
+             'User';
+    }
+    
+    // Fallback to localStorage keys
+    const storedFullName = localStorage.getItem('fullName');
+    if (storedFullName) return storedFullName;
+    
+    const storedUsername = localStorage.getItem('username');
+    if (storedUsername) return storedUsername;
+    
+    const storedOrgName = localStorage.getItem('organizationName');
+    if (storedOrgName) return storedOrgName;
+    
+    return 'User';
+  };
+
+  const displayName = getUserDisplayName();
 
   // ----------------------------------------------------------------------
   // Task handling
@@ -51,30 +90,41 @@ function UserApp({ handleLogout }) {
   // ----------------------------------------------------------------------
   const handleUserLogout = () => {
     handleLogout();
-    localStorage.removeItem('username'); // explicit clear
+    // Clear all user-related localStorage items
+    localStorage.removeItem('username');
+    localStorage.removeItem('fullName');
+    localStorage.removeItem('organizationName');
+    localStorage.removeItem('userData');
+    localStorage.removeItem('userType');
+    localStorage.removeItem('token');
+    localStorage.removeItem('isAdmin');
+    localStorage.removeItem('userId');
     navigate("/login");
   };
 
   // ----------------------------------------------------------------------
-  // Mock logged-in user (replace with real data when you fetch from API)
+  // Fallback user if no user data is available
   // ----------------------------------------------------------------------
-  const loggedInUser = users.find((user) => user.role === "User") || users[1];
+  const fallbackUser = users.find((user) => user.role === "User") || users[1];
+
+  // Use loggedInUser if available, otherwise use fallback
+  const currentUser = loggedInUser || fallbackUser;
 
   // ----------------------------------------------------------------------
   // Render
   // ----------------------------------------------------------------------
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-gray-100 flex">
-      {/* Navbar – you can also pass username here if you want it displayed */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         handleLogout={handleUserLogout}
-        username={username}   
+        username={displayName}
+        user={currentUser}
       />
 
       <div className="flex-1 flex flex-col">
-        <div>
+        <div className="pt-16">
           <Routes>
             <Route
               path="/"
@@ -82,7 +132,7 @@ function UserApp({ handleLogout }) {
                 <UserDashboard
                   leads={leads}
                   activities={activities}
-                  user={loggedInUser}
+                  user={currentUser}
                 />
               }
             />
@@ -91,7 +141,7 @@ function UserApp({ handleLogout }) {
               element={
                 <UserLeadTable
                   leads={leads.filter(
-                    (lead) => lead.assignedTo === loggedInUser.id
+                    (lead) => lead.assignedTo === currentUser.id
                   )}
                   filter={filter}
                   setFilter={setFilter}
@@ -111,7 +161,7 @@ function UserApp({ handleLogout }) {
                 />
               }
             />
-            <Route path="/profile" element={<UserProfile user={loggedInUser} />} />
+            <Route path="/profile" element={<UserProfile user={currentUser} />} />
             <Route
               path="/activity"
               element={
@@ -120,18 +170,17 @@ function UserApp({ handleLogout }) {
                     leads.some(
                       (lead) =>
                         lead.id === activity.leadId &&
-                        lead.assignedTo === loggedInUser.id
+                        lead.assignedTo === currentUser.id
                     )
                   )}
                   leads={leads}
                 />
               }
             />
-            <Route path="/attendance" element={<Attendance user={loggedInUser} />} />
-
-            <Route path="/vehicle-quote" element={<VehicleQuote user={loggedInUser} />} />
-            <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={loggedInUser} />} />
-            <Route path="/quote" element={<Quote user={loggedInUser} />} />
+            <Route path="/attendance" element={<Attendance user={currentUser} />} />
+            <Route path="/vehicle-quote" element={<VehicleQuote user={currentUser} />} />
+            <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={currentUser} />} />
+            <Route path="/quote" element={<Quote user={currentUser} />} />
           </Routes>
         </div>
       </div>
