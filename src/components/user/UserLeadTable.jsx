@@ -1027,24 +1027,407 @@ function UserLeadTable() {
   // ============================================================
   // BULK UPLOAD
   // ============================================================
-  const downloadTemplate = () => {
-    const templateData = [{
-      name: "JOHN DOE",
-      email: "john@example.com",
-      mobileNo: "9876543210",
-      gender: "Male",
-      source: "Employee",
-      remarks: "Customer remarks",
-      lob: "Health Insurance",
-      policyTenure: "1 Year",
-      paymentTerm: "Yearly",
-      sumInsured: "10 Lakh",
-    }];
-    const ws = XLSX.utils.json_to_sheet(templateData);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "LeadTemplate");
-    XLSX.writeFile(wb, "lead_upload_template.xlsx");
-  };
+ const downloadTemplate = () => {
+  // Create a comprehensive template with ALL fields
+  const templateData = [{
+    // ========== BASIC FIELDS ==========
+    name: "JOHN DOE",
+    email: "john.doe@example.com",
+    mobileNo: "9876543210",
+    gender: "Male",
+    source: "Employee",
+    sourceDependentValue: "Employee Name Here",
+    remarks: "Customer remarks and discussion notes",
+    lob: "Health Insurance",
+    pinCode: "110001",
+    state: "Delhi",
+    city: "New Delhi",
+    policyTenure: "1 Year",
+    paymentTerm: "Yearly",
+    sumInsured: "10 Lakh",
+    
+    // ========== HEALTH INSURANCE FIELDS ==========
+    // Policy Details
+    health_policyType: "Individual",
+    health_numberOfAdults: "",
+    health_numberOfChildren: "",
+    health_familyIncome: "500000",
+    health_height: "5'8\"",
+    health_weight: "75",
+    health_qualification: "Graduate",
+    health_occupation: "Salaried",
+    health_proposerDOB: "1990-01-15",
+    health_seniorOneDOB: "",
+    health_proposerIsMember: "Yes",
+    
+    // Nominee Details (Individual)
+    health_nomineeName: "JANE DOE",
+    health_nomineeDOB: "1992-05-20",
+    health_nomineeRelationship: "Spouse",
+    
+    // ID Documents
+    health_aadhaarNumber: "123456789012",
+    health_panNumber: "ABCDE1234F",
+    
+    // Previous Policy
+    health_hasPreviousPolicy: "No",
+    health_previousPolicyCase: "", // "Renew Case", "Portability Case", "Fresh Case"
+    health_experienceYears: "", // For Portability Case
+    
+    // Renewal Details (for Renew Case)
+    health_renewal_insurerName: "",
+    health_renewal_policyNumber: "",
+    health_renewal_policyDueDate: "",
+    
+    // Portability Details - Policy 1 (for Portability Case)
+    health_portability_1_insurerName: "",
+    health_portability_1_policyNumber: "",
+    health_portability_1_policyActiveFrom: "",
+    health_portability_1_policyTillDate: "",
+    health_portability_1_sumAssured: "",
+    health_portability_1_noClaimBonus: "",
+    health_portability_1_ipdClaimTaken: "",
+    
+    // Portability Details - Policy 2
+    health_portability_2_insurerName: "",
+    health_portability_2_policyNumber: "",
+    health_portability_2_policyActiveFrom: "",
+    health_portability_2_policyTillDate: "",
+    health_portability_2_sumAssured: "",
+    health_portability_2_noClaimBonus: "",
+    health_portability_2_ipdClaimTaken: "",
+    
+    // Portability Details - Policy 3
+    health_portability_3_insurerName: "",
+    health_portability_3_policyNumber: "",
+    health_portability_3_policyActiveFrom: "",
+    health_portability_3_policyTillDate: "",
+    health_portability_3_sumAssured: "",
+    health_portability_3_noClaimBonus: "",
+    health_portability_3_ipdClaimTaken: "",
+    
+    // Portability Details - Policy 4
+    health_portability_4_insurerName: "",
+    health_portability_4_policyNumber: "",
+    health_portability_4_policyActiveFrom: "",
+    health_portability_4_policyTillDate: "",
+    health_portability_4_sumAssured: "",
+    health_portability_4_noClaimBonus: "",
+    health_portability_4_ipdClaimTaken: "",
+    
+    // Portability Details - Policy 5
+    health_portability_5_insurerName: "",
+    health_portability_5_policyNumber: "",
+    health_portability_5_policyActiveFrom: "",
+    health_portability_5_policyTillDate: "",
+    health_portability_5_sumAssured: "",
+    health_portability_5_noClaimBonus: "",
+    health_portability_5_ipdClaimTaken: "",
+    
+    health_medicalRemarks: "No pre-existing conditions",
+    
+    // Floater Members (max 5 adults + 5 children)
+    // Adult 1
+    health_member_adult1_name: "",
+    health_member_adult1_dob: "",
+    health_member_adult1_monthlyIncome: "",
+    health_member_adult1_height: "",
+    health_member_adult1_weight: "",
+    health_member_adult1_qualification: "",
+    health_member_adult1_occupation: "",
+    health_member_adult1_relationship: "",
+    health_member_adult1_aadhaar: "",
+    health_member_adult1_wantRider: "",
+    health_member_adult1_selectedRider: "",
+    health_member_adult1_rider_asthma: "",
+    health_member_adult1_rider_diabetes: "",
+    health_member_adult1_rider_hypertension: "",
+    health_member_adult1_rider_hyperlipidaemia: "",
+    health_member_adult1_fetalFlourish: "",
+    health_member_adult1_nrInsure: "",
+    health_member_adult1_lossOfIncome: "",
+    health_member_adult1_majorIllness: "",
+    health_member_adult1_internationalCover: "",
+    health_member_adult1_medicalRemarks: "",
+    
+    // Adult 2
+    health_member_adult2_name: "",
+    health_member_adult2_dob: "",
+    health_member_adult2_monthlyIncome: "",
+    health_member_adult2_height: "",
+    health_member_adult2_weight: "",
+    health_member_adult2_qualification: "",
+    health_member_adult2_occupation: "",
+    health_member_adult2_relationship: "",
+    health_member_adult2_aadhaar: "",
+    health_member_adult2_wantRider: "",
+    health_member_adult2_selectedRider: "",
+    health_member_adult2_rider_asthma: "",
+    health_member_adult2_rider_diabetes: "",
+    health_member_adult2_rider_hypertension: "",
+    health_member_adult2_rider_hyperlipidaemia: "",
+    health_member_adult2_fetalFlourish: "",
+    health_member_adult2_nrInsure: "",
+    health_member_adult2_lossOfIncome: "",
+    health_member_adult2_majorIllness: "",
+    health_member_adult2_internationalCover: "",
+    health_member_adult2_medicalRemarks: "",
+    
+    // Adult 3
+    health_member_adult3_name: "",
+    health_member_adult3_dob: "",
+    health_member_adult3_monthlyIncome: "",
+    health_member_adult3_height: "",
+    health_member_adult3_weight: "",
+    health_member_adult3_qualification: "",
+    health_member_adult3_occupation: "",
+    health_member_adult3_relationship: "",
+    health_member_adult3_aadhaar: "",
+    health_member_adult3_wantRider: "",
+    health_member_adult3_selectedRider: "",
+    health_member_adult3_rider_asthma: "",
+    health_member_adult3_rider_diabetes: "",
+    health_member_adult3_rider_hypertension: "",
+    health_member_adult3_rider_hyperlipidaemia: "",
+    health_member_adult3_fetalFlourish: "",
+    health_member_adult3_nrInsure: "",
+    health_member_adult3_lossOfIncome: "",
+    health_member_adult3_majorIllness: "",
+    health_member_adult3_internationalCover: "",
+    health_member_adult3_medicalRemarks: "",
+    
+    // Adult 4
+    health_member_adult4_name: "",
+    health_member_adult4_dob: "",
+    health_member_adult4_monthlyIncome: "",
+    health_member_adult4_height: "",
+    health_member_adult4_weight: "",
+    health_member_adult4_qualification: "",
+    health_member_adult4_occupation: "",
+    health_member_adult4_relationship: "",
+    health_member_adult4_aadhaar: "",
+    health_member_adult4_wantRider: "",
+    health_member_adult4_selectedRider: "",
+    health_member_adult4_rider_asthma: "",
+    health_member_adult4_rider_diabetes: "",
+    health_member_adult4_rider_hypertension: "",
+    health_member_adult4_rider_hyperlipidaemia: "",
+    health_member_adult4_fetalFlourish: "",
+    health_member_adult4_nrInsure: "",
+    health_member_adult4_lossOfIncome: "",
+    health_member_adult4_majorIllness: "",
+    health_member_adult4_internationalCover: "",
+    health_member_adult4_medicalRemarks: "",
+    
+    // Adult 5
+    health_member_adult5_name: "",
+    health_member_adult5_dob: "",
+    health_member_adult5_monthlyIncome: "",
+    health_member_adult5_height: "",
+    health_member_adult5_weight: "",
+    health_member_adult5_qualification: "",
+    health_member_adult5_occupation: "",
+    health_member_adult5_relationship: "",
+    health_member_adult5_aadhaar: "",
+    health_member_adult5_wantRider: "",
+    health_member_adult5_selectedRider: "",
+    health_member_adult5_rider_asthma: "",
+    health_member_adult5_rider_diabetes: "",
+    health_member_adult5_rider_hypertension: "",
+    health_member_adult5_rider_hyperlipidaemia: "",
+    health_member_adult5_fetalFlourish: "",
+    health_member_adult5_nrInsure: "",
+    health_member_adult5_lossOfIncome: "",
+    health_member_adult5_majorIllness: "",
+    health_member_adult5_internationalCover: "",
+    health_member_adult5_medicalRemarks: "",
+    
+    // Child 1
+    health_member_child1_name: "",
+    health_member_child1_dob: "",
+    health_member_child1_monthlyIncome: "",
+    health_member_child1_height: "",
+    health_member_child1_weight: "",
+    health_member_child1_qualification: "",
+    health_member_child1_occupation: "",
+    health_member_child1_relationship: "",
+    health_member_child1_aadhaar: "",
+    health_member_child1_wantRider: "",
+    health_member_child1_selectedRider: "",
+    health_member_child1_rider_asthma: "",
+    health_member_child1_rider_diabetes: "",
+    health_member_child1_rider_hypertension: "",
+    health_member_child1_rider_hyperlipidaemia: "",
+    health_member_child1_fetalFlourish: "",
+    health_member_child1_nrInsure: "",
+    health_member_child1_lossOfIncome: "",
+    health_member_child1_majorIllness: "",
+    health_member_child1_internationalCover: "",
+    health_member_child1_medicalRemarks: "",
+    
+    // Child 2
+    health_member_child2_name: "",
+    health_member_child2_dob: "",
+    health_member_child2_monthlyIncome: "",
+    health_member_child2_height: "",
+    health_member_child2_weight: "",
+    health_member_child2_qualification: "",
+    health_member_child2_occupation: "",
+    health_member_child2_relationship: "",
+    health_member_child2_aadhaar: "",
+    health_member_child2_wantRider: "",
+    health_member_child2_selectedRider: "",
+    health_member_child2_rider_asthma: "",
+    health_member_child2_rider_diabetes: "",
+    health_member_child2_rider_hypertension: "",
+    health_member_child2_rider_hyperlipidaemia: "",
+    health_member_child2_fetalFlourish: "",
+    health_member_child2_nrInsure: "",
+    health_member_child2_lossOfIncome: "",
+    health_member_child2_majorIllness: "",
+    health_member_child2_internationalCover: "",
+    health_member_child2_medicalRemarks: "",
+    
+    // Child 3
+    health_member_child3_name: "",
+    health_member_child3_dob: "",
+    health_member_child3_monthlyIncome: "",
+    health_member_child3_height: "",
+    health_member_child3_weight: "",
+    health_member_child3_qualification: "",
+    health_member_child3_occupation: "",
+    health_member_child3_relationship: "",
+    health_member_child3_aadhaar: "",
+    health_member_child3_wantRider: "",
+    health_member_child3_selectedRider: "",
+    health_member_child3_rider_asthma: "",
+    health_member_child3_rider_diabetes: "",
+    health_member_child3_rider_hypertension: "",
+    health_member_child3_rider_hyperlipidaemia: "",
+    health_member_child3_fetalFlourish: "",
+    health_member_child3_nrInsure: "",
+    health_member_child3_lossOfIncome: "",
+    health_member_child3_majorIllness: "",
+    health_member_child3_internationalCover: "",
+    health_member_child3_medicalRemarks: "",
+    
+    // Child 4
+    health_member_child4_name: "",
+    health_member_child4_dob: "",
+    health_member_child4_monthlyIncome: "",
+    health_member_child4_height: "",
+    health_member_child4_weight: "",
+    health_member_child4_qualification: "",
+    health_member_child4_occupation: "",
+    health_member_child4_relationship: "",
+    health_member_child4_aadhaar: "",
+    health_member_child4_wantRider: "",
+    health_member_child4_selectedRider: "",
+    health_member_child4_rider_asthma: "",
+    health_member_child4_rider_diabetes: "",
+    health_member_child4_rider_hypertension: "",
+    health_member_child4_rider_hyperlipidaemia: "",
+    health_member_child4_fetalFlourish: "",
+    health_member_child4_nrInsure: "",
+    health_member_child4_lossOfIncome: "",
+    health_member_child4_majorIllness: "",
+    health_member_child4_internationalCover: "",
+    health_member_child4_medicalRemarks: "",
+    
+    // Child 5
+    health_member_child5_name: "",
+    health_member_child5_dob: "",
+    health_member_child5_monthlyIncome: "",
+    health_member_child5_height: "",
+    health_member_child5_weight: "",
+    health_member_child5_qualification: "",
+    health_member_child5_occupation: "",
+    health_member_child5_relationship: "",
+    health_member_child5_aadhaar: "",
+    health_member_child5_wantRider: "",
+    health_member_child5_selectedRider: "",
+    health_member_child5_rider_asthma: "",
+    health_member_child5_rider_diabetes: "",
+    health_member_child5_rider_hypertension: "",
+    health_member_child5_rider_hyperlipidaemia: "",
+    health_member_child5_fetalFlourish: "",
+    health_member_child5_nrInsure: "",
+    health_member_child5_lossOfIncome: "",
+    health_member_child5_majorIllness: "",
+    health_member_child5_internationalCover: "",
+    health_member_child5_medicalRemarks: "",
+    
+    // ========== MOTOR INSURANCE FIELDS ==========
+    motor_vehicleType: "Private Car",
+    motor_previousInsuranceStatus: "Active",
+    motor_registrationNumber: "BR01AB1234",
+    motor_autoRtoCode: "BR01",
+    motor_insuranceType: "Comprehensive (OD+TP)",
+    
+    // New Vehicle Fields
+    motor_manufacturer: "Maruti Suzuki",
+    motor_model: "Swift",
+    motor_fuelType: "Petrol",
+    motor_rtoCode: "BR01",
+    motor_chesisNo: "ABCD1234567890",
+    motor_yearOfManufacturing: "2023",
+    motor_monthOfManufacturing: "January",
+    motor_idvAsPerInvoice: "800000",
+    
+    // Active Policy Fields
+    motor_odDueDate: "2025-12-31",
+    motor_tpDueDate: "2025-12-31",
+    motor_policyNo: "POL123456789",
+    motor_previousInsurerName: "Bajaj Allianz General Insurance Co Ltd",
+    motor_idvAsPerPYP: "750000",
+    
+    // SAOD Fields
+    motor_saodOdDueDate: "",
+    motor_saodTpDueDate: "",
+    motor_saodPolicyNo: "",
+    motor_saodPreviousInsurerName: "",
+    motor_saodIdvAsPerPYP: "",
+    
+    // TP Insurance Fields
+    motor_tpInsuranceDueDate: "",
+    
+    // Claim & NCB
+    motor_claimTaken: "No",
+    motor_ncb: "45%",
+    
+    // Add-Ons
+    motor_addOnRequired: "Yes",
+    motor_selectedAddOns: "Zero Depreciation,Engine Protection,Return to Invoice",
+    
+    // Upload fields (file names - for reference only)
+    motor_pypFile: "previous_policy.pdf",
+    motor_rcFrontFile: "rc_front.jpg",
+    motor_rcBackFile: "rc_back.jpg",
+    motor_chesisPhoto: "chesis_photo.jpg",
+    motor_invoiceCopy: "invoice.pdf",
+    
+    // ========== ELECTRONIC EQUIPMENT FIELDS ==========
+    electronic_deviceType: "Mobile",
+    electronic_otherDeviceType: "",
+    electronic_dateOfPurchase: "2025-06-15",
+    electronic_purchaseValue: "75000",
+    electronic_aadhaarNumber: "123456789012",
+    electronic_panNumber: "ABCDE1234F",
+    electronic_imeiNumber: "123456789012345",
+    
+    // Upload fields (file names - for reference only)
+    electronic_aadhaarFile: "aadhaar.pdf",
+    electronic_panFile: "pan.pdf",
+    electronic_imeiImage: "imei.jpg",
+    electronic_devicePhotos: "photo1.jpg,photo2.jpg,photo3.jpg",
+    electronic_purchaseInvoice: "invoice.pdf",
+  }];
+  
+  const ws = XLSX.utils.json_to_sheet(templateData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "LeadTemplate");
+  XLSX.writeFile(wb, "lead_upload_template.xlsx");
+};
 
   const downloadExcel = () => {
     if (filteredLeads.length === 0) {
