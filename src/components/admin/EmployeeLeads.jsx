@@ -1447,239 +1447,253 @@ const formatDateForInput = (dateValue) => {
     setShowEditModal(true);
   };
 
-   // Update Lead - Same as LeadTable (without workflow)
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setError(null);
+   // Update Lead - Same as LeadTable (without workflow)// Update Lead - Same as LeadTable (without workflow)
+const handleUpdate = async (e) => {
+  e.preventDefault();
+  
+  if (!validateAllFields()) {
+    return;
+  }
+  
+  setIsSubmitting(true);
+  setError(null);
 
-    const submitData = new FormData();
-    
-    submitData.append("name", formData.name);
-    submitData.append("email", formData.email);
-    submitData.append("mobileNo", formData.mobileNo);
-    submitData.append("gender", formData.gender);
-    submitData.append("source", formData.source);
-    submitData.append("remarks", formData.remarks);
-    submitData.append("lob", formData.lob);
-    submitData.append("pinCode", formData.pinCode);
-    submitData.append("state", formData.state);
-    submitData.append("city", formData.city);
-    submitData.append("sourceDependentValue", formData.sourceDependentValue);
-    submitData.append("policyTenure", formData.policyTenure);
-    submitData.append("paymentTerm", formData.paymentTerm);
-    submitData.append("sumInsured", formData.sumInsured);
-    
-    // Preserve existing status
-    submitData.append("status", editLead?.status || "Open");
-    
-    if (showHealthSection) {
-      const hasHealthData = healthDetails.policyType || 
-                            healthDetails.hasPreviousPolicy === "Yes" ||
-                            healthDetails.proposerDOB ||
-                            healthDetails.nomineeName;
+  const submitData = new FormData();
+  
+  submitData.append("name", formData.name);
+  submitData.append("email", formData.email);
+  submitData.append("mobileNo", formData.mobileNo);
+  submitData.append("gender", formData.gender);
+  submitData.append("source", formData.source);
+  submitData.append("remarks", formData.remarks);
+  submitData.append("lob", formData.lob);
+  submitData.append("pinCode", formData.pinCode);
+  submitData.append("state", formData.state);
+  submitData.append("city", formData.city);
+  submitData.append("sourceDependentValue", formData.sourceDependentValue);
+  submitData.append("policyTenure", formData.policyTenure);
+  submitData.append("paymentTerm", formData.paymentTerm);
+  submitData.append("sumInsured", formData.sumInsured);
+  
+  // Preserve existing status
+  submitData.append("status", editLead?.status || "Open");
+  
+  if (showHealthSection) {
+    const hasHealthData = healthDetails.policyType || 
+                          healthDetails.hasPreviousPolicy === "Yes" ||
+                          healthDetails.proposerDOB ||
+                          healthDetails.nomineeName;
 
-      if (hasHealthData) {
-        const healthData = { ...healthDetails };
-        healthData.proposerName = formData.name;
+    if (hasHealthData) {
+      const healthData = { ...healthDetails };
+      healthData.proposerName = formData.name;
 
-        // ✅ FIX: only strip File objects (they can't survive JSON.stringify anyway
-        // and go via FormData appends below). Keep existing URL strings intact so
-        // the backend doesn't wipe out previously-uploaded documents on every save.
-        if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
-        if (healthData.panFile instanceof File) delete healthData.panFile;
-        if (healthData.renewalDetails?.uploadPolicy instanceof File) {
-          delete healthData.renewalDetails.uploadPolicy;
-        }
-        if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
-            const clean = { ...detail };
-            if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
-            return clean;
-          });
-        }
-        if (healthData.members) {
-          healthData.members = healthData.members.map((member) => {
-            const clean = { ...member };
-            // ✅ FIX: same pattern — only strip actual File objects, keep any
-            // existing URL strings (member-level file upload wiring TBD server-side)
-            if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
-            if (clean.epicFile instanceof File) delete clean.epicFile;
-            if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
-            if (!clean.wantRider) delete clean.wantRider;
-            if (!clean.selectedRider) delete clean.selectedRider;
-            if (clean.riderDetails) {
-              const rd = { ...clean.riderDetails };
-              ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-                if (!rd[k]) delete rd[k];
-              });
-              clean.riderDetails = rd;
-            }
-            return clean;
-          });
-        }
-
-        if (!healthData.policyType) delete healthData.policyType;
-        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-        if (!healthData.proposerDOB) delete healthData.proposerDOB;
-        if (!healthData.nomineeName) delete healthData.nomineeName;
-        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-        if (!healthData.panNumber) delete healthData.panNumber;
-        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-        if (Object.keys(healthData).length > 0) {
-          submitData.append("healthDetails", JSON.stringify(healthData));
-        }
+      // ✅ FIX: only strip File objects (they can't survive JSON.stringify anyway
+      // and go via FormData appends below). Keep existing URL strings intact so
+      // the backend doesn't wipe out previously-uploaded documents on every save.
+      if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
+      if (healthData.panFile instanceof File) delete healthData.panFile;
+      if (healthData.renewalDetails?.uploadPolicy instanceof File) {
+        delete healthData.renewalDetails.uploadPolicy;
       }
-    }
-
-    if (showMotorSection) {
-      const hasMotorData = motorDetails.vehicleType || 
-                           motorDetails.previousInsuranceStatus ||
-                           motorDetails.registrationNumber ||
-                           motorDetails.insuranceType;
-      
-      if (hasMotorData) {
-        const motorData = { ...motorDetails };
-        
-        // ✅ Only strip actual File objects — keep existing URL strings intact
-        ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
-          if (motorData[f] instanceof File) delete motorData[f];
+      if (healthData.portabilityDetails) {
+        healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
+          const clean = { ...detail };
+          if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+          return clean;
         });
-        
-        if (!motorData.vehicleType) delete motorData.vehicleType;
-        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-        if (!motorData.registrationNumber) delete motorData.registrationNumber;
-        if (!motorData.insuranceType) delete motorData.insuranceType;
-        if (!motorData.claimTaken) delete motorData.claimTaken;
-        if (!motorData.addOnRequired) delete motorData.addOnRequired;
-        
-        if (Object.keys(motorData).length > 0) {
-          submitData.append("motorDetails", JSON.stringify(motorData));
-        }
       }
+      if (healthData.members) {
+        healthData.members = healthData.members.map((member) => {
+          const clean = { ...member };
+          // ✅ FIX: only strip actual File objects, keep any existing URL strings —
+          // the corresponding File objects are appended to FormData below
+          // (memberAadhaar_${idx}, memberEpic_${idx}, memberBirthCert_${idx})
+          if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+          if (clean.epicFile instanceof File) delete clean.epicFile;
+          if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
+          if (!clean.wantRider) delete clean.wantRider;
+          if (!clean.selectedRider) delete clean.selectedRider;
+          if (clean.riderDetails) {
+            const rd = { ...clean.riderDetails };
+            ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
+              if (!rd[k]) delete rd[k];
+            });
+            clean.riderDetails = rd;
+          }
+          return clean;
+        });
+      }
+
+      if (!healthData.policyType) delete healthData.policyType;
+      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+      if (!healthData.proposerDOB) delete healthData.proposerDOB;
+      if (!healthData.nomineeName) delete healthData.nomineeName;
+      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+      if (!healthData.panNumber) delete healthData.panNumber;
+      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
+
+      if (Object.keys(healthData).length > 0) {
+        submitData.append("healthDetails", JSON.stringify(healthData));
+      }
+    }
+  }
+
+  if (showMotorSection) {
+    const hasMotorData = motorDetails.vehicleType || 
+                         motorDetails.previousInsuranceStatus ||
+                         motorDetails.registrationNumber ||
+                         motorDetails.insuranceType;
+    
+    if (hasMotorData) {
+      const motorData = { ...motorDetails };
       
-      if (motorDetails.pypFile instanceof File) {
-        submitData.append("pypFile", motorDetails.pypFile);
-      }
-      if (motorDetails.rcFrontFile instanceof File) {
-        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-      }
-      if (motorDetails.rcBackFile instanceof File) {
-        submitData.append("rcBackFile", motorDetails.rcBackFile);
-      }
-      if (motorDetails.chesisPhoto instanceof File) {
-        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-      }
-      if (motorDetails.invoiceCopy instanceof File) {
-        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-      }
-    }
-
-    if (showElectronicSection) {
-      const hasElectronicData = electronicDetails.deviceType || 
-                                electronicDetails.dateOfPurchase || 
-                                electronicDetails.purchaseValue;
-      
-      if (hasElectronicData) {
-        const electronicData = { ...electronicDetails };
-        
-        // ✅ FIX: same as health — only strip actual File objects, keep URL strings
-        if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
-        if (electronicData.panFile instanceof File) delete electronicData.panFile;
-        if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
-        if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
-        if (electronicData.devicePhotos) {
-          // keep existing URL strings, drop File objects (those go via appends below)
-          electronicData.devicePhotos = electronicData.devicePhotos.filter(
-            (p) => typeof p === "string"
-          );
-        }
-        
-        if (!electronicData.deviceType) delete electronicData.deviceType;
-        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-        
-        if (Object.keys(electronicData).length > 0) {
-          submitData.append("electronicDetails", JSON.stringify(electronicData));
-        }
-      }
-    }
-
-    // ===== HEALTH FILES =====
-    if (healthDetails.aadhaarFile instanceof File) {
-      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
-    }
-    if (healthDetails.panFile instanceof File) {
-      submitData.append("healthPanFile", healthDetails.panFile);
-    }
-    if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
-      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
-    }
-    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
-      if (detail.uploadPYP instanceof File) {
-        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
-      }
-    });
-
-    // ===== ELECTRONIC FILES =====
-    if (electronicDetails.aadhaarFile instanceof File) {
-      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
-    }
-    if (electronicDetails.panFile instanceof File) {
-      submitData.append("electronicPanFile", electronicDetails.panFile);
-    }
-    if (electronicDetails.imeiImage instanceof File) {
-      submitData.append("imeiImage", electronicDetails.imeiImage);
-    }
-    if (electronicDetails.purchaseInvoice instanceof File) {
-      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
-    }
-    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
-      if (photo instanceof File) {
-        submitData.append(`devicePhoto_${idx}`, photo);
-      }
-    });
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("No authentication token found. Please login again.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
+      // ✅ Only strip actual File objects — keep existing URL strings intact
+      ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
+        if (motorData[f] instanceof File) delete motorData[f];
       });
-
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-        setShowEditModal(false);
-        setEditLead(null);
-        setSuccessMessage("Lead updated successfully!");
-      } else {
-        const errorData = await res.json();
-        setError(errorData.error || errorData.message || "Update failed");
+      
+      if (!motorData.vehicleType) delete motorData.vehicleType;
+      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+      if (!motorData.registrationNumber) delete motorData.registrationNumber;
+      if (!motorData.insuranceType) delete motorData.insuranceType;
+      if (!motorData.claimTaken) delete motorData.claimTaken;
+      if (!motorData.addOnRequired) delete motorData.addOnRequired;
+      
+      if (Object.keys(motorData).length > 0) {
+        submitData.append("motorDetails", JSON.stringify(motorData));
       }
-    } catch (err) {
-      console.error("Update error:", err);
-      setError("Network error. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+    
+    if (motorDetails.pypFile instanceof File) {
+      submitData.append("pypFile", motorDetails.pypFile);
+    }
+    if (motorDetails.rcFrontFile instanceof File) {
+      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+    }
+    if (motorDetails.rcBackFile instanceof File) {
+      submitData.append("rcBackFile", motorDetails.rcBackFile);
+    }
+    if (motorDetails.chesisPhoto instanceof File) {
+      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+    }
+    if (motorDetails.invoiceCopy instanceof File) {
+      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+    }
+  }
+
+  if (showElectronicSection) {
+    const hasElectronicData = electronicDetails.deviceType || 
+                              electronicDetails.dateOfPurchase || 
+                              electronicDetails.purchaseValue;
+    
+    if (hasElectronicData) {
+      const electronicData = { ...electronicDetails };
+      
+      // ✅ FIX: same as health — only strip actual File objects, keep URL strings
+      if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
+      if (electronicData.panFile instanceof File) delete electronicData.panFile;
+      if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
+      if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
+      if (electronicData.devicePhotos) {
+        // keep existing URL strings, drop File objects (those go via appends below)
+        electronicData.devicePhotos = electronicData.devicePhotos.filter(
+          (p) => typeof p === "string"
+        );
+      }
+      
+      if (!electronicData.deviceType) delete electronicData.deviceType;
+      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+      
+      if (Object.keys(electronicData).length > 0) {
+        submitData.append("electronicDetails", JSON.stringify(electronicData));
+      }
+    }
+  }
+
+  // ===== HEALTH FILES =====
+  if (healthDetails.aadhaarFile instanceof File) {
+    submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+  }
+  if (healthDetails.panFile instanceof File) {
+    submitData.append("healthPanFile", healthDetails.panFile);
+  }
+  if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
+    submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+  }
+  (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+    if (detail.uploadPYP instanceof File) {
+      submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+    }
+  });
+
+  // ===== FLOATER MEMBER FILES (NEW — Aadhaar / EPIC / Birth Certificate) =====
+  (healthDetails.members || []).forEach((member, idx) => {
+    if (member.aadhaarFile instanceof File) {
+      submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
+    }
+    if (member.epicFile instanceof File) {
+      submitData.append(`memberEpic_${idx}`, member.epicFile);
+    }
+    if (member.birthCertificate instanceof File) {
+      submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
+    }
+  });
+
+  // ===== ELECTRONIC FILES =====
+  if (electronicDetails.aadhaarFile instanceof File) {
+    submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+  }
+  if (electronicDetails.panFile instanceof File) {
+    submitData.append("electronicPanFile", electronicDetails.panFile);
+  }
+  if (electronicDetails.imeiImage instanceof File) {
+    submitData.append("imeiImage", electronicDetails.imeiImage);
+  }
+  if (electronicDetails.purchaseInvoice instanceof File) {
+    submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+  }
+  (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+    if (photo instanceof File) {
+      submitData.append(`devicePhoto_${idx}`, photo);
+    }
+  });
+
+  const token = localStorage.getItem("token");
+  if (!token) {
+    setError("No authentication token found. Please login again.");
+    setIsSubmitting(false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: submitData,
+    });
+
+    if (res.ok) {
+      const updatedLead = await res.json();
+      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+      setShowEditModal(false);
+      setEditLead(null);
+      setSuccessMessage("Lead updated successfully!");
+    } else {
+      const errorData = await res.json();
+      setError(errorData.error || errorData.message || "Update failed");
+    }
+  } catch (err) {
+    console.error("Update error:", err);
+    setError("Network error. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Delete Lead
   const handleDelete = async (leadId) => {
@@ -2791,19 +2805,27 @@ const formatDateForInput = (dateValue) => {
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-700">Upload Document</label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg"
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].aadhaarFile = e.target.files[0];
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    />
-                  </div>
+                <div>
+  <label className="text-xs font-medium text-gray-700">Upload Document</label>
+  {typeof member.aadhaarFile === "string" && member.aadhaarFile && (
+    <div className="mb-1">
+      <a href={member.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+        View current document
+      </a>
+    </div>
+  )}
+  <input
+    type="file"
+    accept=".pdf,.jpg,.jpeg"
+    onChange={(e) => {
+      const newMembers = [...healthDetails.members];
+      newMembers[index].aadhaarFile = e.target.files[0] || newMembers[index].aadhaarFile;
+      setHealthDetails(prev => ({ ...prev, members: newMembers }));
+    }}
+    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+  />
+  {member.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+</div>
                   
                   <div>
                     <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
