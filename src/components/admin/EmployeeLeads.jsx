@@ -107,6 +107,15 @@ function EmployeeLeads() {
     "Policy Issued",
   ];
 
+  const PAYMENT_STATUS_OPTIONS = [
+    "Quote Under Discussion",
+    "URL Shared",
+    "Payment Done",
+    "e-Mandate Status Pending",
+    "e-Mandate Status Done",
+    "Policy Issued",
+  ];
+
   const POLICY_TYPE_OPTIONS = ["Individual", "Floater"];
   
   const QUALIFICATION_OPTIONS = [
@@ -436,6 +445,24 @@ function EmployeeLeads() {
     purchaseInvoice: null,
   });
 
+  // Workflow Details State - ADDED
+  const [workflowDetails, setWorkflowDetails] = useState({
+    status: "Open",
+    quoteNumber: "",
+    selectedInsurers: [],
+    insurerQuotes: [],
+    paymentStatus: "",
+    paymentUrl: "",
+    utrNumber: "",
+    paymentSnapshot: null,
+    policyNumber: "",
+    policyIssuedOn: "",
+    policyStartDate: "",
+    policyExpiryDate: "",
+    policyCopy: null,
+    remarks: "",
+  });
+
   const [showHealthSection, setShowHealthSection] = useState(false);
   const [showMotorSection, setShowMotorSection] = useState(false);
   const [showElectronicSection, setShowElectronicSection] = useState(false);
@@ -446,6 +473,7 @@ function EmployeeLeads() {
   const [showRenewalFields, setShowRenewalFields] = useState(false);
   const [showFreshCaseFields, setShowFreshCaseFields] = useState(false);
   const [showAddOnModal, setShowAddOnModal] = useState(false);
+  const [showInsurerQuotes, setShowInsurerQuotes] = useState(false);
   const [sourceDependentField, setSourceDependentField] = useState("");
   const [isFetchingPin, setIsFetchingPin] = useState(false);
   const [pinFetchError, setPinFetchError] = useState("");
@@ -582,8 +610,6 @@ function EmployeeLeads() {
     }
   };
 
-  // FIXED: Do NOT filter out Channel Partners / Admins.
-  // A lead's employeeId can legitimately point to an Employee OR a Channel Partner.
   const fetchEmployees = async () => {
     const token = localStorage.getItem("token");
     if (!token) return;
@@ -594,7 +620,6 @@ function EmployeeLeads() {
       });
       if (res.ok) {
         const data = await res.json();
-        // Keep the full list so Channel Partners are available for name lookup
         setEmployees(data);
       }
     } catch (err) {
@@ -603,22 +628,21 @@ function EmployeeLeads() {
   };
 
   // ============================================================
-// DATE FORMATTING HELPER - FIX FOR EMPTY DATE INPUTS ON EDIT
-// ============================================================
-const formatDateForInput = (dateValue) => {
-  if (!dateValue) return "";
-  try {
-    // Already YYYY-MM-DD
-    if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
-      return dateValue;
+  // DATE FORMATTING HELPER
+  // ============================================================
+  const formatDateForInput = (dateValue) => {
+    if (!dateValue) return "";
+    try {
+      if (typeof dateValue === "string" && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+        return dateValue;
+      }
+      const d = new Date(dateValue);
+      if (isNaN(d.getTime())) return "";
+      return d.toISOString().split("T")[0];
+    } catch {
+      return "";
     }
-    const d = new Date(dateValue);
-    if (isNaN(d.getTime())) return "";
-    return d.toISOString().split("T")[0];
-  } catch {
-    return "";
-  }
-};
+  };
 
   const fetchCityState = async (pinCode) => {
     setIsFetchingPin(true);
@@ -940,12 +964,9 @@ const formatDateForInput = (dateValue) => {
     return new Date(dateString).toLocaleDateString("en-IN");
   };
 
-  // FIXED: Prefer the already-populated employeeId object from the lead.
-  // Fallback to employees list + organizationName for Channel Partners.
   const getEmployeeName = (employeeId) => {
     if (!employeeId) return "Unknown";
 
-    // Preferred path: backend already populated the object
     if (typeof employeeId === "object") {
       return (
         employeeId.fullName ||
@@ -957,7 +978,6 @@ const formatDateForInput = (dateValue) => {
       );
     }
 
-    // Fallback when only an ID string is present
     const employee = employees.find((e) => e._id === employeeId);
     return employee
       ? employee.fullName ||
@@ -994,7 +1014,7 @@ const formatDateForInput = (dateValue) => {
   };
 
   // ============================================================
-  // VALIDATE ALL FIELDS - Same as LeadTable
+  // VALIDATE ALL FIELDS
   // ============================================================
   const validateAllFields = () => {
     const errors = {};
@@ -1099,7 +1119,7 @@ const formatDateForInput = (dateValue) => {
             }
             if (!detail.sumAssured) {
               errors[`portabilitySum_${idx}`] = `SUM ASSURED is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilitySum_${idx}`, message: `Policy ${idx + 1}` });
+              errorList.push({ field: `portabilitySum_${idx}`, message: `SUM ASSURED is required for Policy ${idx + 1}` });
             }
             if (!detail.uploadPYP) {
               errors[`portabilityUpload_${idx}`] = `Upload PYP is mandatory for Policy ${idx + 1}`;
@@ -1349,7 +1369,7 @@ const formatDateForInput = (dateValue) => {
   // CRUD OPERATIONS
   // ============================================================
   
-    // Open Edit Modal - Same as LeadTable, WITH date formatting fix
+  // Open Edit Modal - WITH workflow details
   const handleEdit = (lead) => {
     setEditLead(lead);
     
@@ -1370,8 +1390,7 @@ const formatDateForInput = (dateValue) => {
       sumInsured: lead.sumInsured || "",
     });
     
-    // ✅ FIX: format every date field before it hits a <input type="date">
-    // Keep existing Cloudinary URLs for files (do NOT null them out)
+    // Health Details
     if (lead.healthDetails) {
       setHealthDetails({
         ...lead.healthDetails,
@@ -1413,7 +1432,7 @@ const formatDateForInput = (dateValue) => {
       }
     }
     
-    // ✅ FIX: format every date field on motorDetails too + keep file URLs
+    // Motor Details
     if (lead.motorDetails) {
       setMotorDetails({
         ...lead.motorDetails,
@@ -1430,7 +1449,7 @@ const formatDateForInput = (dateValue) => {
       });
     }
     
-    // ✅ FIX: format dateOfPurchase on electronicDetails too + keep file URLs
+    // Electronic Details
     if (lead.electronicDetails) {
       setElectronicDetails({
         ...lead.electronicDetails,
@@ -1442,258 +1461,324 @@ const formatDateForInput = (dateValue) => {
         devicePhotos: lead.electronicDetails.devicePhotos || [],
       });
     }
+
+    // Workflow Details - ADDED
+    if (lead.workflowDetails) {
+      setWorkflowDetails({
+        status: lead.workflowDetails.status || lead.status || "Open",
+        quoteNumber: lead.workflowDetails.quoteNumber || "",
+        selectedInsurers: lead.workflowDetails.selectedInsurers || [],
+        insurerQuotes: lead.workflowDetails.insurerQuotes || [],
+        paymentStatus: lead.workflowDetails.paymentStatus || "",
+        paymentUrl: lead.workflowDetails.paymentUrl || "",
+        utrNumber: lead.workflowDetails.utrNumber || "",
+        paymentSnapshot: lead.workflowDetails.paymentSnapshot || null,
+        policyNumber: lead.workflowDetails.policyNumber || "",
+        policyIssuedOn: formatDateForInput(lead.workflowDetails.policyIssuedOn),
+        policyStartDate: formatDateForInput(lead.workflowDetails.policyStartDate),
+        policyExpiryDate: formatDateForInput(lead.workflowDetails.policyExpiryDate),
+        policyCopy: lead.workflowDetails.policyCopy || null,
+        remarks: lead.workflowDetails.workflowRemarks || lead.remarks || "",
+      });
+    } else {
+      setWorkflowDetails({
+        status: lead.status || "Open",
+        quoteNumber: "",
+        selectedInsurers: [],
+        insurerQuotes: [],
+        paymentStatus: "",
+        paymentUrl: "",
+        utrNumber: "",
+        paymentSnapshot: null,
+        policyNumber: "",
+        policyIssuedOn: "",
+        policyStartDate: "",
+        policyExpiryDate: "",
+        policyCopy: null,
+        remarks: "",
+      });
+    }
+    
+    // Check if status is Quotation Generated to show insurer quotes
+    const currentStatus = lead.workflowDetails?.status || lead.status || "Open";
+    setShowInsurerQuotes(currentStatus === "Quotation Generated");
     
     detectLOB(lead.lob);
     setShowEditModal(true);
   };
 
-   // Update Lead - Same as LeadTable (without workflow)// Update Lead - Same as LeadTable (without workflow)
-const handleUpdate = async (e) => {
-  e.preventDefault();
-  
-  if (!validateAllFields()) {
-    return;
-  }
-  
-  setIsSubmitting(true);
-  setError(null);
+  // Update Lead - WITH workflow details
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    
+    if (!validateAllFields()) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    setError(null);
 
-  const submitData = new FormData();
-  
-  submitData.append("name", formData.name);
-  submitData.append("email", formData.email);
-  submitData.append("mobileNo", formData.mobileNo);
-  submitData.append("gender", formData.gender);
-  submitData.append("source", formData.source);
-  submitData.append("remarks", formData.remarks);
-  submitData.append("lob", formData.lob);
-  submitData.append("pinCode", formData.pinCode);
-  submitData.append("state", formData.state);
-  submitData.append("city", formData.city);
-  submitData.append("sourceDependentValue", formData.sourceDependentValue);
-  submitData.append("policyTenure", formData.policyTenure);
-  submitData.append("paymentTerm", formData.paymentTerm);
-  submitData.append("sumInsured", formData.sumInsured);
-  
-  // Preserve existing status
-  submitData.append("status", editLead?.status || "Open");
-  
-  if (showHealthSection) {
-    const hasHealthData = healthDetails.policyType || 
-                          healthDetails.hasPreviousPolicy === "Yes" ||
-                          healthDetails.proposerDOB ||
-                          healthDetails.nomineeName;
+    const submitData = new FormData();
+    
+    // Basic fields
+    submitData.append("name", formData.name);
+    submitData.append("email", formData.email);
+    submitData.append("mobileNo", formData.mobileNo);
+    submitData.append("gender", formData.gender);
+    submitData.append("source", formData.source);
+    submitData.append("remarks", formData.remarks);
+    submitData.append("lob", formData.lob);
+    submitData.append("pinCode", formData.pinCode);
+    submitData.append("state", formData.state);
+    submitData.append("city", formData.city);
+    submitData.append("sourceDependentValue", formData.sourceDependentValue);
+    submitData.append("policyTenure", formData.policyTenure);
+    submitData.append("paymentTerm", formData.paymentTerm);
+    submitData.append("sumInsured", formData.sumInsured);
+    submitData.append("status", workflowDetails.status || editLead?.status || "Open");
+    
+    // Health Details
+    if (showHealthSection) {
+      const hasHealthData = healthDetails.policyType || 
+                            healthDetails.hasPreviousPolicy === "Yes" ||
+                            healthDetails.proposerDOB ||
+                            healthDetails.nomineeName;
 
-    if (hasHealthData) {
-      const healthData = { ...healthDetails };
-      healthData.proposerName = formData.name;
+      if (hasHealthData) {
+        const healthData = { ...healthDetails };
+        healthData.proposerName = formData.name;
 
-      // ✅ FIX: only strip File objects (they can't survive JSON.stringify anyway
-      // and go via FormData appends below). Keep existing URL strings intact so
-      // the backend doesn't wipe out previously-uploaded documents on every save.
-      if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
-      if (healthData.panFile instanceof File) delete healthData.panFile;
-      if (healthData.renewalDetails?.uploadPolicy instanceof File) {
-        delete healthData.renewalDetails.uploadPolicy;
-      }
-      if (healthData.portabilityDetails) {
-        healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
-          const clean = { ...detail };
-          if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
-          return clean;
-        });
-      }
-      if (healthData.members) {
-        healthData.members = healthData.members.map((member) => {
-          const clean = { ...member };
-          // ✅ FIX: only strip actual File objects, keep any existing URL strings —
-          // the corresponding File objects are appended to FormData below
-          // (memberAadhaar_${idx}, memberEpic_${idx}, memberBirthCert_${idx})
-          if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
-          if (clean.epicFile instanceof File) delete clean.epicFile;
-          if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
-          if (!clean.wantRider) delete clean.wantRider;
-          if (!clean.selectedRider) delete clean.selectedRider;
-          if (clean.riderDetails) {
-            const rd = { ...clean.riderDetails };
-            ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-              if (!rd[k]) delete rd[k];
-            });
-            clean.riderDetails = rd;
-          }
-          return clean;
-        });
-      }
+        // Strip File objects
+        if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
+        if (healthData.panFile instanceof File) delete healthData.panFile;
+        if (healthData.renewalDetails?.uploadPolicy instanceof File) {
+          delete healthData.renewalDetails.uploadPolicy;
+        }
+        if (healthData.portabilityDetails) {
+          healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
+            const clean = { ...detail };
+            if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+            return clean;
+          });
+        }
+        if (healthData.members) {
+          healthData.members = healthData.members.map((member) => {
+            const clean = { ...member };
+            if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+            if (clean.epicFile instanceof File) delete clean.epicFile;
+            if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
+            return clean;
+          });
+        }
 
-      if (!healthData.policyType) delete healthData.policyType;
-      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-      if (!healthData.proposerDOB) delete healthData.proposerDOB;
-      if (!healthData.nomineeName) delete healthData.nomineeName;
-      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-      if (!healthData.panNumber) delete healthData.panNumber;
-      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
+        if (!healthData.policyType) delete healthData.policyType;
+        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+        if (!healthData.proposerDOB) delete healthData.proposerDOB;
+        if (!healthData.nomineeName) delete healthData.nomineeName;
+        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+        if (!healthData.panNumber) delete healthData.panNumber;
+        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
 
-      if (Object.keys(healthData).length > 0) {
-        submitData.append("healthDetails", JSON.stringify(healthData));
+        if (Object.keys(healthData).length > 0) {
+          submitData.append("healthDetails", JSON.stringify(healthData));
+        }
       }
     }
-  }
 
-  if (showMotorSection) {
-    const hasMotorData = motorDetails.vehicleType || 
-                         motorDetails.previousInsuranceStatus ||
-                         motorDetails.registrationNumber ||
-                         motorDetails.insuranceType;
-    
-    if (hasMotorData) {
-      const motorData = { ...motorDetails };
+    // Motor Details
+    if (showMotorSection) {
+      const hasMotorData = motorDetails.vehicleType || 
+                           motorDetails.previousInsuranceStatus ||
+                           motorDetails.registrationNumber ||
+                           motorDetails.insuranceType;
       
-      // ✅ Only strip actual File objects — keep existing URL strings intact
-      ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
-        if (motorData[f] instanceof File) delete motorData[f];
+      if (hasMotorData) {
+        const motorData = { ...motorDetails };
+        
+        ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
+          if (motorData[f] instanceof File) delete motorData[f];
+        });
+        
+        if (!motorData.vehicleType) delete motorData.vehicleType;
+        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+        if (!motorData.registrationNumber) delete motorData.registrationNumber;
+        if (!motorData.insuranceType) delete motorData.insuranceType;
+        if (!motorData.claimTaken) delete motorData.claimTaken;
+        if (!motorData.addOnRequired) delete motorData.addOnRequired;
+        
+        if (Object.keys(motorData).length > 0) {
+          submitData.append("motorDetails", JSON.stringify(motorData));
+        }
+      }
+      
+      // Motor file uploads
+      if (motorDetails.pypFile instanceof File) {
+        submitData.append("pypFile", motorDetails.pypFile);
+      }
+      if (motorDetails.rcFrontFile instanceof File) {
+        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+      }
+      if (motorDetails.rcBackFile instanceof File) {
+        submitData.append("rcBackFile", motorDetails.rcBackFile);
+      }
+      if (motorDetails.chesisPhoto instanceof File) {
+        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+      }
+      if (motorDetails.invoiceCopy instanceof File) {
+        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+      }
+    }
+
+    // Electronic Details
+    if (showElectronicSection) {
+      const hasElectronicData = electronicDetails.deviceType || 
+                                electronicDetails.dateOfPurchase || 
+                                electronicDetails.purchaseValue;
+      
+      if (hasElectronicData) {
+        const electronicData = { ...electronicDetails };
+        
+        if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
+        if (electronicData.panFile instanceof File) delete electronicData.panFile;
+        if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
+        if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
+        if (electronicData.devicePhotos) {
+          electronicData.devicePhotos = electronicData.devicePhotos.filter(
+            (p) => typeof p === "string"
+          );
+        }
+        
+        if (!electronicData.deviceType) delete electronicData.deviceType;
+        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+        
+        if (Object.keys(electronicData).length > 0) {
+          submitData.append("electronicDetails", JSON.stringify(electronicData));
+        }
+      }
+      
+      // Electronic file uploads
+      if (electronicDetails.aadhaarFile instanceof File) {
+        submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
+      }
+      if (electronicDetails.panFile instanceof File) {
+        submitData.append("electronicPanFile", electronicDetails.panFile);
+      }
+      if (electronicDetails.imeiImage instanceof File) {
+        submitData.append("imeiImage", electronicDetails.imeiImage);
+      }
+      if (electronicDetails.purchaseInvoice instanceof File) {
+        submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+      }
+      (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+        if (photo instanceof File) {
+          submitData.append(`devicePhoto_${idx}`, photo);
+        }
       });
-      
-      if (!motorData.vehicleType) delete motorData.vehicleType;
-      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-      if (!motorData.registrationNumber) delete motorData.registrationNumber;
-      if (!motorData.insuranceType) delete motorData.insuranceType;
-      if (!motorData.claimTaken) delete motorData.claimTaken;
-      if (!motorData.addOnRequired) delete motorData.addOnRequired;
-      
-      if (Object.keys(motorData).length > 0) {
-        submitData.append("motorDetails", JSON.stringify(motorData));
+    }
+
+    // Health file uploads
+    if (healthDetails.aadhaarFile instanceof File) {
+      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+    }
+    if (healthDetails.panFile instanceof File) {
+      submitData.append("healthPanFile", healthDetails.panFile);
+    }
+    if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
+      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+    }
+    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+      if (detail.uploadPYP instanceof File) {
+        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
       }
-    }
-    
-    if (motorDetails.pypFile instanceof File) {
-      submitData.append("pypFile", motorDetails.pypFile);
-    }
-    if (motorDetails.rcFrontFile instanceof File) {
-      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-    }
-    if (motorDetails.rcBackFile instanceof File) {
-      submitData.append("rcBackFile", motorDetails.rcBackFile);
-    }
-    if (motorDetails.chesisPhoto instanceof File) {
-      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-    }
-    if (motorDetails.invoiceCopy instanceof File) {
-      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-    }
-  }
-
-  if (showElectronicSection) {
-    const hasElectronicData = electronicDetails.deviceType || 
-                              electronicDetails.dateOfPurchase || 
-                              electronicDetails.purchaseValue;
-    
-    if (hasElectronicData) {
-      const electronicData = { ...electronicDetails };
-      
-      // ✅ FIX: same as health — only strip actual File objects, keep URL strings
-      if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
-      if (electronicData.panFile instanceof File) delete electronicData.panFile;
-      if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
-      if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
-      if (electronicData.devicePhotos) {
-        // keep existing URL strings, drop File objects (those go via appends below)
-        electronicData.devicePhotos = electronicData.devicePhotos.filter(
-          (p) => typeof p === "string"
-        );
+    });
+    (healthDetails.members || []).forEach((member, idx) => {
+      if (member.aadhaarFile instanceof File) {
+        submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
       }
-      
-      if (!electronicData.deviceType) delete electronicData.deviceType;
-      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-      
-      if (Object.keys(electronicData).length > 0) {
-        submitData.append("electronicDetails", JSON.stringify(electronicData));
+      if (member.epicFile instanceof File) {
+        submitData.append(`memberEpic_${idx}`, member.epicFile);
       }
-    }
-  }
-
-  // ===== HEALTH FILES =====
-  if (healthDetails.aadhaarFile instanceof File) {
-    submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
-  }
-  if (healthDetails.panFile instanceof File) {
-    submitData.append("healthPanFile", healthDetails.panFile);
-  }
-  if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
-    submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
-  }
-  (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
-    if (detail.uploadPYP instanceof File) {
-      submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
-    }
-  });
-
-  // ===== FLOATER MEMBER FILES (NEW — Aadhaar / EPIC / Birth Certificate) =====
-  (healthDetails.members || []).forEach((member, idx) => {
-    if (member.aadhaarFile instanceof File) {
-      submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
-    }
-    if (member.epicFile instanceof File) {
-      submitData.append(`memberEpic_${idx}`, member.epicFile);
-    }
-    if (member.birthCertificate instanceof File) {
-      submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
-    }
-  });
-
-  // ===== ELECTRONIC FILES =====
-  if (electronicDetails.aadhaarFile instanceof File) {
-    submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
-  }
-  if (electronicDetails.panFile instanceof File) {
-    submitData.append("electronicPanFile", electronicDetails.panFile);
-  }
-  if (electronicDetails.imeiImage instanceof File) {
-    submitData.append("imeiImage", electronicDetails.imeiImage);
-  }
-  if (electronicDetails.purchaseInvoice instanceof File) {
-    submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
-  }
-  (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
-    if (photo instanceof File) {
-      submitData.append(`devicePhoto_${idx}`, photo);
-    }
-  });
-
-  const token = localStorage.getItem("token");
-  if (!token) {
-    setError("No authentication token found. Please login again.");
-    setIsSubmitting(false);
-    return;
-  }
-
-  try {
-    const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
-      method: "PUT",
-      headers: { Authorization: `Bearer ${token}` },
-      body: submitData,
+      if (member.birthCertificate instanceof File) {
+        submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
+      }
     });
 
-    if (res.ok) {
-      const updatedLead = await res.json();
-      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-      setShowEditModal(false);
-      setEditLead(null);
-      setSuccessMessage("Lead updated successfully!");
-    } else {
-      const errorData = await res.json();
-      setError(errorData.error || errorData.message || "Update failed");
+    // ===== WORKFLOW DETAILS - ADDED =====
+    // Clean workflow data - strip empty enum fields and File objects
+    const cleanWorkflow = { ...workflowDetails };
+    
+    // Strip empty strings for enum fields
+    if (!cleanWorkflow.paymentStatus || cleanWorkflow.paymentStatus === "") {
+      delete cleanWorkflow.paymentStatus;
     }
-  } catch (err) {
-    console.error("Update error:", err);
-    setError("Network error. Please try again.");
-  } finally {
-    setIsSubmitting(false);
-  }
-};
+    
+    // Remove File objects
+    if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
+    if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
+    
+    // Format dates for workflow
+    if (cleanWorkflow.policyIssuedOn) {
+      cleanWorkflow.policyIssuedOn = formatDateForInput(cleanWorkflow.policyIssuedOn);
+    }
+    if (cleanWorkflow.policyStartDate) {
+      cleanWorkflow.policyStartDate = formatDateForInput(cleanWorkflow.policyStartDate);
+    }
+    if (cleanWorkflow.policyExpiryDate) {
+      cleanWorkflow.policyExpiryDate = formatDateForInput(cleanWorkflow.policyExpiryDate);
+    }
+    
+    submitData.append("workflowDetails", JSON.stringify(cleanWorkflow));
+
+    // Workflow file uploads
+    if (workflowDetails.paymentSnapshot instanceof File) {
+      submitData.append("paymentSnapshot", workflowDetails.paymentSnapshot);
+    }
+    if (workflowDetails.policyCopy instanceof File) {
+      submitData.append("policyCopy", workflowDetails.policyCopy);
+    }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      setError("No authentication token found. Please login again.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
+        method: "PUT",
+        headers: { Authorization: `Bearer ${token}` },
+        body: submitData,
+      });
+
+      if (res.ok) {
+        const updatedLead = await res.json();
+        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+        setShowEditModal(false);
+        setEditLead(null);
+        setSuccessMessage("Lead updated successfully!");
+      } else {
+        const errorData = await res.json();
+        setError(errorData.error || errorData.message || "Update failed");
+        // Show validation errors if any
+        if (errorData.errors && Array.isArray(errorData.errors)) {
+          setValidationPopup({
+            show: true,
+            errors: errorData.errors.map(err => ({ field: "general", message: err }))
+          });
+        }
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+      setError("Network error. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Delete Lead
   const handleDelete = async (leadId) => {
@@ -1821,7 +1906,7 @@ const handleUpdate = async (e) => {
   };
 
   // ============================================================
-  // RENDER FUNCTIONS - Same as LeadTable (Health, Motor, Electronic)
+  // RENDER FUNCTIONS
   // ============================================================
   
   // Render Add-On Modal
@@ -2805,27 +2890,27 @@ const handleUpdate = async (e) => {
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
-                <div>
-  <label className="text-xs font-medium text-gray-700">Upload Document</label>
-  {typeof member.aadhaarFile === "string" && member.aadhaarFile && (
-    <div className="mb-1">
-      <a href={member.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-        View current document
-      </a>
-    </div>
-  )}
-  <input
-    type="file"
-    accept=".pdf,.jpg,.jpeg"
-    onChange={(e) => {
-      const newMembers = [...healthDetails.members];
-      newMembers[index].aadhaarFile = e.target.files[0] || newMembers[index].aadhaarFile;
-      setHealthDetails(prev => ({ ...prev, members: newMembers }));
-    }}
-    className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-  />
-  {member.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
-</div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Upload Document</label>
+                    {typeof member.aadhaarFile === "string" && member.aadhaarFile && (
+                      <div className="mb-1">
+                        <a href={member.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                          View current document
+                        </a>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].aadhaarFile = e.target.files[0] || newMembers[index].aadhaarFile;
+                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                    {member.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+                  </div>
                   
                   <div>
                     <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
@@ -3945,7 +4030,328 @@ const handleUpdate = async (e) => {
   };
 
   // ============================================================
-  // RENDER EDIT MODAL - Full like LeadTable
+  // RENDER WORKFLOW FORM - ADDED (Admin Only)
+  // ============================================================
+  const renderWorkflowForm = () => {
+    const isPolicyIssued = workflowDetails.status === "Policy Issued";
+    
+    return (
+      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
+          <FaEdit /> Workflow Management (Admin Only)
+        </h3>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700">Status</label>
+            <select
+              value={workflowDetails.status}
+              onChange={(e) => {
+                setWorkflowDetails(prev => ({ ...prev, status: e.target.value }));
+                setShowInsurerQuotes(e.target.value === "Quotation Generated");
+              }}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              disabled={isPolicyIssued}
+            >
+              {STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
+          </div>
+
+          {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
+            <>
+              <div className="lg:col-span-3">
+                <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
+                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+                  {INSURER_OPTIONS.slice(0, 10).map(ins => (
+                    <label key={ins} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={workflowDetails.selectedInsurers?.includes(ins) || false}
+                        onChange={(e) => {
+                          if (isPolicyIssued) return;
+                          const current = workflowDetails.selectedInsurers || [];
+                          let updated;
+                          if (e.target.checked) {
+                            updated = [...current, ins];
+                          } else {
+                            updated = current.filter(i => i !== ins);
+                          }
+                          setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
+                        }}
+                        className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
+                        disabled={isPolicyIssued}
+                      />
+                      {ins}
+                    </label>
+                  ))}
+                </div>
+                {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
+              </div>
+              {workflowDetails.selectedInsurers?.length > 0 && (
+                <div className="lg:col-span-3">
+                  <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
+                  {workflowDetails.selectedInsurers.map((insurer, idx) => (
+                    <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                      <h6 className="font-medium text-indigo-600">{insurer}</h6>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
+                          <input 
+                            type="text" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter quote number"
+                            value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].quoteNumber = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                          <input 
+                            type="file" 
+                            accept=".pdf,.jpg,.jpeg" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const file = e.target.files[0];
+                              if (file) {
+                                const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                                if (!updatedQuotes[idx]) {
+                                  updatedQuotes[idx] = { insurerName: insurer };
+                                }
+                                updatedQuotes[idx].quoteUpload = file;
+                                setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                              }
+                            }}
+                          />
+                          {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
+                            <p className="text-xs text-green-500 mt-1">✓ File selected</p>
+                          )}
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Premium Amount</label>
+                          <input 
+                            type="number" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter amount"
+                            value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].premiumAmount = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                          <select 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].paymentMode = e.target.value;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Monthly">Monthly</option>
+                            <option value="Quarterly">Quarterly</option>
+                            <option value="Half Quarterly">Half Quarterly</option>
+                            <option value="Half Yearly">Half Yearly</option>
+                            <option value="Yearly">Yearly</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                          <input 
+                            type="number" 
+                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                            disabled={isPolicyIssued}
+                            placeholder="Enter discount"
+                            value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
+                            onChange={(e) => {
+                              if (isPolicyIssued) return;
+                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+                              if (!updatedQuotes[idx]) {
+                                updatedQuotes[idx] = { insurerName: insurer };
+                              }
+                              updatedQuotes[idx].finalDiscount = e.target.value;
+                              const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
+                              const discount = parseFloat(e.target.value) || 0;
+                              updatedQuotes[idx].payableAmount = premium - discount;
+                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium text-gray-700">Payable Amount</label>
+                          <input 
+                            type="text" 
+                            readOnly 
+                            className="w-full p-1 border rounded bg-gray-100 text-sm"
+                            value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Payment Status</label>
+            <select
+              value={workflowDetails.paymentStatus}
+              onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              disabled={isPolicyIssued}
+            >
+              <option value="">Select</option>
+              {PAYMENT_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+            </select>
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment status is locked when Policy Issued</p>}
+          </div>
+
+          {workflowDetails.paymentStatus === "URL Shared" && (
+            <div className="lg:col-span-3">
+              <label className="text-sm font-medium text-gray-700">Payment URL</label>
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={workflowDetails.paymentUrl}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentUrl: e.target.value }))}
+                  className={`flex-1 p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                  placeholder="https://payment.link/..."
+                />
+                {workflowDetails.paymentUrl && !isPolicyIssued && (
+                  <a href={workflowDetails.paymentUrl} target="_blank" rel="noopener noreferrer" 
+                     className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2">
+                    <FaLink /> Open
+                  </a>
+                )}
+              </div>
+              {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Payment URL is locked when Policy Issued</p>}
+            </div>
+          )}
+
+          {workflowDetails.paymentStatus === "Payment Done" && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">UTR Number</label>
+                <input
+                  type="text"
+                  value={workflowDetails.utrNumber}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, utrNumber: e.target.value }))}
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload Payment Snapshot</label>
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg"
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
+                />
+                {workflowDetails.paymentSnapshot && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              </div>
+            </>
+          )}
+
+          {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Number</label>
+                <input
+                  type="text"
+                  value={workflowDetails.policyNumber}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Issued On</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyIssuedOn}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyStartDate}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
+                <input
+                  type="date"
+                  value={workflowDetails.policyExpiryDate}
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">Upload Policy Copy</label>
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
+                  className="w-full p-2 border border-gray-300 rounded-lg"
+                />
+                {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+              </div>
+            </>
+          )}
+
+          <div className="lg:col-span-3">
+            <label className="text-sm font-medium text-gray-700">Remarks</label>
+            <textarea
+              value={workflowDetails.remarks}
+              onChange={(e) => setWorkflowDetails(prev => ({ ...prev, remarks: e.target.value }))}
+              className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+              rows="3"
+              disabled={isPolicyIssued}
+            />
+            {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Remarks are locked when Policy Issued</p>}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER EDIT MODAL - Full like LeadTable WITH workflow
   // ============================================================
   const renderEditModal = () => {
     const hasErrors = Object.keys(validationErrors).length > 0;
@@ -3965,7 +4371,8 @@ const handleUpdate = async (e) => {
         >
           <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <FaEdit className="text-indigo-600" /> Edit Lead
+              <FaEdit className="text-indigo-600" /> Edit Lead - Full Details
+              <span className="text-sm font-normal text-gray-500 ml-2">(Admin Only)</span>
             </h2>
             <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
               <FaTimes className="h-5 w-5" />
@@ -4221,6 +4628,9 @@ const handleUpdate = async (e) => {
             {showMotorSection && renderMotorForm()}
             {showElectronicSection && renderElectronicForm()}
 
+            {/* Workflow Management Section - ADDED */}
+            {renderWorkflowForm()}
+
             {renderPreviousPolicyPopup()}
             {renderValidationPopup()}
 
@@ -4339,6 +4749,28 @@ const handleUpdate = async (e) => {
                   <div>Device: {selectedLead.electronicDetails.deviceType || "-"}</div>
                   <div>Purchase Date: {selectedLead.electronicDetails.dateOfPurchase || "-"}</div>
                   <div>IMEI: {selectedLead.electronicDetails.imeiNumber || "-"}</div>
+                </div>
+              </div>
+            )}
+            {/* Workflow Details in View Modal - ADDED */}
+            {selectedLead.workflowDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Workflow Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Status: {selectedLead.workflowDetails.status || "-"}</div>
+                  <div>Quote Number: {selectedLead.workflowDetails.quoteNumber || "-"}</div>
+                  <div>Payment Status: {selectedLead.workflowDetails.paymentStatus || "-"}</div>
+                  <div>UTR Number: {selectedLead.workflowDetails.utrNumber || "-"}</div>
+                  {selectedLead.workflowDetails.insurerQuotes?.length > 0 && (
+                    <div className="sm:col-span-2">
+                      <span className="font-medium">Insurer Quotes:</span>
+                      <ul className="list-disc list-inside mt-1">
+                        {selectedLead.workflowDetails.insurerQuotes.map((q, i) => (
+                          <li key={i}>{q.insurerName} - ₹{q.premiumAmount || 0}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
