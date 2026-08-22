@@ -2,7 +2,6 @@
 import { motion } from "framer-motion";
 import {
   FaEye,
-  FaEdit,
   FaTimes,
   FaDownload,
   FaSearch,
@@ -350,8 +349,6 @@ function UserLeadTable() {
   // ============================================================
   const [leads, setLeads] = useState([]);
   const [showLeadForm, setShowLeadForm] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [editLead, setEditLead] = useState(null);
   const [selectedLead, setSelectedLead] = useState(null);
   const [globalSearch, setGlobalSearch] = useState("");
   const [sourceFilters, setSourceFilters] = useState({
@@ -499,7 +496,6 @@ function UserLeadTable() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      // ✅ Use the new dropdown endpoint
       const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -522,7 +518,6 @@ function UserLeadTable() {
     const token = localStorage.getItem("token");
     if (!token) return;
     try {
-      // ✅ Use the new dropdown endpoint
       const res = await fetch(`${API_BASE}/api/auth/users/dropdown`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -543,7 +538,7 @@ function UserLeadTable() {
 
   useEffect(() => {
     fetchEmployees();
-    fetchChannelPartners(); // ✅ Make sure this is called
+    fetchChannelPartners();
   }, []);
 
   // ============================================================
@@ -614,7 +609,6 @@ function UserLeadTable() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Auto-fetch RTO from Registration Number (only for non-New vehicles)
   useEffect(() => {
     const isNewVehicle = motorDetails.previousInsuranceStatus === "New";
     if (!isNewVehicle && motorDetails.registrationNumber && motorDetails.registrationNumber.length >= 4) {
@@ -1027,407 +1021,346 @@ function UserLeadTable() {
   // ============================================================
   // BULK UPLOAD
   // ============================================================
- const downloadTemplate = () => {
-  // Create a comprehensive template with ALL fields
-  const templateData = [{
-    // ========== BASIC FIELDS ==========
-    name: "JOHN DOE",
-    email: "john.doe@example.com",
-    mobileNo: "9876543210",
-    gender: "Male",
-    source: "Employee",
-    sourceDependentValue: "Employee Name Here",
-    remarks: "Customer remarks and discussion notes",
-    lob: "Health Insurance",
-    pinCode: "110001",
-    state: "Delhi",
-    city: "New Delhi",
-    policyTenure: "1 Year",
-    paymentTerm: "Yearly",
-    sumInsured: "10 Lakh",
+  const downloadTemplate = () => {
+    // Create a comprehensive template with ALL fields
+    const templateData = [{
+      name: "JOHN DOE",
+      email: "john.doe@example.com",
+      mobileNo: "9876543210",
+      gender: "Male",
+      source: "Employee",
+      sourceDependentValue: "Employee Name Here",
+      remarks: "Customer remarks and discussion notes",
+      lob: "Health Insurance",
+      pinCode: "110001",
+      state: "Delhi",
+      city: "New Delhi",
+      policyTenure: "1 Year",
+      paymentTerm: "Yearly",
+      sumInsured: "10 Lakh",
+      
+      health_policyType: "Individual",
+      health_numberOfAdults: "",
+      health_numberOfChildren: "",
+      health_familyIncome: "500000",
+      health_height: "5'8\"",
+      health_weight: "75",
+      health_qualification: "Graduate",
+      health_occupation: "Salaried",
+      health_proposerDOB: "1990-01-15",
+      health_seniorOneDOB: "",
+      health_proposerIsMember: "Yes",
+      health_nomineeName: "JANE DOE",
+      health_nomineeDOB: "1992-05-20",
+      health_nomineeRelationship: "Spouse",
+      health_aadhaarNumber: "123456789012",
+      health_panNumber: "ABCDE1234F",
+      health_hasPreviousPolicy: "No",
+      health_previousPolicyCase: "",
+      health_experienceYears: "",
+      health_renewal_insurerName: "",
+      health_renewal_policyNumber: "",
+      health_renewal_policyDueDate: "",
+      health_portability_1_insurerName: "",
+      health_portability_1_policyNumber: "",
+      health_portability_1_policyActiveFrom: "",
+      health_portability_1_policyTillDate: "",
+      health_portability_1_sumAssured: "",
+      health_portability_1_noClaimBonus: "",
+      health_portability_1_ipdClaimTaken: "",
+      health_portability_2_insurerName: "",
+      health_portability_2_policyNumber: "",
+      health_portability_2_policyActiveFrom: "",
+      health_portability_2_policyTillDate: "",
+      health_portability_2_sumAssured: "",
+      health_portability_2_noClaimBonus: "",
+      health_portability_2_ipdClaimTaken: "",
+      health_portability_3_insurerName: "",
+      health_portability_3_policyNumber: "",
+      health_portability_3_policyActiveFrom: "",
+      health_portability_3_policyTillDate: "",
+      health_portability_3_sumAssured: "",
+      health_portability_3_noClaimBonus: "",
+      health_portability_3_ipdClaimTaken: "",
+      health_portability_4_insurerName: "",
+      health_portability_4_policyNumber: "",
+      health_portability_4_policyActiveFrom: "",
+      health_portability_4_policyTillDate: "",
+      health_portability_4_sumAssured: "",
+      health_portability_4_noClaimBonus: "",
+      health_portability_4_ipdClaimTaken: "",
+      health_portability_5_insurerName: "",
+      health_portability_5_policyNumber: "",
+      health_portability_5_policyActiveFrom: "",
+      health_portability_5_policyTillDate: "",
+      health_portability_5_sumAssured: "",
+      health_portability_5_noClaimBonus: "",
+      health_portability_5_ipdClaimTaken: "",
+      health_medicalRemarks: "No pre-existing conditions",
+      health_member_adult1_name: "",
+      health_member_adult1_dob: "",
+      health_member_adult1_monthlyIncome: "",
+      health_member_adult1_height: "",
+      health_member_adult1_weight: "",
+      health_member_adult1_qualification: "",
+      health_member_adult1_occupation: "",
+      health_member_adult1_relationship: "",
+      health_member_adult1_aadhaar: "",
+      health_member_adult1_wantRider: "",
+      health_member_adult1_selectedRider: "",
+      health_member_adult1_rider_asthma: "",
+      health_member_adult1_rider_diabetes: "",
+      health_member_adult1_rider_hypertension: "",
+      health_member_adult1_rider_hyperlipidaemia: "",
+      health_member_adult1_fetalFlourish: "",
+      health_member_adult1_nrInsure: "",
+      health_member_adult1_lossOfIncome: "",
+      health_member_adult1_majorIllness: "",
+      health_member_adult1_internationalCover: "",
+      health_member_adult1_medicalRemarks: "",
+      health_member_adult2_name: "",
+      health_member_adult2_dob: "",
+      health_member_adult2_monthlyIncome: "",
+      health_member_adult2_height: "",
+      health_member_adult2_weight: "",
+      health_member_adult2_qualification: "",
+      health_member_adult2_occupation: "",
+      health_member_adult2_relationship: "",
+      health_member_adult2_aadhaar: "",
+      health_member_adult2_wantRider: "",
+      health_member_adult2_selectedRider: "",
+      health_member_adult2_rider_asthma: "",
+      health_member_adult2_rider_diabetes: "",
+      health_member_adult2_rider_hypertension: "",
+      health_member_adult2_rider_hyperlipidaemia: "",
+      health_member_adult2_fetalFlourish: "",
+      health_member_adult2_nrInsure: "",
+      health_member_adult2_lossOfIncome: "",
+      health_member_adult2_majorIllness: "",
+      health_member_adult2_internationalCover: "",
+      health_member_adult2_medicalRemarks: "",
+      health_member_adult3_name: "",
+      health_member_adult3_dob: "",
+      health_member_adult3_monthlyIncome: "",
+      health_member_adult3_height: "",
+      health_member_adult3_weight: "",
+      health_member_adult3_qualification: "",
+      health_member_adult3_occupation: "",
+      health_member_adult3_relationship: "",
+      health_member_adult3_aadhaar: "",
+      health_member_adult3_wantRider: "",
+      health_member_adult3_selectedRider: "",
+      health_member_adult3_rider_asthma: "",
+      health_member_adult3_rider_diabetes: "",
+      health_member_adult3_rider_hypertension: "",
+      health_member_adult3_rider_hyperlipidaemia: "",
+      health_member_adult3_fetalFlourish: "",
+      health_member_adult3_nrInsure: "",
+      health_member_adult3_lossOfIncome: "",
+      health_member_adult3_majorIllness: "",
+      health_member_adult3_internationalCover: "",
+      health_member_adult3_medicalRemarks: "",
+      health_member_adult4_name: "",
+      health_member_adult4_dob: "",
+      health_member_adult4_monthlyIncome: "",
+      health_member_adult4_height: "",
+      health_member_adult4_weight: "",
+      health_member_adult4_qualification: "",
+      health_member_adult4_occupation: "",
+      health_member_adult4_relationship: "",
+      health_member_adult4_aadhaar: "",
+      health_member_adult4_wantRider: "",
+      health_member_adult4_selectedRider: "",
+      health_member_adult4_rider_asthma: "",
+      health_member_adult4_rider_diabetes: "",
+      health_member_adult4_rider_hypertension: "",
+      health_member_adult4_rider_hyperlipidaemia: "",
+      health_member_adult4_fetalFlourish: "",
+      health_member_adult4_nrInsure: "",
+      health_member_adult4_lossOfIncome: "",
+      health_member_adult4_majorIllness: "",
+      health_member_adult4_internationalCover: "",
+      health_member_adult4_medicalRemarks: "",
+      health_member_adult5_name: "",
+      health_member_adult5_dob: "",
+      health_member_adult5_monthlyIncome: "",
+      health_member_adult5_height: "",
+      health_member_adult5_weight: "",
+      health_member_adult5_qualification: "",
+      health_member_adult5_occupation: "",
+      health_member_adult5_relationship: "",
+      health_member_adult5_aadhaar: "",
+      health_member_adult5_wantRider: "",
+      health_member_adult5_selectedRider: "",
+      health_member_adult5_rider_asthma: "",
+      health_member_adult5_rider_diabetes: "",
+      health_member_adult5_rider_hypertension: "",
+      health_member_adult5_rider_hyperlipidaemia: "",
+      health_member_adult5_fetalFlourish: "",
+      health_member_adult5_nrInsure: "",
+      health_member_adult5_lossOfIncome: "",
+      health_member_adult5_majorIllness: "",
+      health_member_adult5_internationalCover: "",
+      health_member_adult5_medicalRemarks: "",
+      health_member_child1_name: "",
+      health_member_child1_dob: "",
+      health_member_child1_monthlyIncome: "",
+      health_member_child1_height: "",
+      health_member_child1_weight: "",
+      health_member_child1_qualification: "",
+      health_member_child1_occupation: "",
+      health_member_child1_relationship: "",
+      health_member_child1_aadhaar: "",
+      health_member_child1_wantRider: "",
+      health_member_child1_selectedRider: "",
+      health_member_child1_rider_asthma: "",
+      health_member_child1_rider_diabetes: "",
+      health_member_child1_rider_hypertension: "",
+      health_member_child1_rider_hyperlipidaemia: "",
+      health_member_child1_fetalFlourish: "",
+      health_member_child1_nrInsure: "",
+      health_member_child1_lossOfIncome: "",
+      health_member_child1_majorIllness: "",
+      health_member_child1_internationalCover: "",
+      health_member_child1_medicalRemarks: "",
+      health_member_child2_name: "",
+      health_member_child2_dob: "",
+      health_member_child2_monthlyIncome: "",
+      health_member_child2_height: "",
+      health_member_child2_weight: "",
+      health_member_child2_qualification: "",
+      health_member_child2_occupation: "",
+      health_member_child2_relationship: "",
+      health_member_child2_aadhaar: "",
+      health_member_child2_wantRider: "",
+      health_member_child2_selectedRider: "",
+      health_member_child2_rider_asthma: "",
+      health_member_child2_rider_diabetes: "",
+      health_member_child2_rider_hypertension: "",
+      health_member_child2_rider_hyperlipidaemia: "",
+      health_member_child2_fetalFlourish: "",
+      health_member_child2_nrInsure: "",
+      health_member_child2_lossOfIncome: "",
+      health_member_child2_majorIllness: "",
+      health_member_child2_internationalCover: "",
+      health_member_child2_medicalRemarks: "",
+      health_member_child3_name: "",
+      health_member_child3_dob: "",
+      health_member_child3_monthlyIncome: "",
+      health_member_child3_height: "",
+      health_member_child3_weight: "",
+      health_member_child3_qualification: "",
+      health_member_child3_occupation: "",
+      health_member_child3_relationship: "",
+      health_member_child3_aadhaar: "",
+      health_member_child3_wantRider: "",
+      health_member_child3_selectedRider: "",
+      health_member_child3_rider_asthma: "",
+      health_member_child3_rider_diabetes: "",
+      health_member_child3_rider_hypertension: "",
+      health_member_child3_rider_hyperlipidaemia: "",
+      health_member_child3_fetalFlourish: "",
+      health_member_child3_nrInsure: "",
+      health_member_child3_lossOfIncome: "",
+      health_member_child3_majorIllness: "",
+      health_member_child3_internationalCover: "",
+      health_member_child3_medicalRemarks: "",
+      health_member_child4_name: "",
+      health_member_child4_dob: "",
+      health_member_child4_monthlyIncome: "",
+      health_member_child4_height: "",
+      health_member_child4_weight: "",
+      health_member_child4_qualification: "",
+      health_member_child4_occupation: "",
+      health_member_child4_relationship: "",
+      health_member_child4_aadhaar: "",
+      health_member_child4_wantRider: "",
+      health_member_child4_selectedRider: "",
+      health_member_child4_rider_asthma: "",
+      health_member_child4_rider_diabetes: "",
+      health_member_child4_rider_hypertension: "",
+      health_member_child4_rider_hyperlipidaemia: "",
+      health_member_child4_fetalFlourish: "",
+      health_member_child4_nrInsure: "",
+      health_member_child4_lossOfIncome: "",
+      health_member_child4_majorIllness: "",
+      health_member_child4_internationalCover: "",
+      health_member_child4_medicalRemarks: "",
+      health_member_child5_name: "",
+      health_member_child5_dob: "",
+      health_member_child5_monthlyIncome: "",
+      health_member_child5_height: "",
+      health_member_child5_weight: "",
+      health_member_child5_qualification: "",
+      health_member_child5_occupation: "",
+      health_member_child5_relationship: "",
+      health_member_child5_aadhaar: "",
+      health_member_child5_wantRider: "",
+      health_member_child5_selectedRider: "",
+      health_member_child5_rider_asthma: "",
+      health_member_child5_rider_diabetes: "",
+      health_member_child5_rider_hypertension: "",
+      health_member_child5_rider_hyperlipidaemia: "",
+      health_member_child5_fetalFlourish: "",
+      health_member_child5_nrInsure: "",
+      health_member_child5_lossOfIncome: "",
+      health_member_child5_majorIllness: "",
+      health_member_child5_internationalCover: "",
+      health_member_child5_medicalRemarks: "",
+      
+      motor_vehicleType: "Private Car",
+      motor_previousInsuranceStatus: "Active",
+      motor_registrationNumber: "BR01AB1234",
+      motor_autoRtoCode: "BR01",
+      motor_insuranceType: "Comprehensive (OD+TP)",
+      motor_manufacturer: "Maruti Suzuki",
+      motor_model: "Swift",
+      motor_fuelType: "Petrol",
+      motor_rtoCode: "BR01",
+      motor_chesisNo: "ABCD1234567890",
+      motor_yearOfManufacturing: "2023",
+      motor_monthOfManufacturing: "January",
+      motor_idvAsPerInvoice: "800000",
+      motor_odDueDate: "2025-12-31",
+      motor_tpDueDate: "2025-12-31",
+      motor_policyNo: "POL123456789",
+      motor_previousInsurerName: "Bajaj Allianz General Insurance Co Ltd",
+      motor_idvAsPerPYP: "750000",
+      motor_saodOdDueDate: "",
+      motor_saodTpDueDate: "",
+      motor_saodPolicyNo: "",
+      motor_saodPreviousInsurerName: "",
+      motor_saodIdvAsPerPYP: "",
+      motor_tpInsuranceDueDate: "",
+      motor_claimTaken: "No",
+      motor_ncb: "45%",
+      motor_addOnRequired: "Yes",
+      motor_selectedAddOns: "Zero Depreciation,Engine Protection,Return to Invoice",
+      motor_pypFile: "previous_policy.pdf",
+      motor_rcFrontFile: "rc_front.jpg",
+      motor_rcBackFile: "rc_back.jpg",
+      motor_chesisPhoto: "chesis_photo.jpg",
+      motor_invoiceCopy: "invoice.pdf",
+      
+      electronic_deviceType: "Mobile",
+      electronic_otherDeviceType: "",
+      electronic_dateOfPurchase: "2025-06-15",
+      electronic_purchaseValue: "75000",
+      electronic_aadhaarNumber: "123456789012",
+      electronic_panNumber: "ABCDE1234F",
+      electronic_imeiNumber: "123456789012345",
+      electronic_aadhaarFile: "aadhaar.pdf",
+      electronic_panFile: "pan.pdf",
+      electronic_imeiImage: "imei.jpg",
+      electronic_devicePhotos: "photo1.jpg,photo2.jpg,photo3.jpg",
+      electronic_purchaseInvoice: "invoice.pdf",
+    }];
     
-    // ========== HEALTH INSURANCE FIELDS ==========
-    // Policy Details
-    health_policyType: "Individual",
-    health_numberOfAdults: "",
-    health_numberOfChildren: "",
-    health_familyIncome: "500000",
-    health_height: "5'8\"",
-    health_weight: "75",
-    health_qualification: "Graduate",
-    health_occupation: "Salaried",
-    health_proposerDOB: "1990-01-15",
-    health_seniorOneDOB: "",
-    health_proposerIsMember: "Yes",
-    
-    // Nominee Details (Individual)
-    health_nomineeName: "JANE DOE",
-    health_nomineeDOB: "1992-05-20",
-    health_nomineeRelationship: "Spouse",
-    
-    // ID Documents
-    health_aadhaarNumber: "123456789012",
-    health_panNumber: "ABCDE1234F",
-    
-    // Previous Policy
-    health_hasPreviousPolicy: "No",
-    health_previousPolicyCase: "", // "Renew Case", "Portability Case", "Fresh Case"
-    health_experienceYears: "", // For Portability Case
-    
-    // Renewal Details (for Renew Case)
-    health_renewal_insurerName: "",
-    health_renewal_policyNumber: "",
-    health_renewal_policyDueDate: "",
-    
-    // Portability Details - Policy 1 (for Portability Case)
-    health_portability_1_insurerName: "",
-    health_portability_1_policyNumber: "",
-    health_portability_1_policyActiveFrom: "",
-    health_portability_1_policyTillDate: "",
-    health_portability_1_sumAssured: "",
-    health_portability_1_noClaimBonus: "",
-    health_portability_1_ipdClaimTaken: "",
-    
-    // Portability Details - Policy 2
-    health_portability_2_insurerName: "",
-    health_portability_2_policyNumber: "",
-    health_portability_2_policyActiveFrom: "",
-    health_portability_2_policyTillDate: "",
-    health_portability_2_sumAssured: "",
-    health_portability_2_noClaimBonus: "",
-    health_portability_2_ipdClaimTaken: "",
-    
-    // Portability Details - Policy 3
-    health_portability_3_insurerName: "",
-    health_portability_3_policyNumber: "",
-    health_portability_3_policyActiveFrom: "",
-    health_portability_3_policyTillDate: "",
-    health_portability_3_sumAssured: "",
-    health_portability_3_noClaimBonus: "",
-    health_portability_3_ipdClaimTaken: "",
-    
-    // Portability Details - Policy 4
-    health_portability_4_insurerName: "",
-    health_portability_4_policyNumber: "",
-    health_portability_4_policyActiveFrom: "",
-    health_portability_4_policyTillDate: "",
-    health_portability_4_sumAssured: "",
-    health_portability_4_noClaimBonus: "",
-    health_portability_4_ipdClaimTaken: "",
-    
-    // Portability Details - Policy 5
-    health_portability_5_insurerName: "",
-    health_portability_5_policyNumber: "",
-    health_portability_5_policyActiveFrom: "",
-    health_portability_5_policyTillDate: "",
-    health_portability_5_sumAssured: "",
-    health_portability_5_noClaimBonus: "",
-    health_portability_5_ipdClaimTaken: "",
-    
-    health_medicalRemarks: "No pre-existing conditions",
-    
-    // Floater Members (max 5 adults + 5 children)
-    // Adult 1
-    health_member_adult1_name: "",
-    health_member_adult1_dob: "",
-    health_member_adult1_monthlyIncome: "",
-    health_member_adult1_height: "",
-    health_member_adult1_weight: "",
-    health_member_adult1_qualification: "",
-    health_member_adult1_occupation: "",
-    health_member_adult1_relationship: "",
-    health_member_adult1_aadhaar: "",
-    health_member_adult1_wantRider: "",
-    health_member_adult1_selectedRider: "",
-    health_member_adult1_rider_asthma: "",
-    health_member_adult1_rider_diabetes: "",
-    health_member_adult1_rider_hypertension: "",
-    health_member_adult1_rider_hyperlipidaemia: "",
-    health_member_adult1_fetalFlourish: "",
-    health_member_adult1_nrInsure: "",
-    health_member_adult1_lossOfIncome: "",
-    health_member_adult1_majorIllness: "",
-    health_member_adult1_internationalCover: "",
-    health_member_adult1_medicalRemarks: "",
-    
-    // Adult 2
-    health_member_adult2_name: "",
-    health_member_adult2_dob: "",
-    health_member_adult2_monthlyIncome: "",
-    health_member_adult2_height: "",
-    health_member_adult2_weight: "",
-    health_member_adult2_qualification: "",
-    health_member_adult2_occupation: "",
-    health_member_adult2_relationship: "",
-    health_member_adult2_aadhaar: "",
-    health_member_adult2_wantRider: "",
-    health_member_adult2_selectedRider: "",
-    health_member_adult2_rider_asthma: "",
-    health_member_adult2_rider_diabetes: "",
-    health_member_adult2_rider_hypertension: "",
-    health_member_adult2_rider_hyperlipidaemia: "",
-    health_member_adult2_fetalFlourish: "",
-    health_member_adult2_nrInsure: "",
-    health_member_adult2_lossOfIncome: "",
-    health_member_adult2_majorIllness: "",
-    health_member_adult2_internationalCover: "",
-    health_member_adult2_medicalRemarks: "",
-    
-    // Adult 3
-    health_member_adult3_name: "",
-    health_member_adult3_dob: "",
-    health_member_adult3_monthlyIncome: "",
-    health_member_adult3_height: "",
-    health_member_adult3_weight: "",
-    health_member_adult3_qualification: "",
-    health_member_adult3_occupation: "",
-    health_member_adult3_relationship: "",
-    health_member_adult3_aadhaar: "",
-    health_member_adult3_wantRider: "",
-    health_member_adult3_selectedRider: "",
-    health_member_adult3_rider_asthma: "",
-    health_member_adult3_rider_diabetes: "",
-    health_member_adult3_rider_hypertension: "",
-    health_member_adult3_rider_hyperlipidaemia: "",
-    health_member_adult3_fetalFlourish: "",
-    health_member_adult3_nrInsure: "",
-    health_member_adult3_lossOfIncome: "",
-    health_member_adult3_majorIllness: "",
-    health_member_adult3_internationalCover: "",
-    health_member_adult3_medicalRemarks: "",
-    
-    // Adult 4
-    health_member_adult4_name: "",
-    health_member_adult4_dob: "",
-    health_member_adult4_monthlyIncome: "",
-    health_member_adult4_height: "",
-    health_member_adult4_weight: "",
-    health_member_adult4_qualification: "",
-    health_member_adult4_occupation: "",
-    health_member_adult4_relationship: "",
-    health_member_adult4_aadhaar: "",
-    health_member_adult4_wantRider: "",
-    health_member_adult4_selectedRider: "",
-    health_member_adult4_rider_asthma: "",
-    health_member_adult4_rider_diabetes: "",
-    health_member_adult4_rider_hypertension: "",
-    health_member_adult4_rider_hyperlipidaemia: "",
-    health_member_adult4_fetalFlourish: "",
-    health_member_adult4_nrInsure: "",
-    health_member_adult4_lossOfIncome: "",
-    health_member_adult4_majorIllness: "",
-    health_member_adult4_internationalCover: "",
-    health_member_adult4_medicalRemarks: "",
-    
-    // Adult 5
-    health_member_adult5_name: "",
-    health_member_adult5_dob: "",
-    health_member_adult5_monthlyIncome: "",
-    health_member_adult5_height: "",
-    health_member_adult5_weight: "",
-    health_member_adult5_qualification: "",
-    health_member_adult5_occupation: "",
-    health_member_adult5_relationship: "",
-    health_member_adult5_aadhaar: "",
-    health_member_adult5_wantRider: "",
-    health_member_adult5_selectedRider: "",
-    health_member_adult5_rider_asthma: "",
-    health_member_adult5_rider_diabetes: "",
-    health_member_adult5_rider_hypertension: "",
-    health_member_adult5_rider_hyperlipidaemia: "",
-    health_member_adult5_fetalFlourish: "",
-    health_member_adult5_nrInsure: "",
-    health_member_adult5_lossOfIncome: "",
-    health_member_adult5_majorIllness: "",
-    health_member_adult5_internationalCover: "",
-    health_member_adult5_medicalRemarks: "",
-    
-    // Child 1
-    health_member_child1_name: "",
-    health_member_child1_dob: "",
-    health_member_child1_monthlyIncome: "",
-    health_member_child1_height: "",
-    health_member_child1_weight: "",
-    health_member_child1_qualification: "",
-    health_member_child1_occupation: "",
-    health_member_child1_relationship: "",
-    health_member_child1_aadhaar: "",
-    health_member_child1_wantRider: "",
-    health_member_child1_selectedRider: "",
-    health_member_child1_rider_asthma: "",
-    health_member_child1_rider_diabetes: "",
-    health_member_child1_rider_hypertension: "",
-    health_member_child1_rider_hyperlipidaemia: "",
-    health_member_child1_fetalFlourish: "",
-    health_member_child1_nrInsure: "",
-    health_member_child1_lossOfIncome: "",
-    health_member_child1_majorIllness: "",
-    health_member_child1_internationalCover: "",
-    health_member_child1_medicalRemarks: "",
-    
-    // Child 2
-    health_member_child2_name: "",
-    health_member_child2_dob: "",
-    health_member_child2_monthlyIncome: "",
-    health_member_child2_height: "",
-    health_member_child2_weight: "",
-    health_member_child2_qualification: "",
-    health_member_child2_occupation: "",
-    health_member_child2_relationship: "",
-    health_member_child2_aadhaar: "",
-    health_member_child2_wantRider: "",
-    health_member_child2_selectedRider: "",
-    health_member_child2_rider_asthma: "",
-    health_member_child2_rider_diabetes: "",
-    health_member_child2_rider_hypertension: "",
-    health_member_child2_rider_hyperlipidaemia: "",
-    health_member_child2_fetalFlourish: "",
-    health_member_child2_nrInsure: "",
-    health_member_child2_lossOfIncome: "",
-    health_member_child2_majorIllness: "",
-    health_member_child2_internationalCover: "",
-    health_member_child2_medicalRemarks: "",
-    
-    // Child 3
-    health_member_child3_name: "",
-    health_member_child3_dob: "",
-    health_member_child3_monthlyIncome: "",
-    health_member_child3_height: "",
-    health_member_child3_weight: "",
-    health_member_child3_qualification: "",
-    health_member_child3_occupation: "",
-    health_member_child3_relationship: "",
-    health_member_child3_aadhaar: "",
-    health_member_child3_wantRider: "",
-    health_member_child3_selectedRider: "",
-    health_member_child3_rider_asthma: "",
-    health_member_child3_rider_diabetes: "",
-    health_member_child3_rider_hypertension: "",
-    health_member_child3_rider_hyperlipidaemia: "",
-    health_member_child3_fetalFlourish: "",
-    health_member_child3_nrInsure: "",
-    health_member_child3_lossOfIncome: "",
-    health_member_child3_majorIllness: "",
-    health_member_child3_internationalCover: "",
-    health_member_child3_medicalRemarks: "",
-    
-    // Child 4
-    health_member_child4_name: "",
-    health_member_child4_dob: "",
-    health_member_child4_monthlyIncome: "",
-    health_member_child4_height: "",
-    health_member_child4_weight: "",
-    health_member_child4_qualification: "",
-    health_member_child4_occupation: "",
-    health_member_child4_relationship: "",
-    health_member_child4_aadhaar: "",
-    health_member_child4_wantRider: "",
-    health_member_child4_selectedRider: "",
-    health_member_child4_rider_asthma: "",
-    health_member_child4_rider_diabetes: "",
-    health_member_child4_rider_hypertension: "",
-    health_member_child4_rider_hyperlipidaemia: "",
-    health_member_child4_fetalFlourish: "",
-    health_member_child4_nrInsure: "",
-    health_member_child4_lossOfIncome: "",
-    health_member_child4_majorIllness: "",
-    health_member_child4_internationalCover: "",
-    health_member_child4_medicalRemarks: "",
-    
-    // Child 5
-    health_member_child5_name: "",
-    health_member_child5_dob: "",
-    health_member_child5_monthlyIncome: "",
-    health_member_child5_height: "",
-    health_member_child5_weight: "",
-    health_member_child5_qualification: "",
-    health_member_child5_occupation: "",
-    health_member_child5_relationship: "",
-    health_member_child5_aadhaar: "",
-    health_member_child5_wantRider: "",
-    health_member_child5_selectedRider: "",
-    health_member_child5_rider_asthma: "",
-    health_member_child5_rider_diabetes: "",
-    health_member_child5_rider_hypertension: "",
-    health_member_child5_rider_hyperlipidaemia: "",
-    health_member_child5_fetalFlourish: "",
-    health_member_child5_nrInsure: "",
-    health_member_child5_lossOfIncome: "",
-    health_member_child5_majorIllness: "",
-    health_member_child5_internationalCover: "",
-    health_member_child5_medicalRemarks: "",
-    
-    // ========== MOTOR INSURANCE FIELDS ==========
-    motor_vehicleType: "Private Car",
-    motor_previousInsuranceStatus: "Active",
-    motor_registrationNumber: "BR01AB1234",
-    motor_autoRtoCode: "BR01",
-    motor_insuranceType: "Comprehensive (OD+TP)",
-    
-    // New Vehicle Fields
-    motor_manufacturer: "Maruti Suzuki",
-    motor_model: "Swift",
-    motor_fuelType: "Petrol",
-    motor_rtoCode: "BR01",
-    motor_chesisNo: "ABCD1234567890",
-    motor_yearOfManufacturing: "2023",
-    motor_monthOfManufacturing: "January",
-    motor_idvAsPerInvoice: "800000",
-    
-    // Active Policy Fields
-    motor_odDueDate: "2025-12-31",
-    motor_tpDueDate: "2025-12-31",
-    motor_policyNo: "POL123456789",
-    motor_previousInsurerName: "Bajaj Allianz General Insurance Co Ltd",
-    motor_idvAsPerPYP: "750000",
-    
-    // SAOD Fields
-    motor_saodOdDueDate: "",
-    motor_saodTpDueDate: "",
-    motor_saodPolicyNo: "",
-    motor_saodPreviousInsurerName: "",
-    motor_saodIdvAsPerPYP: "",
-    
-    // TP Insurance Fields
-    motor_tpInsuranceDueDate: "",
-    
-    // Claim & NCB
-    motor_claimTaken: "No",
-    motor_ncb: "45%",
-    
-    // Add-Ons
-    motor_addOnRequired: "Yes",
-    motor_selectedAddOns: "Zero Depreciation,Engine Protection,Return to Invoice",
-    
-    // Upload fields (file names - for reference only)
-    motor_pypFile: "previous_policy.pdf",
-    motor_rcFrontFile: "rc_front.jpg",
-    motor_rcBackFile: "rc_back.jpg",
-    motor_chesisPhoto: "chesis_photo.jpg",
-    motor_invoiceCopy: "invoice.pdf",
-    
-    // ========== ELECTRONIC EQUIPMENT FIELDS ==========
-    electronic_deviceType: "Mobile",
-    electronic_otherDeviceType: "",
-    electronic_dateOfPurchase: "2025-06-15",
-    electronic_purchaseValue: "75000",
-    electronic_aadhaarNumber: "123456789012",
-    electronic_panNumber: "ABCDE1234F",
-    electronic_imeiNumber: "123456789012345",
-    
-    // Upload fields (file names - for reference only)
-    electronic_aadhaarFile: "aadhaar.pdf",
-    electronic_panFile: "pan.pdf",
-    electronic_imeiImage: "imei.jpg",
-    electronic_devicePhotos: "photo1.jpg,photo2.jpg,photo3.jpg",
-    electronic_purchaseInvoice: "invoice.pdf",
-  }];
-  
-  const ws = XLSX.utils.json_to_sheet(templateData);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "LeadTemplate");
-  XLSX.writeFile(wb, "lead_upload_template.xlsx");
-};
+    const ws = XLSX.utils.json_to_sheet(templateData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "LeadTemplate");
+    XLSX.writeFile(wb, "lead_upload_template.xlsx");
+  };
 
   const downloadExcel = () => {
     if (filteredLeads.length === 0) {
@@ -1550,7 +1483,7 @@ function UserLeadTable() {
   // ============================================================
   // VALIDATE ALL FIELDS
   // ============================================================
-  const validateAllFields = (isEdit = false) => {
+  const validateAllFields = () => {
     const errors = {};
     const errorList = [];
     
@@ -1727,7 +1660,6 @@ function UserLeadTable() {
         errorList.push({ field: "insuranceType", message: "Insurance type is required" });
       }
       
-      // New Vehicle Details validation
       if (motorDetails.previousInsuranceStatus === "New") {
         if (!motorDetails.manufacturer) {
           errors.manufacturer = "Manufacturer is required for New Vehicle";
@@ -1767,7 +1699,6 @@ function UserLeadTable() {
         }
       }
       
-      // Active Policy validations
       if (motorDetails.previousInsuranceStatus === "Active") {
         if (motorDetails.insuranceType === "Comprehensive (OD+TP)" || motorDetails.insuranceType === "SAOD (On Damage)") {
           if (!motorDetails.odDueDate) {
@@ -1844,7 +1775,6 @@ function UserLeadTable() {
         }
       }
       
-      // Upload validations
       if (motorDetails.previousInsuranceStatus === "Active") {
         if (!motorDetails.pypFile) {
           errors.pypFile = "Upload PYP is required for Active Policy";
@@ -1928,12 +1858,12 @@ function UserLeadTable() {
   };
 
   // ============================================================
-  // CREATE LEAD - FIXED NaN ISSUE
+  // CREATE LEAD
   // ============================================================
   const handleCreateLead = async (e) => {
     e.preventDefault();
     
-    if (!validateAllFields(false)) {
+    if (!validateAllFields()) {
       return;
     }
     
@@ -2102,241 +2032,6 @@ function UserLeadTable() {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  // ============================================================
-  // UPDATE LEAD - FIXED NaN ISSUE
-  // ============================================================
-  const handleUpdateLead = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields(true)) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-
-    const submitData = new FormData();
-    
-    submitData.append("name", editLead?.name || formData.name);
-    submitData.append("email", editLead?.email || formData.email);
-    submitData.append("mobileNo", editLead?.mobileNo || formData.mobileNo);
-    submitData.append("gender", editLead?.gender || formData.gender);
-    submitData.append("source", editLead?.source || formData.source);
-    submitData.append("remarks", editLead?.remarks || formData.remarks);
-    submitData.append("lob", editLead?.lob || formData.lob);
-    submitData.append("pinCode", editLead?.pinCode || formData.pinCode);
-    submitData.append("state", editLead?.state || formData.state);
-    submitData.append("city", editLead?.city || formData.city);
-    submitData.append("sourceDependentValue", editLead?.sourceDependentValue || formData.sourceDependentValue);
-    submitData.append("policyTenure", editLead?.policyTenure || formData.policyTenure);
-    submitData.append("paymentTerm", editLead?.paymentTerm || formData.paymentTerm);
-    submitData.append("sumInsured", editLead?.sumInsured || formData.sumInsured);
-    
-    if (showHealthSection) {
-      const hasHealthData = healthDetails.policyType || 
-                            healthDetails.hasPreviousPolicy === "Yes" ||
-                            healthDetails.proposerDOB ||
-                            healthDetails.nomineeName;
-
-      if (hasHealthData) {
-        const healthData = { ...healthDetails };
-        healthData.proposerName = formData.name;
-
-        delete healthData.aadhaarFile;
-        delete healthData.panFile;
-        if (healthData.renewalDetails) {
-          delete healthData.renewalDetails.uploadPolicy;
-        }
-        if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map(
-            ({ uploadPYP, ...rest }) => rest
-          );
-        }
-        if (healthData.members) {
-          healthData.members = healthData.members.map(
-            ({ aadhaarFile, epicFile, birthCertificate, ...rest }) => {
-              const member = { ...rest };
-              if (!member.wantRider) delete member.wantRider;
-              if (!member.selectedRider) delete member.selectedRider;
-              if (member.riderDetails) {
-                const rd = { ...member.riderDetails };
-                ['asthma', 'diabetes', 'hypertension', 'hyperlipidaemia'].forEach((k) => {
-                  if (!rd[k]) delete rd[k];
-                });
-                member.riderDetails = rd;
-              }
-              return member;
-            }
-          );
-        }
-
-        if (!healthData.policyType) delete healthData.policyType;
-        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-        if (!healthData.proposerDOB) delete healthData.proposerDOB;
-        if (!healthData.nomineeName) delete healthData.nomineeName;
-        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-        if (!healthData.panNumber) delete healthData.panNumber;
-        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-        if (Object.keys(healthData).length > 0) {
-          submitData.append("healthDetails", JSON.stringify(healthData));
-        }
-      }
-    }
-
-    if (showMotorSection) {
-      const hasMotorData = motorDetails.vehicleType || 
-                           motorDetails.previousInsuranceStatus ||
-                           motorDetails.registrationNumber ||
-                           motorDetails.insuranceType;
-      
-      if (hasMotorData) {
-        const motorData = { ...motorDetails };
-        
-        if (!motorData.vehicleType) delete motorData.vehicleType;
-        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-        if (!motorData.registrationNumber) delete motorData.registrationNumber;
-        if (!motorData.insuranceType) delete motorData.insuranceType;
-        if (!motorData.claimTaken) delete motorData.claimTaken;
-        if (!motorData.addOnRequired) delete motorData.addOnRequired;
-        
-        if (Object.keys(motorData).length > 0) {
-          submitData.append("motorDetails", JSON.stringify(motorData));
-        }
-      }
-      
-      if (motorDetails.pypFile) {
-        submitData.append("pypFile", motorDetails.pypFile);
-      }
-      if (motorDetails.rcFrontFile) {
-        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-      }
-      if (motorDetails.rcBackFile) {
-        submitData.append("rcBackFile", motorDetails.rcBackFile);
-      }
-      if (motorDetails.chesisPhoto) {
-        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-      }
-      if (motorDetails.invoiceCopy) {
-        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
-      }
-    }
-
-    if (showElectronicSection) {
-      const hasElectronicData = electronicDetails.deviceType || 
-                                electronicDetails.dateOfPurchase || 
-                                electronicDetails.purchaseValue;
-      
-      if (hasElectronicData) {
-        const electronicData = { ...electronicDetails };
-        
-        delete electronicData.aadhaarFile;
-        delete electronicData.panFile;
-        
-        if (!electronicData.deviceType) delete electronicData.deviceType;
-        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-        
-        if (Object.keys(electronicData).length > 0) {
-          submitData.append("electronicDetails", JSON.stringify(electronicData));
-        }
-      }
-    }
-
-    const token = localStorage.getItem("token");
-    try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
-      });
-
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-        setShowEditModal(false);
-        setEditLead(null);
-        alert("Lead updated successfully!");
-      } else {
-        const error = await res.json();
-        setValidationPopup({
-          show: true,
-          errors: [{ field: "general", message: error.error || error.message || "Update failed" }]
-        });
-      }
-    } catch (err) {
-      console.error("Update error:", err);
-      setValidationPopup({
-        show: true,
-        errors: [{ field: "general", message: "Error: " + err.message }]
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ============================================================
-  // OPEN EDIT MODAL (User Version - No Workflow)
-  // ============================================================
-  const openEditModal = (lead) => {
-    setEditLead(lead);
-    
-    setFormData({
-      name: lead.name || "",
-      email: lead.email || "",
-      mobileNo: lead.mobileNo || "",
-      gender: lead.gender || "",
-      source: lead.source || "",
-      remarks: lead.remarks || "",
-      lob: lead.lob || "",
-      pinCode: lead.pinCode || "",
-      state: lead.state || "",
-      city: lead.city || "",
-      sourceDependentValue: lead.sourceDependentValue || "",
-      policyTenure: lead.policyTenure || "",
-      paymentTerm: lead.paymentTerm || "",
-      sumInsured: lead.sumInsured || "",
-    });
-    
-    if (lead.healthDetails) {
-      setHealthDetails({
-        ...lead.healthDetails,
-        aadhaarFile: null,
-        panFile: null,
-        previousPolicyFile: null,
-        members: lead.healthDetails.members || [],
-      });
-      if (lead.healthDetails.policyType === "Floater") {
-        setShowFloaterMembers(true);
-        setShowSeniorOneDOB(true);
-      }
-      if (lead.healthDetails.hasPreviousPolicy === "Yes") {
-        setShowPreviousPolicyPopup(true);
-        if (lead.healthDetails.previousPolicyCase === "Renew Case") {
-          setShowRenewalFields(true);
-        } else if (lead.healthDetails.previousPolicyCase === "Portability Case") {
-          setShowPortabilityFields(true);
-        } else if (lead.healthDetails.previousPolicyCase === "Fresh Case") {
-          setShowFreshCaseFields(true);
-        }
-      }
-    }
-    
-    if (lead.motorDetails) {
-      setMotorDetails(lead.motorDetails);
-    }
-    
-    if (lead.electronicDetails) {
-      setElectronicDetails(lead.electronicDetails);
-    }
-    
-    detectLOB(lead.lob);
-    
-    setShowEditModal(true);
   };
 
   // ============================================================
@@ -3759,7 +3454,7 @@ function UserLeadTable() {
   };
 
   // ============================================================
-  // RENDER MOTOR FORM - COMPLETE (Same as before)
+  // RENDER MOTOR FORM
   // ============================================================
   const renderMotorForm = () => {
     const maxDate = getMaxDate();
@@ -3793,7 +3488,6 @@ function UserLeadTable() {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Vehicle Type */}
           <div>
             <label className="text-sm font-medium text-gray-700">Vehicle Type <span className="text-red-500">*</span></label>
             <select
@@ -3808,7 +3502,6 @@ function UserLeadTable() {
             {validationErrors.vehicleType && <p className="text-red-500 text-xs mt-1">{validationErrors.vehicleType}</p>}
           </div>
 
-          {/* Previous Insurance Status */}
           <div>
             <label className="text-sm font-medium text-gray-700">Previous Insurance Status <span className="text-red-500">*</span></label>
             <select
@@ -3823,7 +3516,6 @@ function UserLeadTable() {
             {validationErrors.previousInsuranceStatus && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsuranceStatus}</p>}
           </div>
 
-          {/* Registration Number - Only for non-New vehicles */}
           {!showNewVehicleFields && (
             <div>
               <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
@@ -3839,7 +3531,6 @@ function UserLeadTable() {
             </div>
           )}
 
-          {/* Auto-fetched RTO Code - Only for non-New vehicles */}
           {!showNewVehicleFields && motorDetails.autoRtoCode && (
             <div>
               <label className="text-sm font-medium text-gray-700">RTO Code (Auto-fetched)</label>
@@ -3852,7 +3543,6 @@ function UserLeadTable() {
             </div>
           )}
 
-          {/* Insurance Type */}
           <div className={showNewVehicleFields ? "lg:col-span-3" : ""}>
             <label className="text-sm font-medium text-gray-700">Insurance Type <span className="text-red-500">*</span></label>
             <select
@@ -3887,7 +3577,6 @@ function UserLeadTable() {
           </div>
         </div>
 
-        {/* New Vehicle Details Section */}
         {showNewVehicleFields && (
           <div className="mt-4 border-t border-blue-200 pt-4">
             <h4 className="text-md font-semibold text-blue-600 mb-3 flex items-center gap-2">
@@ -4029,7 +3718,6 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* Active Policy Fields */}
         {showActiveFields && (
           <div className="mt-4 border-t border-green-200 pt-4">
             <h4 className="text-md font-semibold text-green-600 mb-3 flex items-center gap-2">
@@ -4173,7 +3861,6 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* SAOD Specific Fields */}
         {showSAODFields && showActiveFields && (
           <div className="mt-4 border-t border-purple-200 pt-4">
             <h5 className="text-sm font-semibold text-purple-600 mb-3">SAOD (On Damage) Details</h5>
@@ -4251,7 +3938,6 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* TP Insurance Fields */}
         {showTPFields && (
           <div className="mt-4 border-t border-orange-200 pt-4">
             <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
@@ -4271,7 +3957,6 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* Add-On Section - For all types except TP */}
         {!isTP && (
           <div className="mt-4 border-t border-pink-200 pt-4">
             <h5 className="text-sm font-semibold text-pink-600 mb-3 flex items-center gap-2">
@@ -4338,7 +4023,6 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* TP Insurance - Add-On automatically set to No */}
         {isTP && (
           <div className="mt-4 border-t border-orange-200 pt-4">
             <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
@@ -4353,11 +4037,9 @@ function UserLeadTable() {
           </div>
         )}
 
-        {/* Uploads Section */}
         <div className="mt-4 border-t border-gray-200 pt-4">
           <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* PYP Upload - Show for ALL statuses */}
             <div>
               <label className="text-sm font-medium text-gray-700">
                 Upload PYP 
@@ -4374,7 +4056,6 @@ function UserLeadTable() {
               {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
             </div>
 
-            {/* RC Front Upload - Show for ALL statuses */}
             <div>
               <label className="text-sm font-medium text-gray-700">
                 RC Front Upload
@@ -4391,7 +4072,6 @@ function UserLeadTable() {
               {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
             </div>
 
-            {/* RC Back Upload - Show for ALL statuses */}
             <div>
               <label className="text-sm font-medium text-gray-700">
                 RC Back Upload
@@ -4410,14 +4090,13 @@ function UserLeadTable() {
           </div>
         </div>
 
-        {/* Add-On Modal */}
         {renderAddOnModal()}
       </div>
     );
   };
 
   // ============================================================
-  // RENDER ELECTRONIC FORM - COMPLETE
+  // RENDER ELECTRONIC FORM
   // ============================================================
   const renderElectronicForm = () => {
     const isDeviceOlderThan15Days = () => {
@@ -4797,62 +4476,62 @@ function UserLeadTable() {
                 </select>
               </div>
 
-             {sourceDependentField && (
-  <div>
-    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-    {formData.source === "Employee" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Employee</option>
-        {employees.map((emp) => (
-          <option key={emp._id} value={emp.fullName || emp.username}>
-            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : formData.source === "Channel Partner" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Channel Partner</option>
-        {channelPartners.map((partner) => (
-          <option key={partner._id} value={partner.fullName || partner.username}>
-            {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : formData.source === "Store" ? (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder="Enter Store Name"
-      />
-    ) : formData.source === "Social Media" ? (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder="Enter Social Media Source"
-      />
-    ) : formData.source === "Other" ? (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder="Enter Other Source"
-      />
-    ) : null}
-  </div>
-)}
+              {sourceDependentField && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+                  {formData.source === "Employee" ? (
+                    <select
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select Employee</option>
+                      {employees.map((emp) => (
+                        <option key={emp._id} value={emp.fullName || emp.username}>
+                          {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : formData.source === "Channel Partner" ? (
+                    <select
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                    >
+                      <option value="">Select Channel Partner</option>
+                      {channelPartners.map((partner) => (
+                        <option key={partner._id} value={partner.fullName || partner.username}>
+                          {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  ) : formData.source === "Store" ? (
+                    <input
+                      type="text"
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter Store Name"
+                    />
+                  ) : formData.source === "Social Media" ? (
+                    <input
+                      type="text"
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter Social Media Source"
+                    />
+                  ) : formData.source === "Other" ? (
+                    <input
+                      type="text"
+                      value={formData.sourceDependentValue}
+                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+                      className="w-full p-2 border border-gray-300 rounded-lg"
+                      placeholder="Enter Other Source"
+                    />
+                  ) : null}
+                </div>
+              )}
 
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
@@ -4894,312 +4573,6 @@ function UserLeadTable() {
               </button>
               <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
                 {isSubmitting ? "Creating..." : <><FaCheck /> Create Lead</>}
-              </button>
-            </div>
-          </form>
-        </motion.div>
-      </motion.div>
-    );
-  };
-
-  // ============================================================
-  // RENDER EDIT MODAL (User Version - No Workflow)
-  // ============================================================
-  const renderEditModal = () => {
-    const hasErrors = Object.keys(validationErrors).length > 0;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto"
-        onClick={() => setShowEditModal(false)}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl p-6 max-w-6xl max-h-[90vh] overflow-y-auto w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <FaEdit className="text-indigo-600" /> Edit Lead
-            </h2>
-            <button onClick={() => setShowEditModal(false)} className="text-gray-500 hover:text-gray-700">
-              <FaTimes className="h-5 w-5" />
-            </button>
-          </div>
-
-          {hasErrors && (
-            <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-start gap-2">
-                <FaExclamationCircle className="text-red-500 h-5 w-5 mt-0.5" />
-                <div>
-                  <p className="font-medium text-red-700">Please fix the following errors:</p>
-                  <ul className="list-disc list-inside text-sm text-red-600 mt-1">
-                    {Object.entries(validationErrors).map(([key, error]) => (
-                      <li key={key}>{error}</li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={handleUpdateLead}>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-gray-50 p-4 rounded-lg mb-4">
-              <div><span className="font-medium">Lead Code:</span> {editLead?.leadCode}</div>
-              <div><span className="font-medium">Created:</span> {editLead?.createdAt ? new Date(editLead.createdAt).toLocaleDateString() : "-"}</div>
-              <div><span className="font-medium">Current Status:</span> 
-                <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
-                  editLead?.status === "Open" ? "bg-yellow-100 text-yellow-800" :
-                  editLead?.status === "Policy Issued" ? "bg-emerald-100 text-emerald-800" :
-                  "bg-blue-100 text-blue-800"
-                }`}>{editLead?.status}</span>
-              </div>
-              <div><span className="font-medium">LOB:</span> {editLead?.lob}</div>
-            </div>
-
-            <h3 className="text-md font-semibold text-gray-700 mb-3">Basic Information</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Name <span className="text-red-500">*</span></label>
-                <input
-                  name="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: toUpperCase(e.target.value) })}
-                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.name ? 'border-red-500' : 'border-gray-300'}`}
-                  required
-                />
-                {validationErrors.name && <p className="text-red-500 text-xs mt-1">{validationErrors.name}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Gender</label>
-                <select
-                  value={formData.gender}
-                  onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {GENDER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Mobile Number <span className="text-red-500">*</span></label>
-                <input
-                  name="mobileNo"
-                  type="text"
-                  value={formData.mobileNo}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    if (val.length <= 10) setFormData({ ...formData, mobileNo: val });
-                  }}
-                  maxLength="10"
-                  className={`w-full p-2 border rounded-lg ${validationErrors.mobileNo ? 'border-red-500' : 'border-gray-300'}`}
-                  required
-                />
-                {validationErrors.mobileNo && <p className="text-red-500 text-xs mt-1">{validationErrors.mobileNo}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Email ID</label>
-                <input
-                  name="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.email ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {validationErrors.email && <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Pin/Zip Code</label>
-                <div className="relative">
-                  <input
-                    name="pinCode"
-                    type="text"
-                    value={formData.pinCode}
-                    onChange={(e) => {
-                      const val = e.target.value.replace(/\D/g, '');
-                      if (val.length <= 6) {
-                        setFormData(prev => ({ ...prev, pinCode: val }));
-                        if (val.length < 6) {
-                          setFormData(prev => ({ ...prev, state: "", city: "" }));
-                        }
-                      }
-                    }}
-                    maxLength="6"
-                    className={`w-full p-2 border rounded-lg pr-10 ${validationErrors.pinCode ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="Enter 6 digit PIN code"
-                  />
-                  {isFetchingPin && (
-                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                      <FaSpinner className="animate-spin text-indigo-500 h-5 w-5" />
-                    </div>
-                  )}
-                </div>
-                {formData.pinCode && validatePIN(formData.pinCode) && formData.state && (
-                  <p className="text-green-500 text-xs mt-1 flex items-center gap-1">
-                    <FaCheck className="h-3 w-3" /> {formData.city}, {formData.state}
-                  </p>
-                )}
-                {validationErrors.pinCode && <p className="text-red-500 text-xs mt-1">{validationErrors.pinCode}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">State</label>
-                <input
-                  type="text"
-                  value={formData.state}
-                  readOnly
-                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">City</label>
-                <input
-                  type="text"
-                  value={formData.city}
-                  readOnly
-                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Source</label>
-                <select
-                  value={formData.source}
-                  onChange={(e) => setFormData({ ...formData, source: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {SOURCE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-{sourceDependentField && (
-  <div>
-    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-    {formData.source === "Employee" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Employee</option>
-        {employees.map((emp) => (
-          <option key={emp._id} value={emp.fullName || emp.username}>
-            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : formData.source === "Channel Partner" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Channel Partner</option>
-        {channelPartners.map((partner) => (
-          <option key={partner._id} value={partner.fullName || partner.username}>
-            {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder={`Enter ${sourceDependentField}`}
-      />
-    )}
-  </div>
-)}
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
-                <select
-                  value={formData.policyTenure}
-                  onChange={(e) => setFormData({ ...formData, policyTenure: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {POLICY_TENURE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Payment Term</label>
-                <select
-                  value={formData.paymentTerm}
-                  onChange={(e) => setFormData({ ...formData, paymentTerm: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {PAYMENT_TERM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Sum Insured</label>
-                <select
-                  value={formData.sumInsured}
-                  onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              <div className="lg:col-span-3">
-                <label className="text-sm font-medium text-gray-700">Remarks</label>
-                <textarea
-                  value={formData.remarks}
-                  onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                  rows="2"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">LOB <span className="text-red-500">*</span></label>
-                <select
-                  name="lob"
-                  value={formData.lob}
-                  onChange={(e) => {
-                    setFormData({ ...formData, lob: e.target.value });
-                    detectLOB(e.target.value);
-                  }}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.lob ? 'border-red-500' : 'border-gray-300'}`}
-                  required
-                >
-                  <option value="">-- Select LOB --</option>
-                  {LOB_OPTIONS.map(lob => <option key={lob} value={lob}>{lob}</option>)}
-                </select>
-                {validationErrors.lob && <p className="text-red-500 text-xs mt-1">{validationErrors.lob}</p>}
-              </div>
-            </div>
-
-            {showHealthSection && renderHealthForm()}
-            {showMotorSection && renderMotorForm()}
-            {showElectronicSection && renderElectronicForm()}
-
-            {renderPreviousPolicyPopup()}
-            {renderValidationPopup()}
-
-            <div className="flex gap-4 justify-end mt-6 pt-4 border-t">
-              <button type="button" onClick={() => setShowEditModal(false)} className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400">
-                Cancel
-              </button>
-              <button type="submit" disabled={isSubmitting} className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
-                {isSubmitting ? "Updating..." : <><FaSave /> Update Lead</>}
               </button>
             </div>
           </form>
@@ -5485,9 +4858,6 @@ function UserLeadTable() {
                     <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800">
                       <FaEye className="h-5 w-5" />
                     </button>
-                    <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
-                      <FaEdit className="h-5 w-5" />
-                    </button>
                   </td>
                 </tr>
               ))}
@@ -5515,9 +4885,10 @@ function UserLeadTable() {
                     "bg-blue-100 text-blue-800"
                   }`}>{lead.status}</span>
                 </div>
-                <div className="pt-2 flex gap-3">
-                  <button onClick={() => setSelectedLead(lead)} className="text-indigo-600"><FaEye className="h-5 w-5" /></button>
-                  <button onClick={() => openEditModal(lead)} className="text-blue-600"><FaEdit className="h-5 w-5" /></button>
+                <div className="pt-2">
+                  <button onClick={() => setSelectedLead(lead)} className="text-indigo-600">
+                    <FaEye className="h-5 w-5" />
+                  </button>
                 </div>
               </div>
             </div>
@@ -5534,7 +4905,6 @@ function UserLeadTable() {
       </div>
 
       {showLeadForm && renderLeadFormModal()}
-      {showEditModal && renderEditModal()}
       {selectedLead && renderLeadDetails()}
     </div>
   );
