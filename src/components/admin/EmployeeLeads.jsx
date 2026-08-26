@@ -329,6 +329,71 @@ function EmployeeLeads() {
   };
 
   // ============================================================
+  // EMI / PAYOUT CALCULATION HELPERS - ADDED
+  // ============================================================
+  const EMI_PER_YEAR = {
+    "Monthly": 12,
+    "Quarterly": 4,
+    "Half Quarterly": 6,
+    "Half Yearly": 2,
+    "Yearly": 1,
+  };
+
+  const getTenureYears = (tenure) => {
+    if (!tenure) return 1;
+    const match = String(tenure).match(/\d+/);
+    return match ? parseInt(match[0], 10) : 1;
+  };
+
+  const computeTotalEmiCount = (paymentMode, policyTenure) => {
+    if (!paymentMode || paymentMode === "Yearly") return 0;
+    const perYear = EMI_PER_YEAR[paymentMode] || 1;
+    const years = getTenureYears(policyTenure);
+    return perYear * years;
+  };
+
+  // Recalculates every derived field on a single insurer quote object.
+  // TDS is fixed at 2% per requirement #11.
+  const recalcInsurerQuote = (quote, policyTenure) => {
+    const q = { ...quote };
+
+    const netPremium = safeNumber(q.netPremium);
+    const gst = safeNumber(q.gst) || 18;
+    q.grossPremium = netPremium + (netPremium * gst / 100);
+
+    const emiNet = safeNumber(q.emiNetPremium);
+    const emiGst = safeNumber(q.emiGst) || 18;
+    q.emiGrossPremium = emiNet + (emiNet * emiGst / 100);
+
+    q.totalEmiCount = computeTotalEmiCount(q.paymentMode, policyTenure);
+
+    // Clamp received count to the valid range
+    let receivedCount = safeNumber(q.emiReceivedCount);
+    if (q.totalEmiCount > 0 && receivedCount > q.totalEmiCount) {
+      receivedCount = q.totalEmiCount;
+    }
+    q.emiReceivedCount = receivedCount;
+    q.grossPremiumReceived = q.emiGrossPremium * receivedCount;
+
+    const finalDiscount = safeNumber(q.finalDiscount);
+    q.payableAmount = q.grossPremium - finalDiscount;
+
+    // ---- Payout (Admin only) ----
+    const payoutSlab = safeNumber(q.payoutSlab);
+    q.totalPayoutReceivable = netPremium * payoutSlab / 100;
+    q.payoutOnEMI = emiNet * payoutSlab / 100;
+
+    const gstReturnSlab = safeNumber(q.gstReturnSlabOnEMI);
+    const gstReturnAmount = q.payoutOnEMI * gstReturnSlab / 100;
+    const tdsAmount = q.payoutOnEMI * 2 / 100; // TDS fixed at 2%
+
+    // Arshyan Payout = Insurer Payout + GST Return% - TDS 2% - Total Commission/Discount
+    q.arshyanPayout = q.payoutOnEMI + gstReturnAmount - tdsAmount - finalDiscount;
+
+    return q;
+  };
+
+  // ============================================================
   // STATE
   // ============================================================
   const [leads, setLeads] = useState([]);
@@ -567,6 +632,25 @@ function EmployeeLeads() {
       return () => clearTimeout(timer);
     }
   }, [error]);
+
+  // ============================================================
+  // AUTO-CALCULATE POLICY EXPIRY DATE FROM START DATE + TENURE
+  // ============================================================
+  useEffect(() => {
+    if (workflowDetails.policyStartDate && formData.policyTenure) {
+      const start = new Date(workflowDetails.policyStartDate);
+      if (!isNaN(start.getTime())) {
+        const years = getTenureYears(formData.policyTenure);
+        const expiry = new Date(start);
+        expiry.setFullYear(expiry.getFullYear() + years);
+        expiry.setDate(expiry.getDate() - 1); // policy runs up to the day before renewal
+        const expiryStr = expiry.toISOString().split("T")[0];
+        setWorkflowDetails(prev =>
+          prev.policyExpiryDate !== expiryStr ? { ...prev, policyExpiryDate: expiryStr } : prev
+        );
+      }
+    }
+  }, [workflowDetails.policyStartDate, formData.policyTenure]);
 
   // ============================================================
   // API CALLS
@@ -1369,6 +1453,26 @@ function EmployeeLeads() {
   // CRUD OPERATIONS
   // ============================================================
   
+  // Generic field-updater for insurer quotes
+  const updateInsurerQuote = (idx, field, value) => {
+    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+    if (!updatedQuotes[idx]) {
+      updatedQuotes[idx] = { insurerName: workflowDetails.selectedInsurers[idx] };
+    }
+    updatedQuotes[idx] = { ...updatedQuotes[idx], [field]: value };
+    updatedQuotes[idx] = recalcInsurerQuote(updatedQuotes[idx], formData.policyTenure);
+    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+  };
+
+  const updateInsurerQuoteFile = (idx, field, file) => {
+    const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
+    if (!updatedQuotes[idx]) {
+      updatedQuotes[idx] = { insurerName: workflowDetails.selectedInsurers[idx] };
+    }
+    updatedQuotes[idx] = { ...updatedQuotes[idx], [field]: file };
+    setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
+  };
+  
   // Open Edit Modal - WITH workflow details
   const handleEdit = (lead) => {
     setEditLead(lead);
@@ -1462,13 +1566,18 @@ function EmployeeLeads() {
       });
     }
 
-    // Workflow Details - ADDED
+    // Workflow Details - ADDED with recalc on load
+    const loadedTenure = lead.policyTenure || formData.policyTenure;
     if (lead.workflowDetails) {
       setWorkflowDetails({
         status: lead.workflowDetails.status || lead.status || "Open",
         quoteNumber: lead.workflowDetails.quoteNumber || "",
         selectedInsurers: lead.workflowDetails.selectedInsurers || [],
-        insurerQuotes: lead.workflowDetails.insurerQuotes || [],
+        // FIX: recalc every quote on load so derived fields (gross, EMI count,
+        // payout figures) stay correct even if tenure/mode changed since save
+        insurerQuotes: (lead.workflowDetails.insurerQuotes || []).map((q) =>
+          recalcInsurerQuote({ ...q }, loadedTenure)
+        ),
         paymentStatus: lead.workflowDetails.paymentStatus || "",
         paymentUrl: lead.workflowDetails.paymentUrl || "",
         utrNumber: lead.workflowDetails.utrNumber || "",
@@ -1508,277 +1617,289 @@ function EmployeeLeads() {
   };
 
   // Update Lead - WITH workflow details
-  const handleUpdate = async (e) => {
-    e.preventDefault();
-    
-    if (!validateAllFields()) {
-      return;
-    }
-    
-    setIsSubmitting(true);
-    setError(null);
+const handleUpdate = async (e) => {
+  e.preventDefault();
+  
+  if (!validateAllFields()) {
+    return;
+  }
+  
+  setIsSubmitting(true);
+  setError(null);
 
-    const submitData = new FormData();
-    
-    // Basic fields
-    submitData.append("name", formData.name);
-    submitData.append("email", formData.email);
-    submitData.append("mobileNo", formData.mobileNo);
-    submitData.append("gender", formData.gender);
-    submitData.append("source", formData.source);
-    submitData.append("remarks", formData.remarks);
-    submitData.append("lob", formData.lob);
-    submitData.append("pinCode", formData.pinCode);
-    submitData.append("state", formData.state);
-    submitData.append("city", formData.city);
-    submitData.append("sourceDependentValue", formData.sourceDependentValue);
-    submitData.append("policyTenure", formData.policyTenure);
-    submitData.append("paymentTerm", formData.paymentTerm);
-    submitData.append("sumInsured", formData.sumInsured);
-    submitData.append("status", workflowDetails.status || editLead?.status || "Open");
-    
-    // Health Details
-    if (showHealthSection) {
-      const hasHealthData = healthDetails.policyType || 
-                            healthDetails.hasPreviousPolicy === "Yes" ||
-                            healthDetails.proposerDOB ||
-                            healthDetails.nomineeName;
+  const submitData = new FormData();
+  
+  // Basic fields
+  submitData.append("name", formData.name);
+  submitData.append("email", formData.email);
+  submitData.append("mobileNo", formData.mobileNo);
+  submitData.append("gender", formData.gender);
+  submitData.append("source", formData.source);
+  submitData.append("remarks", formData.remarks);
+  submitData.append("lob", formData.lob);
+  submitData.append("pinCode", formData.pinCode);
+  submitData.append("state", formData.state);
+  submitData.append("city", formData.city);
+  submitData.append("sourceDependentValue", formData.sourceDependentValue);
+  submitData.append("policyTenure", formData.policyTenure);
+  submitData.append("paymentTerm", formData.paymentTerm);
+  submitData.append("sumInsured", formData.sumInsured);
+  submitData.append("status", workflowDetails.status || editLead?.status || "Open");
+  
+  // Health Details
+  if (showHealthSection) {
+    const hasHealthData = healthDetails.policyType || 
+                          healthDetails.hasPreviousPolicy === "Yes" ||
+                          healthDetails.proposerDOB ||
+                          healthDetails.nomineeName;
 
-      if (hasHealthData) {
-        const healthData = { ...healthDetails };
-        healthData.proposerName = formData.name;
+    if (hasHealthData) {
+      const healthData = { ...healthDetails };
+      healthData.proposerName = formData.name;
 
-        // Strip File objects
-        if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
-        if (healthData.panFile instanceof File) delete healthData.panFile;
-        if (healthData.renewalDetails?.uploadPolicy instanceof File) {
-          delete healthData.renewalDetails.uploadPolicy;
-        }
-        if (healthData.portabilityDetails) {
-          healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
-            const clean = { ...detail };
-            if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
-            return clean;
-          });
-        }
-        if (healthData.members) {
-          healthData.members = healthData.members.map((member) => {
-            const clean = { ...member };
-            if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
-            if (clean.epicFile instanceof File) delete clean.epicFile;
-            if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
-            return clean;
-          });
-        }
-
-        if (!healthData.policyType) delete healthData.policyType;
-        if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
-        if (!healthData.proposerDOB) delete healthData.proposerDOB;
-        if (!healthData.nomineeName) delete healthData.nomineeName;
-        if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
-        if (!healthData.panNumber) delete healthData.panNumber;
-        if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
-        if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
-        if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
-        if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
-
-        if (Object.keys(healthData).length > 0) {
-          submitData.append("healthDetails", JSON.stringify(healthData));
-        }
+      // Strip File objects
+      if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
+      if (healthData.panFile instanceof File) delete healthData.panFile;
+      if (healthData.renewalDetails?.uploadPolicy instanceof File) {
+        delete healthData.renewalDetails.uploadPolicy;
       }
-    }
-
-    // Motor Details
-    if (showMotorSection) {
-      const hasMotorData = motorDetails.vehicleType || 
-                           motorDetails.previousInsuranceStatus ||
-                           motorDetails.registrationNumber ||
-                           motorDetails.insuranceType;
-      
-      if (hasMotorData) {
-        const motorData = { ...motorDetails };
-        
-        ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
-          if (motorData[f] instanceof File) delete motorData[f];
+      if (healthData.portabilityDetails) {
+        healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
+          const clean = { ...detail };
+          if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+          return clean;
         });
-        
-        if (!motorData.vehicleType) delete motorData.vehicleType;
-        if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
-        if (!motorData.registrationNumber) delete motorData.registrationNumber;
-        if (!motorData.insuranceType) delete motorData.insuranceType;
-        if (!motorData.claimTaken) delete motorData.claimTaken;
-        if (!motorData.addOnRequired) delete motorData.addOnRequired;
-        
-        if (Object.keys(motorData).length > 0) {
-          submitData.append("motorDetails", JSON.stringify(motorData));
-        }
       }
-      
-      // Motor file uploads
-      if (motorDetails.pypFile instanceof File) {
-        submitData.append("pypFile", motorDetails.pypFile);
+      if (healthData.members) {
+        healthData.members = healthData.members.map((member) => {
+          const clean = { ...member };
+          if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+          if (clean.epicFile instanceof File) delete clean.epicFile;
+          if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
+          return clean;
+        });
       }
-      if (motorDetails.rcFrontFile instanceof File) {
-        submitData.append("rcFrontFile", motorDetails.rcFrontFile);
-      }
-      if (motorDetails.rcBackFile instanceof File) {
-        submitData.append("rcBackFile", motorDetails.rcBackFile);
-      }
-      if (motorDetails.chesisPhoto instanceof File) {
-        submitData.append("chesisPhoto", motorDetails.chesisPhoto);
-      }
-      if (motorDetails.invoiceCopy instanceof File) {
-        submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+
+      if (!healthData.policyType) delete healthData.policyType;
+      if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
+      if (!healthData.proposerDOB) delete healthData.proposerDOB;
+      if (!healthData.nomineeName) delete healthData.nomineeName;
+      if (!healthData.aadhaarNumber) delete healthData.aadhaarNumber;
+      if (!healthData.panNumber) delete healthData.panNumber;
+      if (!healthData.proposerIsMember) delete healthData.proposerIsMember;
+      if (!healthData.previousPolicyCase) delete healthData.previousPolicyCase;
+      if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
+      if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
+
+      if (Object.keys(healthData).length > 0) {
+        submitData.append("healthDetails", JSON.stringify(healthData));
       }
     }
+  }
 
-    // Electronic Details
-    if (showElectronicSection) {
-      const hasElectronicData = electronicDetails.deviceType || 
-                                electronicDetails.dateOfPurchase || 
-                                electronicDetails.purchaseValue;
+  // Motor Details
+  if (showMotorSection) {
+    const hasMotorData = motorDetails.vehicleType || 
+                         motorDetails.previousInsuranceStatus ||
+                         motorDetails.registrationNumber ||
+                         motorDetails.insuranceType;
+    
+    if (hasMotorData) {
+      const motorData = { ...motorDetails };
       
-      if (hasElectronicData) {
-        const electronicData = { ...electronicDetails };
-        
-        if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
-        if (electronicData.panFile instanceof File) delete electronicData.panFile;
-        if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
-        if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
-        if (electronicData.devicePhotos) {
-          electronicData.devicePhotos = electronicData.devicePhotos.filter(
-            (p) => typeof p === "string"
-          );
-        }
-        
-        if (!electronicData.deviceType) delete electronicData.deviceType;
-        if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
-        if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
-        
-        if (Object.keys(electronicData).length > 0) {
-          submitData.append("electronicDetails", JSON.stringify(electronicData));
-        }
-      }
-      
-      // Electronic file uploads
-      if (electronicDetails.aadhaarFile instanceof File) {
-        submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
-      }
-      if (electronicDetails.panFile instanceof File) {
-        submitData.append("electronicPanFile", electronicDetails.panFile);
-      }
-      if (electronicDetails.imeiImage instanceof File) {
-        submitData.append("imeiImage", electronicDetails.imeiImage);
-      }
-      if (electronicDetails.purchaseInvoice instanceof File) {
-        submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
-      }
-      (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
-        if (photo instanceof File) {
-          submitData.append(`devicePhoto_${idx}`, photo);
-        }
+      ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
+        if (motorData[f] instanceof File) delete motorData[f];
       });
+      
+      if (!motorData.vehicleType) delete motorData.vehicleType;
+      if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
+      if (!motorData.registrationNumber) delete motorData.registrationNumber;
+      if (!motorData.insuranceType) delete motorData.insuranceType;
+      if (!motorData.claimTaken) delete motorData.claimTaken;
+      if (!motorData.addOnRequired) delete motorData.addOnRequired;
+      
+      if (Object.keys(motorData).length > 0) {
+        submitData.append("motorDetails", JSON.stringify(motorData));
+      }
     }
+    
+    // Motor file uploads
+    if (motorDetails.pypFile instanceof File) {
+      submitData.append("pypFile", motorDetails.pypFile);
+    }
+    if (motorDetails.rcFrontFile instanceof File) {
+      submitData.append("rcFrontFile", motorDetails.rcFrontFile);
+    }
+    if (motorDetails.rcBackFile instanceof File) {
+      submitData.append("rcBackFile", motorDetails.rcBackFile);
+    }
+    if (motorDetails.chesisPhoto instanceof File) {
+      submitData.append("chesisPhoto", motorDetails.chesisPhoto);
+    }
+    if (motorDetails.invoiceCopy instanceof File) {
+      submitData.append("invoiceCopy", motorDetails.invoiceCopy);
+    }
+  }
 
-    // Health file uploads
-    if (healthDetails.aadhaarFile instanceof File) {
-      submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+  // Electronic Details
+  if (showElectronicSection) {
+    const hasElectronicData = electronicDetails.deviceType || 
+                              electronicDetails.dateOfPurchase || 
+                              electronicDetails.purchaseValue;
+    
+    if (hasElectronicData) {
+      const electronicData = { ...electronicDetails };
+      
+      if (electronicData.aadhaarFile instanceof File) delete electronicData.aadhaarFile;
+      if (electronicData.panFile instanceof File) delete electronicData.panFile;
+      if (electronicData.imeiImage instanceof File) delete electronicData.imeiImage;
+      if (electronicData.purchaseInvoice instanceof File) delete electronicData.purchaseInvoice;
+      if (electronicData.devicePhotos) {
+        electronicData.devicePhotos = electronicData.devicePhotos.filter(
+          (p) => typeof p === "string"
+        );
+      }
+      
+      if (!electronicData.deviceType) delete electronicData.deviceType;
+      if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
+      if (!electronicData.purchaseValue) delete electronicData.purchaseValue;
+      
+      if (Object.keys(electronicData).length > 0) {
+        submitData.append("electronicDetails", JSON.stringify(electronicData));
+      }
     }
-    if (healthDetails.panFile instanceof File) {
-      submitData.append("healthPanFile", healthDetails.panFile);
+    
+    // Electronic file uploads
+    if (electronicDetails.aadhaarFile instanceof File) {
+      submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
     }
-    if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
-      submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+    if (electronicDetails.panFile instanceof File) {
+      submitData.append("electronicPanFile", electronicDetails.panFile);
     }
-    (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
-      if (detail.uploadPYP instanceof File) {
-        submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+    if (electronicDetails.imeiImage instanceof File) {
+      submitData.append("imeiImage", electronicDetails.imeiImage);
+    }
+    if (electronicDetails.purchaseInvoice instanceof File) {
+      submitData.append("purchaseInvoice", electronicDetails.purchaseInvoice);
+    }
+    (electronicDetails.devicePhotos || []).forEach((photo, idx) => {
+      if (photo instanceof File) {
+        submitData.append(`devicePhoto_${idx}`, photo);
       }
     });
-    (healthDetails.members || []).forEach((member, idx) => {
-      if (member.aadhaarFile instanceof File) {
-        submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
+  }
+
+  // Health file uploads
+  if (healthDetails.aadhaarFile instanceof File) {
+    submitData.append("healthAadhaarFile", healthDetails.aadhaarFile);
+  }
+  if (healthDetails.panFile instanceof File) {
+    submitData.append("healthPanFile", healthDetails.panFile);
+  }
+  if (healthDetails.renewalDetails?.uploadPolicy instanceof File) {
+    submitData.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+  }
+  (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
+    if (detail.uploadPYP instanceof File) {
+      submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+    }
+  });
+  (healthDetails.members || []).forEach((member, idx) => {
+    if (member.aadhaarFile instanceof File) {
+      submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
+    }
+    if (member.epicFile instanceof File) {
+      submitData.append(`memberEpic_${idx}`, member.epicFile);
+    }
+    if (member.birthCertificate instanceof File) {
+      submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
+    }
+  });
+
+  // ===== WORKFLOW DETAILS - ADDED =====
+  // Clean workflow data - strip empty enum fields and File objects
+  const cleanWorkflow = { ...workflowDetails };
+  
+  // Strip empty strings for enum fields
+  if (!cleanWorkflow.paymentStatus || cleanWorkflow.paymentStatus === "") {
+    delete cleanWorkflow.paymentStatus;
+  }
+  
+  // Remove File objects
+  if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
+  if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
+  
+  // Strip File objects from insurerQuotes (upload separately) and queue them
+  if (cleanWorkflow.insurerQuotes && Array.isArray(cleanWorkflow.insurerQuotes)) {
+    cleanWorkflow.insurerQuotes = cleanWorkflow.insurerQuotes.map((quote, idx) => {
+      const cleanQuote = { ...quote };
+      if (cleanQuote.quoteUpload instanceof File) {
+        submitData.append(`insurerQuoteFile_${idx}`, cleanQuote.quoteUpload);
+        delete cleanQuote.quoteUpload; // keep existing URL string if present, else drop
       }
-      if (member.epicFile instanceof File) {
-        submitData.append(`memberEpic_${idx}`, member.epicFile);
-      }
-      if (member.birthCertificate instanceof File) {
-        submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
-      }
+      return cleanQuote;
+    });
+  }
+  
+  // Format dates for workflow
+  if (cleanWorkflow.policyIssuedOn) {
+    cleanWorkflow.policyIssuedOn = formatDateForInput(cleanWorkflow.policyIssuedOn);
+  }
+  if (cleanWorkflow.policyStartDate) {
+    cleanWorkflow.policyStartDate = formatDateForInput(cleanWorkflow.policyStartDate);
+  }
+  if (cleanWorkflow.policyExpiryDate) {
+    cleanWorkflow.policyExpiryDate = formatDateForInput(cleanWorkflow.policyExpiryDate);
+  }
+  
+  submitData.append("workflowDetails", JSON.stringify(cleanWorkflow));
+
+  // Workflow file uploads
+  if (workflowDetails.paymentSnapshot instanceof File) {
+    submitData.append("paymentSnapshot", workflowDetails.paymentSnapshot);
+  }
+  if (workflowDetails.policyCopy instanceof File) {
+    submitData.append("policyCopy", workflowDetails.policyCopy);
+  }
+
+  const token = localStorage.getItem("token");
+  if (!token) {
+    setError("No authentication token found. Please login again.");
+    setIsSubmitting(false);
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
+      method: "PUT",
+      headers: { Authorization: `Bearer ${token}` },
+      body: submitData,
     });
 
-    // ===== WORKFLOW DETAILS - ADDED =====
-    // Clean workflow data - strip empty enum fields and File objects
-    const cleanWorkflow = { ...workflowDetails };
-    
-    // Strip empty strings for enum fields
-    if (!cleanWorkflow.paymentStatus || cleanWorkflow.paymentStatus === "") {
-      delete cleanWorkflow.paymentStatus;
-    }
-    
-    // Remove File objects
-    if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
-    if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
-    
-    // Format dates for workflow
-    if (cleanWorkflow.policyIssuedOn) {
-      cleanWorkflow.policyIssuedOn = formatDateForInput(cleanWorkflow.policyIssuedOn);
-    }
-    if (cleanWorkflow.policyStartDate) {
-      cleanWorkflow.policyStartDate = formatDateForInput(cleanWorkflow.policyStartDate);
-    }
-    if (cleanWorkflow.policyExpiryDate) {
-      cleanWorkflow.policyExpiryDate = formatDateForInput(cleanWorkflow.policyExpiryDate);
-    }
-    
-    submitData.append("workflowDetails", JSON.stringify(cleanWorkflow));
-
-    // Workflow file uploads
-    if (workflowDetails.paymentSnapshot instanceof File) {
-      submitData.append("paymentSnapshot", workflowDetails.paymentSnapshot);
-    }
-    if (workflowDetails.policyCopy instanceof File) {
-      submitData.append("policyCopy", workflowDetails.policyCopy);
-    }
-
-    const token = localStorage.getItem("token");
-    if (!token) {
-      setError("No authentication token found. Please login again.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, {
-        method: "PUT",
-        headers: { Authorization: `Bearer ${token}` },
-        body: submitData,
-      });
-
-      if (res.ok) {
-        const updatedLead = await res.json();
-        setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
-        setShowEditModal(false);
-        setEditLead(null);
-        setSuccessMessage("Lead updated successfully!");
-      } else {
-        const errorData = await res.json();
-        setError(errorData.error || errorData.message || "Update failed");
-        // Show validation errors if any
-        if (errorData.errors && Array.isArray(errorData.errors)) {
-          setValidationPopup({
-            show: true,
-            errors: errorData.errors.map(err => ({ field: "general", message: err }))
-          });
-        }
+    if (res.ok) {
+      const updatedLead = await res.json();
+      setLeads((prev) => prev.map((l) => l._id === updatedLead._id ? updatedLead : l));
+      setShowEditModal(false);
+      setEditLead(null);
+      setSuccessMessage("Lead updated successfully!");
+    } else {
+      const errorData = await res.json();
+      setError(errorData.error || errorData.message || "Update failed");
+      // Show validation errors if any
+      if (errorData.errors && Array.isArray(errorData.errors)) {
+        setValidationPopup({
+          show: true,
+          errors: errorData.errors.map(err => ({ field: "general", message: err }))
+        });
       }
-    } catch (err) {
-      console.error("Update error:", err);
-      setError("Network error. Please try again.");
-    } finally {
-      setIsSubmitting(false);
     }
-  };
+  } catch (err) {
+    console.error("Update error:", err);
+    setError("Network error. Please try again.");
+  } finally {
+    setIsSubmitting(false);
+  }
+};
 
   // Delete Lead
   const handleDelete = async (leadId) => {
@@ -4091,130 +4212,219 @@ function EmployeeLeads() {
               {workflowDetails.selectedInsurers?.length > 0 && (
                 <div className="lg:col-span-3">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
-                  {workflowDetails.selectedInsurers.map((insurer, idx) => (
-                    <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
-                      <h6 className="font-medium text-indigo-600">{insurer}</h6>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
-                          <input 
-                            type="text" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter quote number"
-                            value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].quoteNumber = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
+                  {workflowDetails.selectedInsurers.map((insurer, idx) => {
+                    const quote = workflowDetails.insurerQuotes?.[idx] || {};
+                    const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly";
+
+                    return (
+                      <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                        <h6 className="font-medium text-indigo-600">{insurer}</h6>
+
+                        {/* ---- Quote No. + Upload + View ---- */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              placeholder="Enter quote number"
+                              value={quote.quoteNumber || ''}
+                              onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'quoteNumber', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                            {/* FIX: View option for existing uploaded quote */}
+                            {typeof quote.quoteUpload === "string" && quote.quoteUpload && (
+                              <div className="mb-1">
+                                <a href={quote.quoteUpload} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                                  View current quote file
+                                </a>
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file && !isPolicyIssued) updateInsurerQuoteFile(idx, 'quoteUpload', file);
+                              }}
+                            />
+                            {quote.quoteUpload instanceof File && (
+                              <p className="text-xs text-green-500 mt-1">✓ New file selected</p>
+                            )}
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                            <select
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              value={quote.paymentMode || ''}
+                              onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              <option value="Monthly">Monthly</option>
+                              <option value="Quarterly">Quarterly</option>
+                              <option value="Half Quarterly">Half Quarterly</option>
+                              <option value="Half Yearly">Half Yearly</option>
+                              <option value="Yearly">Yearly</option>
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Upload Quote</label>
-                          <input 
-                            type="file" 
-                            accept=".pdf,.jpg,.jpeg" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const file = e.target.files[0];
-                              if (file) {
-                                const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                                if (!updatedQuotes[idx]) {
-                                  updatedQuotes[idx] = { insurerName: insurer };
-                                }
-                                updatedQuotes[idx].quoteUpload = file;
-                                setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                              }
-                            }}
-                          />
-                          {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
-                            <p className="text-xs text-green-500 mt-1">✓ File selected</p>
-                          )}
+
+                        {/* ---- Full/Annual Premium: Net -> GST -> Gross ---- */}
+                        <div className="mt-3 border-t pt-2">
+                          <h6 className="text-xs font-semibold text-gray-600 mb-2">Full Policy Premium</h6>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Net Premium</label>
+                              <input
+                                type="number"
+                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={isPolicyIssued}
+                                value={quote.netPremium || ''}
+                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'netPremium', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">GST %</label>
+                              <input
+                                type="number"
+                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={isPolicyIssued}
+                                value={quote.gst ?? 18}
+                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'gst', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Gross Premium (auto)</label>
+                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                value={formatCurrency(quote.grossPremium)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                              <input
+                                type="number"
+                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={isPolicyIssued}
+                                value={quote.finalDiscount || ''}
+                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'finalDiscount', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Payable Amount (auto)</label>
+                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                value={formatCurrency(quote.payableAmount)} />
+                            </div>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Premium Amount</label>
-                          <input 
-                            type="number" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter amount"
-                            value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].premiumAmount = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Payment Mode</label>
-                          <select 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].paymentMode = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          >
-                            <option value="">Select</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Half Quarterly">Half Quarterly</option>
-                            <option value="Half Yearly">Half Yearly</option>
-                            <option value="Yearly">Yearly</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Final Discount</label>
-                          <input 
-                            type="number" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter discount"
-                            value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].finalDiscount = e.target.value;
-                              const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
-                              const discount = parseFloat(e.target.value) || 0;
-                              updatedQuotes[idx].payableAmount = premium - discount;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Payable Amount</label>
-                          <input 
-                            type="text" 
-                            readOnly 
-                            className="w-full p-1 border rounded bg-gray-100 text-sm"
-                            value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
-                          />
+
+                        {/* ---- EMI Premium (only if not Yearly) ---- */}
+                        {showEmiFields && (
+                          <div className="mt-3 border-t pt-2">
+                            <h6 className="text-xs font-semibold text-gray-600 mb-2">
+                              Premium per EMI ({quote.paymentMode})
+                            </h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">EMI Net Premium</label>
+                                <input
+                                  type="number"
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiNetPremium || ''}
+                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiNetPremium', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">EMI GST %</label>
+                                <input
+                                  type="number"
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiGst ?? 18}
+                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiGst', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">EMI Gross Premium (auto)</label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                  value={formatCurrency(quote.emiGrossPremium)} />
+                              </div>
+
+                              {/* Auto EMI-count dropdown, e.g. Monthly + 3 Years = 1..36 */}
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">EMI Received Count</label>
+                                <select
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiReceivedCount || 0}
+                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiReceivedCount', e.target.value)}
+                                >
+                                  {Array.from({ length: (quote.totalEmiCount || 0) + 1 }, (_, i) => i).map((n) => (
+                                    <option key={n} value={n}>{n}</option>
+                                  ))}
+                                </select>
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  Total EMIs for this policy: {quote.totalEmiCount || 0}
+                                </p>
+                              </div>
+                              <div className="lg:col-span-2">
+                                <label className="text-xs font-medium text-gray-700">Gross Premium Received (auto)</label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium"
+                                  value={formatCurrency(quote.grossPremiumReceived)} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* ---- Payout Section (Admin Only) ---- */}
+                        <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
+                          <h6 className="text-xs font-semibold text-amber-700 mb-2">Payout (Admin Only)</h6>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Payout Slab (%)</label>
+                              <input
+                                type="number"
+                                className="w-full p-1 border border-gray-300 rounded text-sm"
+                                value={quote.payoutSlab || ''}
+                                onChange={(e) => updateInsurerQuote(idx, 'payoutSlab', e.target.value)}
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
+                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                value={formatCurrency(quote.totalPayoutReceivable)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">PayOut on EMI (auto)</label>
+                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                value={formatCurrency(quote.payoutOnEMI)} />
+                            </div>
+                            <div>
+                              <label className="text-xs font-medium text-gray-700">GST Return Slab on EMI (%)</label>
+                              <input
+                                type="number"
+                                className="w-full p-1 border border-gray-300 rounded text-sm"
+                                value={quote.gstReturnSlabOnEMI || ''}
+                                onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
+                              />
+                            </div>
+                            <div className="lg:col-span-2">
+                              <label className="text-xs font-medium text-gray-700">
+                                Arshyan Payout (auto: PayOut+GST Return% - TDS 2% - Discount)
+                              </label>
+                              <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
+                                value={formatCurrency(quote.arshyanPayout)} />
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -4313,13 +4523,14 @@ function EmployeeLeads() {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
+                <label className="text-sm font-medium text-gray-700">Policy Expiry Date (auto)</label>
                 <input
                   type="date"
                   value={workflowDetails.policyExpiryDate}
-                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  readOnly
+                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                 />
+                <p className="text-xs text-gray-500 mt-1">Auto-calculated from Start Date + Tenure</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Policy Copy</label>
