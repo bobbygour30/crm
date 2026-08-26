@@ -244,6 +244,15 @@ function LeadTable() {
     "Yearly"
   ];
 
+  // EMI Frequency mapping
+  const EMI_FREQUENCY_PER_YEAR = {
+    "Monthly": 12,
+    "Quarterly": 4,
+    "Half Quarterly": 8,
+    "Half Yearly": 2,
+    "Yearly": 1,
+  };
+
   const SUM_INSURED_OPTIONS = [
     "3 Lakh",
     "4 Lakh",
@@ -464,6 +473,24 @@ function LeadTable() {
     purchaseInvoice: null,
   });
 
+  // ============================================================
+  // QUOTE FILES STATE
+  // ============================================================
+  const [quoteFiles, setQuoteFiles] = useState({}); // { insurerName: File }
+
+  // ============================================================
+  // PAYOUT DETAILS STATE
+  // ============================================================
+  const [payoutDetails, setPayoutDetails] = useState({
+    payoutSlabPercent: "",
+    gstReturnSlabPercent: "",
+    totalCommissionDiscount: "",
+    tdsPercent: "2",
+  });
+
+  // ============================================================
+  // WORKFLOW STATE
+  // ============================================================
   const [workflowDetails, setWorkflowDetails] = useState({
     status: "Open",
     quoteNumber: "",
@@ -632,6 +659,25 @@ useEffect(() => {
       setMotorDetails(prev => ({ ...prev, autoRtoCode: "" }));
     }
   }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
+
+  // ============================================================
+  // AUTO-CALCULATE POLICY EXPIRY DATE
+  // ============================================================
+  useEffect(() => {
+    if (workflowDetails.policyStartDate && formData.policyTenure) {
+      const startDate = new Date(workflowDetails.policyStartDate);
+      if (!isNaN(startDate.getTime())) {
+        const tenureYears = parseInt(formData.policyTenure, 10) || 1;
+        const expiry = new Date(startDate);
+        expiry.setFullYear(expiry.getFullYear() + tenureYears);
+        expiry.setDate(expiry.getDate() - 1); // last covered day
+        const formatted = expiry.toISOString().split("T")[0];
+        setWorkflowDetails(prev =>
+          prev.policyExpiryDate === formatted ? prev : { ...prev, policyExpiryDate: formatted }
+        );
+      }
+    }
+  }, [workflowDetails.policyStartDate, formData.policyTenure]);
 
   // ============================================================
   // API CALLS
@@ -1017,6 +1063,86 @@ const formatDateForInput = (dateValue) => {
       ...prev,
       renewalDetails: { ...prev.renewalDetails, [field]: value }
     }));
+  };
+
+  // ============================================================
+  // QUOTE HELPER FUNCTIONS
+  // ============================================================
+  const getInsurerQuote = (insurerName) => {
+    return (workflowDetails.insurerQuotes || []).find(q => q.insurerName === insurerName) || { insurerName };
+  };
+
+  const updateInsurerQuote = (insurerName, field, value) => {
+    setWorkflowDetails(prev => {
+      const quotes = [...(prev.insurerQuotes || [])];
+      let idx = quotes.findIndex(q => q.insurerName === insurerName);
+      if (idx === -1) {
+        quotes.push({ insurerName });
+        idx = quotes.length - 1;
+      }
+      quotes[idx] = { ...quotes[idx], [field]: value };
+      return { ...prev, insurerQuotes: quotes };
+    });
+  };
+
+  // ============================================================
+  // COMPUTE QUOTE DERIVED VALUES
+  // ============================================================
+  const computeQuoteDerived = (quote) => {
+    const netPremium = parseFloat(quote.netPremium) || 0;
+    const gstPercent = parseFloat(quote.gstPercent) || 0;
+    const grossPremium = netPremium + (netPremium * gstPercent) / 100;
+
+    const isEMI = !!quote.paymentMode && quote.paymentMode !== "Yearly";
+    let emiCount = 0, emiGrossPremium = 0;
+    let receivedNetPremium = 0, receivedGST = 0, receivedGrossPremium = 0;
+
+    if (isEMI) {
+      const tenureYears = parseInt(formData.policyTenure, 10) || 1;
+      const freq = EMI_FREQUENCY_PER_YEAR[quote.paymentMode] || 1;
+      emiCount = tenureYears * freq;
+
+      const emiNetPremium = parseFloat(quote.emiNetPremium) || 0;
+      const emiGstPercent = parseFloat(quote.emiGstPercent) || 0;
+      emiGrossPremium = emiNetPremium + (emiNetPremium * emiGstPercent) / 100;
+
+      const emiReceivedCount = parseInt(quote.emiReceivedCount, 10) || 0;
+      receivedNetPremium = emiNetPremium * emiReceivedCount;
+      receivedGST = (emiNetPremium * emiGstPercent / 100) * emiReceivedCount;
+      receivedGrossPremium = emiGrossPremium * emiReceivedCount;
+    }
+
+    const finalDiscount = parseFloat(quote.finalDiscount) || 0;
+    const payableAmount = grossPremium - finalDiscount;
+
+    return { grossPremium, isEMI, emiCount, emiGrossPremium, receivedNetPremium, receivedGST, receivedGrossPremium, payableAmount };
+  };
+
+  // ============================================================
+  // COMPUTE PAYOUT DERIVED VALUES
+  // ============================================================
+  const computePayoutDerived = () => {
+    const acceptedQuote =
+      (workflowDetails.insurerQuotes || []).find(q => q.insurerName === workflowDetails.previousInsurerName) ||
+      (workflowDetails.insurerQuotes || [])[0] || {};
+
+    const netPremium = parseFloat(acceptedQuote.netPremium) || 0;
+    const emiNetPremium = parseFloat(acceptedQuote.emiNetPremium) || 0;
+
+    const payoutSlabPercent = parseFloat(payoutDetails.payoutSlabPercent) || 0;
+    const gstReturnSlabPercent = parseFloat(payoutDetails.gstReturnSlabPercent) || 0;
+    const tdsPercent = parseFloat(payoutDetails.tdsPercent) || 2;
+    const totalCommissionDiscount = parseFloat(payoutDetails.totalCommissionDiscount) || 0;
+
+    const totalPayoutToReceive = (netPremium * payoutSlabPercent) / 100;
+    const payoutOnEMI = (emiNetPremium * payoutSlabPercent) / 100;
+
+    const insurerPayout = totalPayoutToReceive + payoutOnEMI;
+    const gstReturnAmount = (insurerPayout * gstReturnSlabPercent) / 100;
+    const tdsAmount = ((insurerPayout + gstReturnAmount) * tdsPercent) / 100;
+    const arshyanPayout = insurerPayout + gstReturnAmount - tdsAmount - totalCommissionDiscount;
+
+    return { totalPayoutToReceive, payoutOnEMI, gstReturnAmount, tdsAmount, arshyanPayout };
   };
 
   // ============================================================
@@ -1635,11 +1761,6 @@ if (showMotorSection) {
         const healthData = { ...healthDetails };
         healthData.proposerName = formData.name;
 
-        // REMOVED: delete healthData.aadhaarFile;
-        // REMOVED: delete healthData.panFile;
-        // REMOVED: delete healthData.renewalDetails.uploadPolicy;
-        // REMOVED: strip uploadPYP from portabilityDetails
-
         if (!healthData.policyType) delete healthData.policyType;
         if (!healthData.hasPreviousPolicy) delete healthData.hasPreviousPolicy;
         if (!healthData.proposerDOB) delete healthData.proposerDOB;
@@ -1702,9 +1823,6 @@ if (showMotorSection) {
       
       if (hasElectronicData) {
         const electronicData = { ...electronicDetails };
-        
-        // REMOVED: delete electronicData.aadhaarFile;
-        // REMOVED: delete electronicData.panFile;
         
         if (!electronicData.deviceType) delete electronicData.deviceType;
         if (!electronicData.dateOfPurchase) delete electronicData.dateOfPurchase;
@@ -1873,7 +1991,32 @@ const handleUpdateLead = async (e) => {
   // Remove File objects
   if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
   if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
+  
+  // Snapshot computed premium/EMI values into each quote so the backend stores final numbers
+  if (cleanWorkflow.insurerQuotes) {
+    cleanWorkflow.insurerQuotes = cleanWorkflow.insurerQuotes.map(q => {
+      const d = computeQuoteDerived(q);
+      return {
+        ...q,
+        grossPremium: d.grossPremium,
+        emiGrossPremium: d.emiGrossPremium,
+        emiCount: d.emiCount,
+        receivedNetPremium: d.receivedNetPremium,
+        receivedGST: d.receivedGST,
+        receivedGrossPremium: d.receivedGrossPremium,
+        payableAmount: d.payableAmount,
+      };
+    });
+  }
   submitData.append("workflowDetails", JSON.stringify(cleanWorkflow));
+
+  // Keep root-level dates/policy number in sync so renewal alerts keep working
+  submitData.append("policyNumber", workflowDetails.policyNumber || "");
+  submitData.append("policyStartDate", workflowDetails.policyStartDate || "");
+  submitData.append("policyExpiryDate", workflowDetails.policyExpiryDate || "");
+
+  // PayOut (admin section)
+  submitData.append("payoutDetails", JSON.stringify({ ...payoutDetails, ...computePayoutDerived() }));
 
   // ===== ACTUAL FILE UPLOADS =====
   // Motor
@@ -1907,6 +2050,14 @@ const handleUpdateLead = async (e) => {
   // Workflow files
   if (workflowDetails.paymentSnapshot instanceof File) submitData.append("paymentSnapshot", workflowDetails.paymentSnapshot);
   if (workflowDetails.policyCopy instanceof File) submitData.append("policyCopy", workflowDetails.policyCopy);
+
+  // Quote file uploads, keyed by insurer's index in insurerQuotes (name-based lookup keeps this stable)
+  Object.entries(quoteFiles).forEach(([insurerName, file]) => {
+    const idx = (cleanWorkflow.insurerQuotes || []).findIndex(q => q.insurerName === insurerName);
+    if (idx !== -1 && file instanceof File) {
+      submitData.append(`quoteFile_${idx}`, file);
+    }
+  });
 
   try {
     // CRITICAL FIX: Use leadId (string) in the URL
@@ -1972,6 +2123,17 @@ const openEditModal = (lead) => {
     policyTenure: safeLead.policyTenure || "",
     paymentTerm: safeLead.paymentTerm || "",
     sumInsured: safeLead.sumInsured || "",
+  });
+
+  // Reset quote files
+  setQuoteFiles({});
+  
+  // Reset payout details
+  setPayoutDetails({
+    payoutSlabPercent: safeLead.payoutDetails?.payoutSlabPercent || "",
+    gstReturnSlabPercent: safeLead.payoutDetails?.gstReturnSlabPercent || "",
+    totalCommissionDiscount: safeLead.payoutDetails?.totalCommissionDiscount || "",
+    tdsPercent: safeLead.payoutDetails?.tdsPercent || "2",
   });
 
   // Health - with date formatting
@@ -2144,6 +2306,7 @@ const openEditModal = (lead) => {
     policyExpiryDate: formatDateForInput(safeLead.policyExpiryDate || safeLead.workflowDetails?.policyExpiryDate),
     policyCopy: safeLead.policyCopy || safeLead.workflowDetails?.policyCopy || null,
     remarks: safeLead.remarks || safeLead.workflowDetails?.workflowRemarks || "",
+    previousInsurerName: safeLead.previousInsurerName || safeLead.workflowDetails?.previousInsurerName || "",
   });
   
   setShowInsurerQuotes(safeLead.status === "Quotation Generated" || safeLead.workflowDetails?.status === "Quotation Generated");
@@ -2250,6 +2413,8 @@ const openEditModal = (lead) => {
       devicePhotos: [],
       purchaseInvoice: null,
     });
+    setQuoteFiles({});
+    setPayoutDetails({ payoutSlabPercent: "", gstReturnSlabPercent: "", totalCommissionDiscount: "", tdsPercent: "2" });
     setShowHealthSection(false);
     setShowMotorSection(false);
     setShowElectronicSection(false);
@@ -2705,7 +2870,6 @@ const openEditModal = (lead) => {
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Upload PYP (Mandatory)</label>
-                            {/* --- UPDATED: View current file link + file input --- */}
                             {typeof detail.uploadPYP === "string" && detail.uploadPYP && (
                               <div className="mb-1">
                                 <a
@@ -2787,7 +2951,6 @@ const openEditModal = (lead) => {
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Upload Policy (Not Mandatory)</label>
-                    {/* --- UPDATED: View current file link + file input --- */}
                     {typeof healthDetails.renewalDetails.uploadPolicy === "string" && healthDetails.renewalDetails.uploadPolicy && (
                       <div className="mb-1">
                         <a
@@ -3183,7 +3346,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof healthDetails.aadhaarFile === "string" && healthDetails.aadhaarFile && (
               <div className="mb-1">
                 <a
@@ -3223,7 +3385,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof healthDetails.panFile === "string" && healthDetails.panFile && (
               <div className="mb-1">
                 <a
@@ -3807,7 +3968,6 @@ const openEditModal = (lead) => {
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
-                {/* --- UPDATED: View current file link + file input --- */}
                 {typeof motorDetails.invoiceCopy === "string" && motorDetails.invoiceCopy && (
                   <div className="mb-1">
                     <a
@@ -3833,7 +3993,6 @@ const openEditModal = (lead) => {
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
-                {/* --- UPDATED: View current file link + file input --- */}
                 {typeof motorDetails.chesisPhoto === "string" && motorDetails.chesisPhoto && (
                   <div className="mb-1">
                     <a
@@ -4193,7 +4352,6 @@ const openEditModal = (lead) => {
         Upload PYP 
         {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
       </label>
-      {/* --- UPDATED: View current file link + file input --- */}
       {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
         <div className="mb-1">
           <a
@@ -4223,7 +4381,6 @@ const openEditModal = (lead) => {
         RC Front Upload
         {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
       </label>
-      {/* --- UPDATED: View current file link + file input --- */}
       {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
         <div className="mb-1">
           <a
@@ -4253,7 +4410,6 @@ const openEditModal = (lead) => {
         RC Back Upload
         {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
       </label>
-      {/* --- UPDATED: View current file link + file input --- */}
       {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
         <div className="mb-1">
           <a
@@ -4390,7 +4546,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof electronicDetails.aadhaarFile === "string" && electronicDetails.aadhaarFile && (
               <div className="mb-1">
                 <a
@@ -4433,7 +4588,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof electronicDetails.panFile === "string" && electronicDetails.panFile && (
               <div className="mb-1">
                 <a
@@ -4473,7 +4627,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof electronicDetails.imeiImage === "string" && electronicDetails.imeiImage && (
               <div className="mb-1">
                 <a
@@ -4498,7 +4651,6 @@ const openEditModal = (lead) => {
             <label className="text-sm font-medium text-gray-700">
               Device Photos (3-4 photos from different angles showing IMEI)
             </label>
-            {/* --- UPDATED: View current file links for already uploaded photos --- */}
             {electronicDetails.devicePhotos && electronicDetails.devicePhotos.length > 0 && (
               <div className="mb-1 flex flex-wrap gap-2">
                 {electronicDetails.devicePhotos.map((photo, idx) => {
@@ -4533,7 +4685,6 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
-            {/* --- UPDATED: View current file link + file input --- */}
             {typeof electronicDetails.purchaseInvoice === "string" && electronicDetails.purchaseInvoice && (
               <div className="mb-1">
                 <a
@@ -4552,6 +4703,84 @@ const openEditModal = (lead) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] || prev.purchaseInvoice }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER: PAYOUT SECTION (Admin Only)
+  // ============================================================
+  const renderPayoutSection = () => {
+    const isAdmin = localStorage.getItem("userRole") === "Admin";
+    if (!isAdmin) return null;
+
+    const derived = computePayoutDerived();
+
+    return (
+      <div className="border-t-2 border-emerald-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-emerald-700 mb-4 flex items-center gap-2">
+          <FaMoneyBillWave /> PayOut (Admin Only)
+        </h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            <label className="text-sm font-medium text-gray-700">PayOut Slab (%)</label>
+            <input
+              type="number"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={payoutDetails.payoutSlabPercent}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, payoutSlabPercent: e.target.value }))}
+              placeholder="e.g., 15"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Total PayOut to be Received</label>
+            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.totalPayoutToReceive.toFixed(2)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">PayOut on EMI</label>
+            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.payoutOnEMI.toFixed(2)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">GST % Return Slab on EMI</label>
+            <input
+              type="number"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={payoutDetails.gstReturnSlabPercent}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, gstReturnSlabPercent: e.target.value }))}
+              placeholder="e.g., 18"
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Total Commission/Discount Made</label>
+            <input
+              type="number"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={payoutDetails.totalCommissionDiscount}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, totalCommissionDiscount: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">TDS %</label>
+            <input
+              type="number"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={payoutDetails.tdsPercent}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, tdsPercent: e.target.value }))}
+            />
+          </div>
+          <div className="lg:col-span-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+            <label className="text-sm font-semibold text-emerald-800">Arshyan Payout (Auto Calculated)</label>
+            <input
+              type="text"
+              readOnly
+              className="w-full p-2 border border-emerald-300 rounded-lg bg-white font-bold text-emerald-700 text-lg"
+              value={derived.arshyanPayout.toFixed(2)}
+            />
+            <p className="text-xs text-emerald-600 mt-1">
+              = (Insurer Payout + GST Return) − TDS ({payoutDetails.tdsPercent || 2}%) − Commission/Discount
+            </p>
           </div>
         </div>
       </div>
@@ -4620,130 +4849,172 @@ const openEditModal = (lead) => {
               {workflowDetails.selectedInsurers?.length > 0 && (
                 <div className="lg:col-span-3">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
-                  {workflowDetails.selectedInsurers.map((insurer, idx) => (
-                    <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
-                      <h6 className="font-medium text-indigo-600">{insurer}</h6>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
-                          <input 
-                            type="text" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter quote number"
-                            value={workflowDetails.insurerQuotes?.[idx]?.quoteNumber || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].quoteNumber = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
+                  {workflowDetails.selectedInsurers.map((insurer, idx) => {
+                    const quote = getInsurerQuote(insurer);
+                    const derived = computeQuoteDerived(quote);
+                    return (
+                      <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                        <h6 className="font-medium text-indigo-600">{insurer}</h6>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
+                            <input
+                              type="text"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              placeholder="Enter quote number"
+                              value={quote.quoteNumber || ''}
+                              onChange={(e) => updateInsurerQuote(insurer, 'quoteNumber', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Upload Quote</label>
+                            {typeof quote.quoteUpload === "string" && quote.quoteUpload && (
+                              <div className="mb-1">
+                                <a href={quote.quoteUpload} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                                  View current quote
+                                </a>
+                              </div>
+                            )}
+                            <input
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg"
+                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              onChange={(e) => {
+                                const file = e.target.files[0];
+                                if (file) setQuoteFiles(prev => ({ ...prev, [insurer]: file }));
+                              }}
+                            />
+                            {quoteFiles[insurer] && <p className="text-xs text-green-500 mt-1">✓ {quoteFiles[insurer].name} selected</p>}
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                            <select
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              value={quote.paymentMode || ''}
+                              onChange={(e) => updateInsurerQuote(insurer, 'paymentMode', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              {PAYMENT_TERM_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Upload Quote</label>
-                          <input 
-                            type="file" 
-                            accept=".pdf,.jpg,.jpeg" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const file = e.target.files[0];
-                              if (file) {
-                                const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                                if (!updatedQuotes[idx]) {
-                                  updatedQuotes[idx] = { insurerName: insurer };
-                                }
-                                updatedQuotes[idx].quoteUpload = file.name;
-                                setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                              }
-                            }}
-                          />
-                          {workflowDetails.insurerQuotes?.[idx]?.quoteUpload && (
-                            <p className="text-xs text-green-500 mt-1">✓ {workflowDetails.insurerQuotes[idx].quoteUpload}</p>
-                          )}
+
+                        {/* Net -> GST -> Gross (full premium) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3 pt-3 border-t border-dashed">
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Net Premium</label>
+                            <input
+                              type="number"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              value={quote.netPremium || ''}
+                              onChange={(e) => updateInsurerQuote(insurer, 'netPremium', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">GST %</label>
+                            <input
+                              type="number"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              value={quote.gstPercent || ''}
+                              onChange={(e) => updateInsurerQuote(insurer, 'gstPercent', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Gross Premium</label>
+                            <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.grossPremium.toFixed(2)} />
+                          </div>
                         </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Premium Amount</label>
-                          <input 
-                            type="number" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter amount"
-                            value={workflowDetails.insurerQuotes?.[idx]?.premiumAmount || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].premiumAmount = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Payment Mode</label>
-                          <select 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            value={workflowDetails.insurerQuotes?.[idx]?.paymentMode || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].paymentMode = e.target.value;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          >
-                            <option value="">Select</option>
-                            <option value="Monthly">Monthly</option>
-                            <option value="Quarterly">Quarterly</option>
-                            <option value="Half Quarterly">Half Quarterly</option>
-                            <option value="Half Yearly">Half Yearly</option>
-                            <option value="Yearly">Yearly</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Final Discount</label>
-                          <input 
-                            type="number" 
-                            className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                            disabled={isPolicyIssued}
-                            placeholder="Enter discount"
-                            value={workflowDetails.insurerQuotes?.[idx]?.finalDiscount || ''}
-                            onChange={(e) => {
-                              if (isPolicyIssued) return;
-                              const updatedQuotes = [...(workflowDetails.insurerQuotes || [])];
-                              if (!updatedQuotes[idx]) {
-                                updatedQuotes[idx] = { insurerName: insurer };
-                              }
-                              updatedQuotes[idx].finalDiscount = e.target.value;
-                              const premium = parseFloat(updatedQuotes[idx].premiumAmount) || 0;
-                              const discount = parseFloat(e.target.value) || 0;
-                              updatedQuotes[idx].payableAmount = premium - discount;
-                              setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
-                            }}
-                          />
-                        </div>
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Payable Amount</label>
-                          <input 
-                            type="text" 
-                            readOnly 
-                            className="w-full p-1 border rounded bg-gray-100 text-sm"
-                            value={workflowDetails.insurerQuotes?.[idx]?.payableAmount || ''}
-                          />
+
+                        {/* EMI block - only for Monthly/Quarterly/Half Quarterly/Half Yearly */}
+                        {derived.isEMI && (
+                          <div className="mt-3 pt-3 border-t border-dashed">
+                            <p className="text-xs font-semibold text-purple-600 mb-2">EMI Premium Details ({quote.paymentMode})</p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Premium per EMI (Net)</label>
+                                <input
+                                  type="number"
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiNetPremium || ''}
+                                  onChange={(e) => updateInsurerQuote(insurer, 'emiNetPremium', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">GST % on EMI</label>
+                                <input
+                                  type="number"
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiGstPercent || ''}
+                                  onChange={(e) => updateInsurerQuote(insurer, 'emiGstPercent', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Gross Premium per EMI</label>
+                                <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.emiGrossPremium.toFixed(2)} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Total EMIs ({formData.policyTenure || '1 Year'})</label>
+                                <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.emiCount} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">EMIs Received So Far</label>
+                                <select
+                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={isPolicyIssued}
+                                  value={quote.emiReceivedCount || ''}
+                                  onChange={(e) => updateInsurerQuote(insurer, 'emiReceivedCount', e.target.value)}
+                                >
+                                  <option value="">Select</option>
+                                  {Array.from({ length: derived.emiCount }, (_, i) => i + 1).map(n => (
+                                    <option key={n} value={n}>{n}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Gross Premium Received (Net)</label>
+                                <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.receivedNetPremium.toFixed(2)} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Gross Premium Received (GST)</label>
+                                <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.receivedGST.toFixed(2)} />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Gross Premium Received (Total)</label>
+                                <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm font-semibold text-green-700" value={derived.receivedGrossPremium.toFixed(2)} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3 pt-3 border-t border-dashed">
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Final Discount</label>
+                            <input
+                              type="number"
+                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={isPolicyIssued}
+                              value={quote.finalDiscount || ''}
+                              onChange={(e) => updateInsurerQuote(insurer, 'finalDiscount', e.target.value)}
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium text-gray-700">Payable Amount</label>
+                            <input type="text" readOnly className="w-full p-1 border border-gray-300 rounded bg-gray-100 text-sm" value={derived.payableAmount.toFixed(2)} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -4842,12 +5113,12 @@ const openEditModal = (lead) => {
                 />
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Policy Expiry Date</label>
+                <label className="text-sm font-medium text-gray-700">Policy Expiry Date (Auto-calculated)</label>
                 <input
                   type="date"
                   value={workflowDetails.policyExpiryDate}
-                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyExpiryDate: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  readOnly
+                  className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100"
                 />
               </div>
               <div>
@@ -5440,6 +5711,7 @@ const openEditModal = (lead) => {
             {showElectronicSection && renderElectronicForm()}
 
             {renderWorkflowForm()}
+            {renderPayoutSection()}
 
             {renderPreviousPolicyPopup()}
             {renderValidationPopup()}
