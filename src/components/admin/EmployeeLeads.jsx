@@ -239,12 +239,13 @@ function EmployeeLeads() {
   const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
   
   const PAYMENT_TERM_OPTIONS = [
-    "Monthly",
-    "Quarterly",
-    "Half Quarterly",
-    "Half Yearly",
-    "Yearly"
-  ];
+  "One Time",
+  "Monthly",
+  "Quarterly",
+  "Half Quarterly",
+  "Half Yearly",
+  "Yearly"
+];
 
   const SUM_INSURED_OPTIONS = [
     "3 Lakh",
@@ -355,43 +356,57 @@ function EmployeeLeads() {
   // Recalculates every derived field on a single insurer quote object.
   // TDS is fixed at 2% per requirement #11.
   const recalcInsurerQuote = (quote, policyTenure) => {
-    const q = { ...quote };
+  const q = { ...quote };
 
-    const netPremium = safeNumber(q.netPremium);
-    const gst = safeNumber(q.gst) || 18;
-    q.grossPremium = netPremium + (netPremium * gst / 100);
+  const netPremium = safeNumber(q.netPremium);
+  const gst = safeNumber(q.gst) || 18;
+  q.grossPremium = netPremium + (netPremium * gst / 100);
 
-    const emiNet = safeNumber(q.emiNetPremium);
-    const emiGst = safeNumber(q.emiGst) || 18;
-    q.emiGrossPremium = emiNet + (emiNet * emiGst / 100);
+  // "Yearly" and "One Time" are single-payment modes, not EMI
+  const isEMIMode = !!q.paymentMode && q.paymentMode !== "Yearly" && q.paymentMode !== "One Time";
 
-    q.totalEmiCount = computeTotalEmiCount(q.paymentMode, policyTenure);
+  const emiNet = safeNumber(q.emiNetPremium);
+  const emiGst = safeNumber(q.emiGst) || 18;
+  q.emiGrossPremium = emiNet + (emiNet * emiGst / 100);
 
-    // Clamp received count to the valid range
-    let receivedCount = safeNumber(q.emiReceivedCount);
-    if (q.totalEmiCount > 0 && receivedCount > q.totalEmiCount) {
-      receivedCount = q.totalEmiCount;
-    }
-    q.emiReceivedCount = receivedCount;
-    q.grossPremiumReceived = q.emiGrossPremium * receivedCount;
+  q.totalEmiCount = isEMIMode ? computeTotalEmiCount(q.paymentMode, policyTenure) : 0;
 
-    const finalDiscount = safeNumber(q.finalDiscount);
-    q.payableAmount = q.grossPremium - finalDiscount;
+  // Clamp received count to the valid range; force 0 outside EMI mode
+  let receivedCount = safeNumber(q.emiReceivedCount);
+  if (q.totalEmiCount > 0 && receivedCount > q.totalEmiCount) {
+    receivedCount = q.totalEmiCount;
+  }
+  if (!isEMIMode) receivedCount = 0;
+  q.emiReceivedCount = receivedCount;
+  q.grossPremiumReceived = isEMIMode ? q.emiGrossPremium * receivedCount : 0;
 
-    // ---- Payout (Admin only) ----
-    const payoutSlab = safeNumber(q.payoutSlab);
-    q.totalPayoutReceivable = netPremium * payoutSlab / 100;
-    q.payoutOnEMI = emiNet * payoutSlab / 100;
+  const finalDiscount = safeNumber(q.finalDiscount);
+  q.payableAmount = q.grossPremium - finalDiscount;
 
-    const gstReturnSlab = safeNumber(q.gstReturnSlabOnEMI);
-    const gstReturnAmount = q.payoutOnEMI * gstReturnSlab / 100;
-    const tdsAmount = q.payoutOnEMI * 2 / 100; // TDS fixed at 2%
+  // ---- Payout (Admin only) ----
+  const payoutSlab = safeNumber(q.payoutSlab);
+  q.totalPayoutReceivable = netPremium * payoutSlab / 100;
+  q.payoutOnEMI = isEMIMode ? (emiNet * payoutSlab / 100) : 0;
 
-    // Arshyan Payout = Insurer Payout + GST Return% - TDS 2% - Total Commission/Discount
-    q.arshyanPayout = q.payoutOnEMI + gstReturnAmount - tdsAmount - finalDiscount;
+  const gstReturnSlab = safeNumber(q.gstReturnSlabOnEMI);
 
-    return q;
-  };
+  // Basis for GST Return / TDS / Arshyan Payout:
+  // One Time (or Yearly) -> Total PayOut Receivable
+  // EMI mode              -> PayOut on EMI * EMIs Received
+  const receivedInsurerPayout = isEMIMode
+    ? q.payoutOnEMI * receivedCount
+    : q.totalPayoutReceivable;
+
+  q.gstReturnAmount = receivedInsurerPayout * gstReturnSlab / 100;
+  q.tdsAmount = receivedInsurerPayout * 2 / 100; // TDS fixed at 2%
+
+  // Arshyan Payout = Insurer Payout Received + GST Return - TDS 2% - Discount
+  q.arshyanPayout = receivedInsurerPayout + q.gstReturnAmount - q.tdsAmount - finalDiscount;
+
+  q.isEMIMode = isEMIMode;
+
+  return q;
+};
 
   // ============================================================
   // STATE
@@ -3354,6 +3369,17 @@ const handleUpdate = async (e) => {
               </p>
             )}
           </div>
+          {/* Sum Insured - Manual entry for Motor Insurance */}
+<div>
+  <label className="text-sm font-medium text-gray-700">Sum Insured (IDV) — Manual Entry</label>
+  <input
+    type="text"
+    value={formData.sumInsured}
+    onChange={(e) => setFormData(prev => ({ ...prev, sumInsured: e.target.value }))}
+    className="w-full p-2 border border-gray-300 rounded-lg"
+    placeholder="Enter Sum Insured manually (e.g., 5,50,000)"
+  />
+</div>
         </div>
 
         {showNewVehicleFields && (
@@ -4214,7 +4240,7 @@ const handleUpdate = async (e) => {
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
                   {workflowDetails.selectedInsurers.map((insurer, idx) => {
                     const quote = workflowDetails.insurerQuotes?.[idx] || {};
-                    const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly";
+const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quote.paymentMode !== "One Time";
 
                     return (
                       <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
@@ -4260,18 +4286,19 @@ const handleUpdate = async (e) => {
                           <div>
                             <label className="text-xs font-medium text-gray-700">Payment Mode</label>
                             <select
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
-                              value={quote.paymentMode || ''}
-                              onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
-                            >
-                              <option value="">Select</option>
-                              <option value="Monthly">Monthly</option>
-                              <option value="Quarterly">Quarterly</option>
-                              <option value="Half Quarterly">Half Quarterly</option>
-                              <option value="Half Yearly">Half Yearly</option>
-                              <option value="Yearly">Yearly</option>
-                            </select>
+  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+  disabled={isPolicyIssued}
+  value={quote.paymentMode || ''}
+  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
+>
+  <option value="">Select</option>
+  <option value="One Time">One Time</option>
+  <option value="Monthly">Monthly</option>
+  <option value="Quarterly">Quarterly</option>
+  <option value="Half Quarterly">Half Quarterly</option>
+  <option value="Half Yearly">Half Yearly</option>
+  <option value="Yearly">Yearly</option>
+</select>
                           </div>
                         </div>
 
@@ -4381,47 +4408,72 @@ const handleUpdate = async (e) => {
                           </div>
                         )}
 
-                        {/* ---- Payout Section (Admin Only) ---- */}
-                        <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
-                          <h6 className="text-xs font-semibold text-amber-700 mb-2">Payout (Admin Only)</h6>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Payout Slab (%)</label>
-                              <input
-                                type="number"
-                                className="w-full p-1 border border-gray-300 rounded text-sm"
-                                value={quote.payoutSlab || ''}
-                                onChange={(e) => updateInsurerQuote(idx, 'payoutSlab', e.target.value)}
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
-                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
-                                value={formatCurrency(quote.totalPayoutReceivable)} />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">PayOut on EMI (auto)</label>
-                              <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
-                                value={formatCurrency(quote.payoutOnEMI)} />
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">GST Return Slab on EMI (%)</label>
-                              <input
-                                type="number"
-                                className="w-full p-1 border border-gray-300 rounded text-sm"
-                                value={quote.gstReturnSlabOnEMI || ''}
-                                onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
-                              />
-                            </div>
-                            <div className="lg:col-span-2">
-                              <label className="text-xs font-medium text-gray-700">
-                                Arshyan Payout (auto: PayOut+GST Return% - TDS 2% - Discount)
-                              </label>
-                              <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
-                                value={formatCurrency(quote.arshyanPayout)} />
-                            </div>
-                          </div>
-                        </div>
+                        {/* ---- Payout Section (Admin Only, and only once Policy Issued) ---- */}
+{(localStorage.getItem("userRole") === "Admin") && isPolicyIssued && (
+  <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
+    <h6 className="text-xs font-semibold text-amber-700 mb-2">Payout (Admin Only)</h6>
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      <div>
+        <label className="text-xs font-medium text-gray-700">Payout Slab (%)</label>
+        <input
+          type="number"
+          className="w-full p-1 border border-gray-300 rounded text-sm"
+          value={quote.payoutSlab || ''}
+          onChange={(e) => updateInsurerQuote(idx, 'payoutSlab', e.target.value)}
+        />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
+        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+          value={formatCurrency(quote.totalPayoutReceivable)} />
+      </div>
+
+      {/* Only show PayOut on EMI when the quote's payment mode is actually EMI-based */}
+      {quote.isEMIMode && (
+        <div>
+          <label className="text-xs font-medium text-gray-700">PayOut on EMI (auto)</label>
+          <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+            value={formatCurrency(quote.payoutOnEMI)} />
+        </div>
+      )}
+
+      <div>
+        <label className="text-xs font-medium text-gray-700">GST Return Slab (%)</label>
+        <input
+          type="number"
+          className="w-full p-1 border border-gray-300 rounded text-sm"
+          value={quote.gstReturnSlabOnEMI || ''}
+          onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
+        />
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-gray-700">GST Return Amount (auto)</label>
+        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-emerald-700"
+          value={formatCurrency(quote.gstReturnAmount)} />
+      </div>
+
+      <div>
+        <label className="text-xs font-medium text-gray-700">TDS Amount @ 2% (auto)</label>
+        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-red-600"
+          value={formatCurrency(quote.tdsAmount)} />
+        <p className="text-[10px] text-gray-500 mt-0.5">
+          {quote.isEMIMode
+            ? "= PayOut on EMI × EMIs Received × 2%"
+            : "= Total PayOut Receivable × 2%"}
+        </p>
+      </div>
+
+      <div className="lg:col-span-3">
+        <label className="text-xs font-medium text-gray-700">
+          Arshyan Payout (auto: Insurer Payout Received + GST Return − TDS 2% − Discount)
+        </label>
+        <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
+          value={formatCurrency(quote.arshyanPayout)} />
+      </div>
+    </div>
+  </div>
+)}
                       </div>
                     );
                   })}
