@@ -236,13 +236,14 @@ function LeadTable() {
 
   const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
   
-  const PAYMENT_TERM_OPTIONS = [
-    "Monthly",
-    "Quarterly",
-    "Half Quarterly",
-    "Half Yearly",
-    "Yearly"
-  ];
+ const PAYMENT_TERM_OPTIONS = [
+  "One Time",
+  "Monthly",
+  "Quarterly",
+  "Half Quarterly",
+  "Half Yearly",
+  "Yearly"
+];
 
   // EMI Frequency mapping
   const EMI_FREQUENCY_PER_YEAR = {
@@ -274,6 +275,8 @@ function LeadTable() {
     "4 Crore",
     "5 Crore"
   ];
+
+  
 
   const RIDER_OPTIONS = [
     "Insta Shield",
@@ -1085,65 +1088,81 @@ const formatDateForInput = (dateValue) => {
     });
   };
 
-  // ============================================================
-  // COMPUTE QUOTE DERIVED VALUES
-  // ============================================================
-  const computeQuoteDerived = (quote) => {
-    const netPremium = parseFloat(quote.netPremium) || 0;
-    const gstPercent = parseFloat(quote.gstPercent) || 0;
-    const grossPremium = netPremium + (netPremium * gstPercent) / 100;
+ const computeQuoteDerived = (quote) => {
+  const netPremium = parseFloat(quote.netPremium) || 0;
+  const gstPercent = parseFloat(quote.gstPercent) || 0;
+  const grossPremium = netPremium + (netPremium * gstPercent) / 100;
 
-    const isEMI = !!quote.paymentMode && quote.paymentMode !== "Yearly";
-    let emiCount = 0, emiGrossPremium = 0;
-    let receivedNetPremium = 0, receivedGST = 0, receivedGrossPremium = 0;
+  // "Yearly" and "One Time" are single-payment modes, not EMI
+  const isEMI = !!quote.paymentMode && quote.paymentMode !== "Yearly" && quote.paymentMode !== "One Time";
+  let emiCount = 0, emiGrossPremium = 0;
+  let receivedNetPremium = 0, receivedGST = 0, receivedGrossPremium = 0;
 
-    if (isEMI) {
-      const tenureYears = parseInt(formData.policyTenure, 10) || 1;
-      const freq = EMI_FREQUENCY_PER_YEAR[quote.paymentMode] || 1;
-      emiCount = tenureYears * freq;
+  if (isEMI) {
+    const tenureYears = parseInt(formData.policyTenure, 10) || 1;
+    const freq = EMI_FREQUENCY_PER_YEAR[quote.paymentMode] || 1;
+    emiCount = tenureYears * freq;
 
-      const emiNetPremium = parseFloat(quote.emiNetPremium) || 0;
-      const emiGstPercent = parseFloat(quote.emiGstPercent) || 0;
-      emiGrossPremium = emiNetPremium + (emiNetPremium * emiGstPercent) / 100;
+    const emiNetPremium = parseFloat(quote.emiNetPremium) || 0;
+    const emiGstPercent = parseFloat(quote.emiGstPercent) || 0;
+    emiGrossPremium = emiNetPremium + (emiNetPremium * emiGstPercent) / 100;
 
-      const emiReceivedCount = parseInt(quote.emiReceivedCount, 10) || 0;
-      receivedNetPremium = emiNetPremium * emiReceivedCount;
-      receivedGST = (emiNetPremium * emiGstPercent / 100) * emiReceivedCount;
-      receivedGrossPremium = emiGrossPremium * emiReceivedCount;
-    }
+    const emiReceivedCount = parseInt(quote.emiReceivedCount, 10) || 0;
+    receivedNetPremium = emiNetPremium * emiReceivedCount;
+    receivedGST = (emiNetPremium * emiGstPercent / 100) * emiReceivedCount;
+    receivedGrossPremium = emiGrossPremium * emiReceivedCount;
+  }
 
-    const finalDiscount = parseFloat(quote.finalDiscount) || 0;
-    const payableAmount = grossPremium - finalDiscount;
+  const finalDiscount = parseFloat(quote.finalDiscount) || 0;
+  const payableAmount = grossPremium - finalDiscount;
 
-    return { grossPremium, isEMI, emiCount, emiGrossPremium, receivedNetPremium, receivedGST, receivedGrossPremium, payableAmount };
-  };
+  return { grossPremium, isEMI, emiCount, emiGrossPremium, receivedNetPremium, receivedGST, receivedGrossPremium, payableAmount };
+};
 
   // ============================================================
   // COMPUTE PAYOUT DERIVED VALUES
   // ============================================================
-  const computePayoutDerived = () => {
-    const acceptedQuote =
-      (workflowDetails.insurerQuotes || []).find(q => q.insurerName === workflowDetails.previousInsurerName) ||
-      (workflowDetails.insurerQuotes || [])[0] || {};
+ const computePayoutDerived = () => {
+  const acceptedQuote =
+    (workflowDetails.insurerQuotes || []).find(q => q.insurerName === workflowDetails.previousInsurerName) ||
+    (workflowDetails.insurerQuotes || [])[0] || {};
 
-    const netPremium = parseFloat(acceptedQuote.netPremium) || 0;
-    const emiNetPremium = parseFloat(acceptedQuote.emiNetPremium) || 0;
+  const quoteDerived = computeQuoteDerived(acceptedQuote);
+  const isEMIMode = quoteDerived.isEMI; // false for "One Time" and "Yearly"
 
-    const payoutSlabPercent = parseFloat(payoutDetails.payoutSlabPercent) || 0;
-    const gstReturnSlabPercent = parseFloat(payoutDetails.gstReturnSlabPercent) || 0;
-    const tdsPercent = parseFloat(payoutDetails.tdsPercent) || 2;
-    const totalCommissionDiscount = parseFloat(payoutDetails.totalCommissionDiscount) || 0;
+  const netPremium = parseFloat(acceptedQuote.netPremium) || 0;
+  const emiNetPremium = parseFloat(acceptedQuote.emiNetPremium) || 0;
+  const emiReceivedCount = parseInt(acceptedQuote.emiReceivedCount, 10) || 0;
 
-    const totalPayoutToReceive = (netPremium * payoutSlabPercent) / 100;
-    const payoutOnEMI = (emiNetPremium * payoutSlabPercent) / 100;
+  const payoutSlabPercent = parseFloat(payoutDetails.payoutSlabPercent) || 0;
+  const gstReturnSlabPercent = parseFloat(payoutDetails.gstReturnSlabPercent) || 0;
+  const tdsPercent = parseFloat(payoutDetails.tdsPercent) || 2;
+  const totalCommissionDiscount = parseFloat(payoutDetails.totalCommissionDiscount) || 0;
 
-    const insurerPayout = totalPayoutToReceive + payoutOnEMI;
-    const gstReturnAmount = (insurerPayout * gstReturnSlabPercent) / 100;
-    const tdsAmount = ((insurerPayout + gstReturnAmount) * tdsPercent) / 100;
-    const arshyanPayout = insurerPayout + gstReturnAmount - tdsAmount - totalCommissionDiscount;
+  const totalPayoutToReceive = (netPremium * payoutSlabPercent) / 100;
+  const payoutOnEMI = isEMIMode ? (emiNetPremium * payoutSlabPercent) / 100 : 0;
 
-    return { totalPayoutToReceive, payoutOnEMI, gstReturnAmount, tdsAmount, arshyanPayout };
+  // Basis for GST return / TDS / Arshyan payout:
+  // One Time (or Yearly) -> total payment receivable
+  // EMI mode              -> Payout on EMI * EMIs Received
+  const receivedInsurerPayout = isEMIMode
+    ? payoutOnEMI * emiReceivedCount
+    : totalPayoutToReceive;
+
+  const gstReturnAmount = (receivedInsurerPayout * gstReturnSlabPercent) / 100;
+  const tdsAmount = (receivedInsurerPayout * tdsPercent) / 100;
+  const arshyanPayout = receivedInsurerPayout + gstReturnAmount - tdsAmount - totalCommissionDiscount;
+
+  return {
+    totalPayoutToReceive,
+    payoutOnEMI,
+    receivedInsurerPayout,
+    gstReturnAmount,
+    tdsAmount,
+    arshyanPayout,
+    isEMIMode,
   };
+};
 
   // ============================================================
   // FILTER LEADS
@@ -2016,7 +2035,13 @@ const handleUpdateLead = async (e) => {
   submitData.append("policyExpiryDate", workflowDetails.policyExpiryDate || "");
 
   // PayOut (admin section)
-  submitData.append("payoutDetails", JSON.stringify({ ...payoutDetails, ...computePayoutDerived() }));
+  let payoutDerivedSafe = {};
+try {
+  payoutDerivedSafe = computePayoutDerived();
+} catch (err) {
+  console.error("Payout calculation error (ignored so update still proceeds):", err);
+}
+submitData.append("payoutDetails", JSON.stringify({ ...payoutDetails, ...payoutDerivedSafe }));
 
   // ===== ACTUAL FILE UPLOADS =====
   // Motor
@@ -3849,6 +3874,17 @@ const openEditModal = (lead) => {
               </p>
             )}
           </div>
+          {/* Sum Insured - Manual entry for Motor Insurance */}
+<div>
+  <label className="text-sm font-medium text-gray-700">Sum Insured (IDV) — Manual Entry</label>
+  <input
+    type="text"
+    value={formData.sumInsured}
+    onChange={(e) => setFormData(prev => ({ ...prev, sumInsured: e.target.value }))}
+    className="w-full p-2 border border-gray-300 rounded-lg"
+    placeholder="Enter Sum Insured manually (e.g., 5,50,000)"
+  />
+</div>
         </div>
 
         {/* New Vehicle Details Section */}
@@ -4712,80 +4748,117 @@ const openEditModal = (lead) => {
   // ============================================================
   // RENDER: PAYOUT SECTION (Admin Only)
   // ============================================================
-  const renderPayoutSection = () => {
-    const isAdmin = localStorage.getItem("userRole") === "Admin";
-    if (!isAdmin) return null;
+ const renderPayoutSection = () => {
+  const isAdmin = localStorage.getItem("userRole") === "Admin";
+  const isPolicyIssued = workflowDetails.status === "Policy Issued";
 
-    const derived = computePayoutDerived();
+  // Payout tab only for Admins, and only once the lead has reached "Policy Issued"
+  if (!isAdmin || !isPolicyIssued) return null;
 
-    return (
-      <div className="border-t-2 border-emerald-200 pt-4 mt-4">
-        <h3 className="text-lg font-semibold text-emerald-700 mb-4 flex items-center gap-2">
-          <FaMoneyBillWave /> PayOut (Admin Only)
-        </h3>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700">PayOut Slab (%)</label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              value={payoutDetails.payoutSlabPercent}
-              onChange={(e) => setPayoutDetails(prev => ({ ...prev, payoutSlabPercent: e.target.value }))}
-              placeholder="e.g., 15"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">Total PayOut to be Received</label>
-            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.totalPayoutToReceive.toFixed(2)} />
-          </div>
+  const derived = computePayoutDerived();
+
+  return (
+    <div className="border-t-2 border-emerald-200 pt-4 mt-4">
+      <h3 className="text-lg font-semibold text-emerald-700 mb-4 flex items-center gap-2">
+        <FaMoneyBillWave /> PayOut (Admin Only)
+      </h3>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div>
+          <label className="text-sm font-medium text-gray-700">PayOut Slab (%)</label>
+          <input
+            type="number"
+            className="w-full p-2 border border-gray-300 rounded-lg"
+            value={payoutDetails.payoutSlabPercent}
+            onChange={(e) => setPayoutDetails(prev => ({ ...prev, payoutSlabPercent: e.target.value }))}
+            placeholder="e.g., 15"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">Total PayOut to be Received</label>
+          <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.totalPayoutToReceive.toFixed(2)} />
+        </div>
+
+        {/* Only show PayOut on EMI when the accepted quote is actually on an EMI payment mode */}
+        {derived.isEMIMode && (
           <div>
             <label className="text-sm font-medium text-gray-700">PayOut on EMI</label>
             <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.payoutOnEMI.toFixed(2)} />
           </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">GST % Return Slab on EMI</label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              value={payoutDetails.gstReturnSlabPercent}
-              onChange={(e) => setPayoutDetails(prev => ({ ...prev, gstReturnSlabPercent: e.target.value }))}
-              placeholder="e.g., 18"
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">Total Commission/Discount Made</label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              value={payoutDetails.totalCommissionDiscount}
-              onChange={(e) => setPayoutDetails(prev => ({ ...prev, totalCommissionDiscount: e.target.value }))}
-            />
-          </div>
-          <div>
-            <label className="text-sm font-medium text-gray-700">TDS %</label>
-            <input
-              type="number"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-              value={payoutDetails.tdsPercent}
-              onChange={(e) => setPayoutDetails(prev => ({ ...prev, tdsPercent: e.target.value }))}
-            />
-          </div>
-          <div className="lg:col-span-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
-            <label className="text-sm font-semibold text-emerald-800">Arshyan Payout (Auto Calculated)</label>
-            <input
-              type="text"
-              readOnly
-              className="w-full p-2 border border-emerald-300 rounded-lg bg-white font-bold text-emerald-700 text-lg"
-              value={derived.arshyanPayout.toFixed(2)}
-            />
-            <p className="text-xs text-emerald-600 mt-1">
-              = (Insurer Payout + GST Return) − TDS ({payoutDetails.tdsPercent || 2}%) − Commission/Discount
-            </p>
-          </div>
+        )}
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">GST % Return Slab</label>
+          <input
+            type="number"
+            className="w-full p-2 border border-gray-300 rounded-lg"
+            value={payoutDetails.gstReturnSlabPercent}
+            onChange={(e) => setPayoutDetails(prev => ({ ...prev, gstReturnSlabPercent: e.target.value }))}
+            placeholder="e.g., 18"
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">GST Return Amount (Auto Calculated)</label>
+          <input
+            type="text"
+            readOnly
+            className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-medium text-emerald-700"
+            value={derived.gstReturnAmount.toFixed(2)}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">Total Commission/Discount Made</label>
+          <input
+            type="number"
+            className="w-full p-2 border border-gray-300 rounded-lg"
+            value={payoutDetails.totalCommissionDiscount}
+            onChange={(e) => setPayoutDetails(prev => ({ ...prev, totalCommissionDiscount: e.target.value }))}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">TDS %</label>
+          <input
+            type="number"
+            className="w-full p-2 border border-gray-300 rounded-lg"
+            value={payoutDetails.tdsPercent}
+            onChange={(e) => setPayoutDetails(prev => ({ ...prev, tdsPercent: e.target.value }))}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-medium text-gray-700">TDS Amount (Auto Calculated)</label>
+          <input
+            type="text"
+            readOnly
+            className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-medium text-red-600"
+            value={derived.tdsAmount.toFixed(2)}
+          />
+          <p className="text-xs text-gray-500 mt-1">
+            {derived.isEMIMode
+              ? "= PayOut on EMI × EMIs Received × TDS%"
+              : "= Total PayOut to be Received × TDS%"}
+          </p>
+        </div>
+
+        <div className="lg:col-span-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+          <label className="text-sm font-semibold text-emerald-800">Arshyan Payout (Auto Calculated)</label>
+          <input
+            type="text"
+            readOnly
+            className="w-full p-2 border border-emerald-300 rounded-lg bg-white font-bold text-emerald-700 text-lg"
+            value={derived.arshyanPayout.toFixed(2)}
+          />
+          <p className="text-xs text-emerald-600 mt-1">
+            = Insurer PayOut Received + GST Return − TDS ({payoutDetails.tdsPercent || 2}%) − Commission/Discount
+          </p>
         </div>
       </div>
-    );
-  };
+    </div>
+  );
+};
 
   // ============================================================
   // RENDER: WORKFLOW FORM (Edit Modal)
