@@ -170,37 +170,42 @@ function EmployeeLeads() {
   
   const DEVICE_TYPE_OPTIONS = ["Mobile", "Tablet", "Laptop", "Other"];
 
+  // ============================================================
+  // #4: EXPANDED INSURER LIST (Corrected typo: SHAMPOO -> SOMPO)
+  // ============================================================
   const INSURER_OPTIONS = [
-    "Bajaj Allianz General Insurance Co Ltd",
-    "Tata Aig General Insurance Co Ltd",
-    "HDFC Ergo General Insurance Co Ltd",
-    "ICICI Lombard General Insurance Co Ltd",
-    "Digit General Insurance Co Ltd",
-    "Reliance General Insurance Co Ltd",
-    "SBI General Insurance Co Ltd",
-    "Future General General Insurance Co Ltd",
-    "Magma HDI General Insurance Co Ltd",
-    "Royal Sundram General Insurance Co Ltd",
-    "Kotak Mahindra General Insurance Co Ltd",
-    "Liberty General Insurance Co Ltd",
-    "Shriram General Insurance Co Ltd",
-    "United India General Insurance Co Ltd",
-    "Oriental General Insurance Co Ltd",
-    "National General Insurance Co Ltd",
-    "New India General Insurance Co Ltd",
-    "Chola MS General Insurance Co Ltd",
-    "Universal Sompo General Insurance Co Ltd",
-    "Iffco Tokio General Insurance Co Ltd",
-    "ICICI Prudential Life Insurance",
-    "TATA AIA Life Insurance",
-    "HDFC Life Insurance",
-    "Reliance Nippon Life Insurance",
-    "Axis Max Life Insurance",
-    "Niva Bupa Health Insurance",
-    "Care Health Insurance",
-    "Star Health Insurance",
-    "Aditya Birla Health Insurance",
-    "Bajaj Allianz Life Insurance",
+    "TATA AIG GENERAL INSURANCE CO LTD",
+    "BAJAJ GENERAL INSURANCE LTD",
+    "HDFC ERGO GENERAL INSURANCE CO LTD",
+    "INDUSIND GENERAL INSURANCE CO LTD",
+    "Generali Central Insurance Co Ltd",
+    "DIGIT GENERAL INSURANCE CO LTD",
+    "KOTAK GENERAL INSURANCE CO LTD",
+    "CHOLA GENERAL INSURANCE CO LTD",
+    "SHRIRAM GENERAL INSURANCE CO LTD",
+    "MAGMA GENERAL INSURANCE CO LTD",
+    "ROYAL SUNDARAM GENERAL INSURANCE CO LTD",
+    "SBI GENERAL INSURANCE CO LTD",
+    "NATIONAL GENERAL INSURANCE LTD",
+    "UNITED INDIA GENERAL INSURANCE CO LTD",
+    "The New India Assurance Co. Ltd.",
+    "The Oriental Insurance Co. Ltd",
+    "IFFCO TOKIO GENERAL INSURANCE LTD",
+    "LIBERTY GENERAL INSURANCE CO LTD",
+    "UNIVERSAL SOMPO GENERAL INSURANCE LTD",
+    "Navi General Insurance Ltd",
+    "Raheja QBE General Insurance Co. Ltd",
+    "Acko General Insurance Ltd",
+    "Zuno General Insurance Ltd",
+    "Kshema General Insurance Ltd",
+    "ICICI LOMBARD GENERAL INSURANCE LTD",
+    "Niva Bupa Health Insurance Co Ltd",
+    "Care Health Insurance Co Ltd",
+    "Aditya Birla Health Insurance Co Ltd",
+    "Star Health and Allied Insurance",
+    "Indusind Nippon Life Insurance Co Ltd",
+    "Bharti Axa Life Insurance",
+    "Tata AIA Life Insurance",
   ];
 
   const MANUFACTURER_OPTIONS = [
@@ -649,13 +654,14 @@ function EmployeeLeads() {
   }, [error]);
 
   // ============================================================
-  // AUTO-CALCULATE POLICY EXPIRY DATE FROM START DATE + TENURE
+  // #6a: AUTO-CALCULATE POLICY EXPIRY DATE FROM START DATE + TENURE
+  // (Removed && formData.policyTenure guard; getTenureYears already defaults to 1)
   // ============================================================
   useEffect(() => {
-    if (workflowDetails.policyStartDate && formData.policyTenure) {
+    if (workflowDetails.policyStartDate) {
       const start = new Date(workflowDetails.policyStartDate);
       if (!isNaN(start.getTime())) {
-        const years = getTenureYears(formData.policyTenure);
+        const years = getTenureYears(formData.policyTenure); // already defaults to 1 internally
         const expiry = new Date(start);
         expiry.setFullYear(expiry.getFullYear() + years);
         expiry.setDate(expiry.getDate() - 1); // policy runs up to the day before renewal
@@ -819,15 +825,16 @@ function EmployeeLeads() {
   };
 
   // ============================================================
-  // FLOATER MEMBERS
+  // #1: FLOATER MEMBERS (Fixed stale state bug — accepts overrides)
   // ============================================================
-  const generateFloaterMembers = () => {
-    let adults = parseInt(healthDetails.numberOfAdults) || 0;
-    let children = parseInt(healthDetails.numberOfChildren) || 0;
+  const generateFloaterMembers = (adultsOverride, childrenOverride, proposerOverride) => {
+    let adults = parseInt(adultsOverride ?? healthDetails.numberOfAdults) || 0;
+    let children = parseInt(childrenOverride ?? healthDetails.numberOfChildren) || 0;
+    const proposerIsMember = proposerOverride ?? healthDetails.proposerIsMember;
     
     const members = [];
     
-    if (healthDetails.proposerIsMember === "Yes") {
+    if (proposerIsMember === "Yes") {
       members.push({
         id: `proposer`,
         type: 'proposer',
@@ -1631,11 +1638,22 @@ function EmployeeLeads() {
     setShowEditModal(true);
   };
 
-  // Update Lead - WITH workflow details
+  // ============================================================
+  // #2: UPDATE LEAD - with frontend guard for Policy Issued payment
+  // ============================================================
 const handleUpdate = async (e) => {
   e.preventDefault();
   
   if (!validateAllFields()) {
+    return;
+  }
+
+  // #2: Frontend guard - Policy Issued requires payment confirmation
+  if (workflowDetails.status === "Policy Issued" && !workflowDetails.paymentUrl && !workflowDetails.utrNumber) {
+    setValidationPopup({
+      show: true,
+      errors: [{ field: "general", message: "Enter a Payment URL or UTR Number (set Payment Status = Payment Done first) before marking status as Policy Issued." }]
+    });
     return;
   }
   
@@ -2252,14 +2270,17 @@ const handleUpdate = async (e) => {
                       <div key={detail.id} className="border rounded-lg p-4 bg-gray-50">
                         <h5 className="font-medium text-gray-700 mb-3">Policy {index + 1}</h5>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                          {/* #3: Portability Insurer Name - Dropdown */}
                           <div>
                             <label className="text-xs font-medium text-gray-700">Previous Insurer Name</label>
-                            <input
-                              type="text"
+                            <select
                               value={detail.insurerName}
                               onChange={(e) => handlePortabilityDetailChange(index, 'insurerName', e.target.value)}
                               className={`w-full p-2 border rounded-lg text-sm ${validationErrors[`portabilityInsurer_${index}`] ? 'border-red-500' : 'border-gray-300'}`}
-                            />
+                            >
+                              <option value="">Select Insurer</option>
+                              {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
                             {validationErrors[`portabilityInsurer_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilityInsurer_${index}`]}</p>}
                           </div>
                           <div>
@@ -2322,15 +2343,17 @@ const handleUpdate = async (e) => {
                             </select>
                             {validationErrors[`portabilitySum_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilitySum_${index}`]}</p>}
                           </div>
+                          {/* #3: Portability NCB - Dropdown */}
                           <div>
                             <label className="text-xs font-medium text-gray-700">Any CB (No Claim Bonus)</label>
-                            <input
-                              type="text"
+                            <select
                               value={detail.noClaimBonus}
                               onChange={(e) => handlePortabilityDetailChange(index, 'noClaimBonus', e.target.value)}
                               className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                              placeholder="e.g., 20%"
-                            />
+                            >
+                              <option value="">Select</option>
+                              {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Any IPD Claim taken during the period</label>
@@ -2373,15 +2396,18 @@ const handleUpdate = async (e) => {
               <div className="border rounded-lg p-4 bg-gray-50">
                 <h4 className="font-semibold text-indigo-600 mb-3">Renewal Details</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {/* #3: Renewal Insurer Name - Dropdown */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Insurer Name</label>
-                    <input
+                    <select
                       data-field="renewalInsurer"
-                      type="text"
                       value={healthDetails.renewalDetails.insurerName}
                       onChange={(e) => handleRenewalDetailChange('insurerName', e.target.value)}
                       className={`w-full p-2 border rounded-lg text-sm ${validationErrors.renewalInsurer ? 'border-red-500' : 'border-gray-300'}`}
-                    />
+                    >
+                      <option value="">Select Insurer</option>
+                      {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                     {validationErrors.renewalInsurer && <p className="text-red-500 text-xs mt-1">{validationErrors.renewalInsurer}</p>}
                   </div>
                   <div>
@@ -2530,10 +2556,12 @@ const handleUpdate = async (e) => {
               data-field="policyType"
               value={healthDetails.policyType}
               onChange={(e) => {
-                setHealthDetails(prev => ({ ...prev, policyType: e.target.value }));
-                setShowFloaterMembers(e.target.value === "Floater");
-                setShowSeniorOneDOB(e.target.value === "Floater");
-                if (e.target.value === "Floater") generateFloaterMembers();
+                const val = e.target.value;
+                setHealthDetails(prev => ({ ...prev, policyType: val }));
+                setShowFloaterMembers(val === "Floater");
+                setShowSeniorOneDOB(val === "Floater");
+                // #1: Pass fresh values directly to avoid stale state
+                if (val === "Floater") generateFloaterMembers(healthDetails.numberOfAdults, healthDetails.numberOfChildren, healthDetails.proposerIsMember);
               }}
               className={`w-full p-2 border rounded-lg ${validationErrors.policyType ? 'border-red-500' : 'border-gray-300'}`}
             >
@@ -2582,15 +2610,17 @@ const handleUpdate = async (e) => {
           {healthDetails.policyType === "Floater" && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-700">Number of Adults</label>
+                <label className="text-sm font-medium text-gray-700">Total Adults (including Proposer)</label>
                 <input
                   data-field="numberOfAdults"
                   type="number"
                   min="0"
                   value={healthDetails.numberOfAdults}
                   onChange={(e) => {
-                    setHealthDetails(prev => ({ ...prev, numberOfAdults: e.target.value }));
-                    generateFloaterMembers();
+                    const val = e.target.value;
+                    setHealthDetails(prev => ({ ...prev, numberOfAdults: val }));
+                    // #1: Pass fresh value directly to avoid stale state
+                    generateFloaterMembers(val, healthDetails.numberOfChildren, healthDetails.proposerIsMember);
                   }}
                   className={`w-full p-2 border rounded-lg ${validationErrors.numberOfAdults ? 'border-red-500' : 'border-gray-300'}`}
                 />
@@ -2603,8 +2633,10 @@ const handleUpdate = async (e) => {
                   min="0"
                   value={healthDetails.numberOfChildren}
                   onChange={(e) => {
-                    setHealthDetails(prev => ({ ...prev, numberOfChildren: e.target.value }));
-                    generateFloaterMembers();
+                    const val = e.target.value;
+                    setHealthDetails(prev => ({ ...prev, numberOfChildren: val }));
+                    // #1: Pass fresh value directly to avoid stale state
+                    generateFloaterMembers(healthDetails.numberOfAdults, val, healthDetails.proposerIsMember);
                   }}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
@@ -2728,8 +2760,10 @@ const handleUpdate = async (e) => {
                 data-field="proposerIsMember"
                 value={healthDetails.proposerIsMember}
                 onChange={(e) => {
-                  setHealthDetails(prev => ({ ...prev, proposerIsMember: e.target.value }));
-                  generateFloaterMembers();
+                  const val = e.target.value;
+                  setHealthDetails(prev => ({ ...prev, proposerIsMember: val }));
+                  // #1: Pass fresh value directly to avoid stale state
+                  generateFloaterMembers(healthDetails.numberOfAdults, healthDetails.numberOfChildren, val);
                 }}
                 className={`w-full p-2 border rounded-lg ${validationErrors.proposerIsMember ? 'border-red-500' : 'border-gray-300'}`}
               >
@@ -4181,6 +4215,16 @@ const handleUpdate = async (e) => {
   // ============================================================
   const renderWorkflowForm = () => {
     const isPolicyIssued = workflowDetails.status === "Policy Issued";
+
+    // #5: Payment Mode EMI restriction by LOB
+    const isEMIEligibleLOB = formData.lob && (
+      formData.lob.toLowerCase().includes("health") ||
+      formData.lob.toLowerCase().includes("term") ||
+      formData.lob === "Mediclaim Health Insurance" ||
+      formData.lob === "Group Health Insurance" ||
+      formData.lob === "Terms Insurance"
+    );
+    const paymentModeOptionsForLOB = isEMIEligibleLOB ? PAYMENT_TERM_OPTIONS : ["One Time"];
     
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
@@ -4285,19 +4329,15 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Payment Mode</label>
+                            {/* #5: Payment Mode options restricted by LOB */}
                             <select
   className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
   disabled={isPolicyIssued}
-  value={quote.paymentMode || ''}
+  value={quote.paymentMode || (isEMIEligibleLOB ? '' : 'One Time')}
   onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
 >
   <option value="">Select</option>
-  <option value="One Time">One Time</option>
-  <option value="Monthly">Monthly</option>
-  <option value="Quarterly">Quarterly</option>
-  <option value="Half Quarterly">Half Quarterly</option>
-  <option value="Half Yearly">Half Yearly</option>
-  <option value="Yearly">Yearly</option>
+  {paymentModeOptionsForLOB.map(opt => <option key={opt} value={opt}>{opt}</option>)}
 </select>
                           </div>
                         </div>
@@ -4565,12 +4605,22 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
               </div>
+              {/* #6b: Policy Start Date with PYP due date check */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
                 <input
                   type="date"
                   value={workflowDetails.policyStartDate}
-                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }))}
+                  onChange={(e) => {
+                    const selected = new Date(e.target.value);
+                    const pypDue = motorDetails.odDueDate || motorDetails.tpDueDate;
+                    if (pypDue && selected < new Date(pypDue)) {
+                      alert("Policy Start Date cannot be earlier than the Previous Policy (PYP) Due Date");
+                      return;
+                    }
+                    setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }));
+                  }}
+                  min={motorDetails.odDueDate || motorDetails.tpDueDate || undefined}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
               </div>
