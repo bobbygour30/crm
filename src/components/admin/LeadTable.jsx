@@ -851,7 +851,10 @@ useEffect(() => {
         occupation: healthDetails.occupation || '',
         relationship: 'Self',
         aadhaarNumber: healthDetails.aadhaarNumber || '',
-        aadhaarFile: null,
+        // FIX: carry over the already-uploaded Aadhaar/PAN instead of hardcoding null
+        aadhaarFile: healthDetails.aadhaarFile || null,
+        panNumber: healthDetails.panNumber || '',
+        panFile: healthDetails.panFile || null,
         epicFile: null,
         birthCertificate: null,
         ped: '',
@@ -888,6 +891,8 @@ useEffect(() => {
           relationship: '',
           aadhaarNumber: '',
           aadhaarFile: null,
+          panNumber: '',
+          panFile: null,
           epicFile: null,
           birthCertificate: null,
           ped: '',
@@ -924,6 +929,8 @@ useEffect(() => {
           relationship: '',
           aadhaarNumber: '',
           aadhaarFile: null,
+          panNumber: '',
+          panFile: null,
           epicFile: null,
           birthCertificate: null,
           ped: '',
@@ -961,6 +968,8 @@ useEffect(() => {
         relationship: '',
         aadhaarNumber: '',
         aadhaarFile: null,
+        panNumber: '',
+        panFile: null,
         epicFile: null,
         birthCertificate: null,
         ped: '',
@@ -1797,6 +1806,18 @@ if (showMotorSection) {
         if (!healthData.numberOfAdults) delete healthData.numberOfAdults;
         if (!healthData.numberOfChildren) delete healthData.numberOfChildren;
 
+        // Strip File objects from members before JSON
+        if (healthData.members) {
+          healthData.members = healthData.members.map((member) => {
+            const clean = { ...member };
+            if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+            if (clean.panFile instanceof File) delete clean.panFile;
+            if (clean.epicFile instanceof File) delete clean.epicFile;
+            if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
+            return clean;
+          });
+        }
+
         if (Object.keys(healthData).length > 0) {
           submitData.append("healthDetails", JSON.stringify(healthData));
         }
@@ -1878,6 +1899,22 @@ if (showMotorSection) {
       }
     });
 
+    // ===== MEMBER FILES (Aadhaar, PAN, EPIC, Birth Cert) =====
+    (healthDetails.members || []).forEach((member, idx) => {
+      if (member.aadhaarFile instanceof File) {
+        submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
+      }
+      if (member.panFile instanceof File) {
+        submitData.append(`memberPan_${idx}`, member.panFile);
+      }
+      if (member.epicFile instanceof File) {
+        submitData.append(`memberEpic_${idx}`, member.epicFile);
+      }
+      if (member.birthCertificate instanceof File) {
+        submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
+      }
+    });
+
     // ===== ELECTRONIC FILES =====
     if (electronicDetails.aadhaarFile && typeof electronicDetails.aadhaarFile !== "string") {
       submitData.append("electronicAadhaarFile", electronicDetails.aadhaarFile);
@@ -1940,11 +1977,17 @@ const handleUpdateLead = async (e) => {
     return;
   }
 
-  // #2: Frontend guard - Policy Issued requires payment confirmation
-  if (workflowDetails.status === "Policy Issued" && !workflowDetails.paymentUrl && !workflowDetails.utrNumber) {
+  // #4a: Frontend guard - Policy Issued requires payment confirmation
+  const isPaymentConfirmed =
+    workflowDetails.paymentUrl ||
+    workflowDetails.utrNumber ||
+    workflowDetails.paymentStatus === "Payment Done" ||
+    workflowDetails.paymentStatus === "e-Mandate Status Done";
+
+  if (workflowDetails.status === "Policy Issued" && !isPaymentConfirmed) {
     setValidationPopup({
       show: true,
-      errors: [{ field: "general", message: "Enter a Payment URL or UTR Number (set Payment Status = Payment Done first) before marking status as Policy Issued." }]
+      errors: [{ field: "general", message: "Set Payment Status to 'Payment Done' (with UTR Number) or share a Payment URL before marking status as Policy Issued." }]
     });
     return;
   }
@@ -1988,6 +2031,17 @@ const handleUpdateLead = async (e) => {
       healthData.portabilityDetails = healthData.portabilityDetails.map(p => {
         const clean = { ...p };
         if (clean.uploadPYP instanceof File) delete clean.uploadPYP;
+        return clean;
+      });
+    }
+    // #1d: Strip member-level File objects (aadhaar, pan, epic, birthCert)
+    if (healthData.members) {
+      healthData.members = healthData.members.map((member) => {
+        const clean = { ...member };
+        if (clean.aadhaarFile instanceof File) delete clean.aadhaarFile;
+        if (clean.panFile instanceof File) delete clean.panFile;
+        if (clean.epicFile instanceof File) delete clean.epicFile;
+        if (clean.birthCertificate instanceof File) delete clean.birthCertificate;
         return clean;
       });
     }
@@ -2075,6 +2129,22 @@ submitData.append("payoutDetails", JSON.stringify({ ...payoutDetails, ...payoutD
   (healthDetails.portabilityDetails || []).forEach((detail, idx) => {
     if (detail.uploadPYP instanceof File) {
       submitData.append(`portabilityPYP_${idx}`, detail.uploadPYP);
+    }
+  });
+
+  // #1d: Member file uploads (Aadhaar, PAN, EPIC, Birth Cert)
+  (healthDetails.members || []).forEach((member, idx) => {
+    if (member.aadhaarFile instanceof File) {
+      submitData.append(`memberAadhaar_${idx}`, member.aadhaarFile);
+    }
+    if (member.panFile instanceof File) {
+      submitData.append(`memberPan_${idx}`, member.panFile);
+    }
+    if (member.epicFile instanceof File) {
+      submitData.append(`memberEpic_${idx}`, member.epicFile);
+    }
+    if (member.birthCertificate instanceof File) {
+      submitData.append(`memberBirthCert_${idx}`, member.birthCertificate);
     }
   });
 
@@ -2191,6 +2261,12 @@ const openEditModal = (lead) => {
       members: (safeLead.healthDetails.members || []).map(m => ({
         ...m,
         dob: formatDateForInput(m.dob),
+        // FIX: fall back to top-level Aadhaar/PAN for the proposer row so
+        // "View current file" links actually show for old saved leads too
+        aadhaarFile: m.type === 'proposer' ? (m.aadhaarFile || safeLead.healthDetails.aadhaarFile || null) : (m.aadhaarFile || null),
+        aadhaarNumber: m.type === 'proposer' ? (m.aadhaarNumber || safeLead.healthDetails.aadhaarNumber || '') : (m.aadhaarNumber || ''),
+        panNumber: m.type === 'proposer' ? (m.panNumber || safeLead.healthDetails.panNumber || '') : (m.panNumber || ''),
+        panFile: m.type === 'proposer' ? (m.panFile || safeLead.healthDetails.panFile || null) : (m.panFile || null),
       })),
       portabilityDetails: (safeLead.healthDetails.portabilityDetails || []).map(p => ({
         ...p,
@@ -2860,16 +2936,20 @@ const openEditModal = (lead) => {
                             {validationErrors[`portabilityActive_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilityActive_${index}`]}</p>}
                           </div>
                           <div>
-                            <label className="text-xs font-medium text-gray-700">Policy Till Date</label>
+                            <label className="text-xs font-medium text-gray-700">End of Policy Date (Policy Till Date)</label>
                             <input
                               type="date"
-                              max={maxDate}
                               value={detail.policyTillDate}
                               onChange={(e) => {
                                 const selected = new Date(e.target.value);
                                 const today = new Date();
-                                if (selected > today) {
-                                  alert("Date cannot be in the future");
+                                const sixtyDaysBefore = new Date();
+                                sixtyDaysBefore.setDate(today.getDate() - 60);
+                                const sixtyDaysAfter = new Date();
+                                sixtyDaysAfter.setDate(today.getDate() + 60);
+
+                                if (selected < sixtyDaysBefore || selected > sixtyDaysAfter) {
+                                  alert("End of Policy Date must be within 60 days before or 60 days after today");
                                   return;
                                 }
                                 handlePortabilityDetailChange(index, 'policyTillDate', e.target.value);
@@ -2890,17 +2970,17 @@ const openEditModal = (lead) => {
                             </select>
                             {validationErrors[`portabilitySum_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilitySum_${index}`]}</p>}
                           </div>
-                          {/* #3: Portability NCB - Dropdown */}
+                          {/* #5: Portability NCB - Manual ₹ entry */}
                           <div>
-                            <label className="text-xs font-medium text-gray-700">Any CB (No Claim Bonus)</label>
-                            <select
+                            <label className="text-xs font-medium text-gray-700">No Claim Bonus (₹, if any)</label>
+                            <input
+                              type="number"
+                              min="0"
                               value={detail.noClaimBonus}
                               onChange={(e) => handlePortabilityDetailChange(index, 'noClaimBonus', e.target.value)}
                               className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            >
-                              <option value="">Select</option>
-                              {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
+                              placeholder="Enter amount in ₹"
+                            />
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Any IPD Claim taken during the period</label>
@@ -2973,6 +3053,7 @@ const openEditModal = (lead) => {
                     />
                     {validationErrors.renewalPolicy && <p className="text-red-500 text-xs mt-1">{validationErrors.renewalPolicy}</p>}
                   </div>
+                  {/* #6a: Renewal Policy Due Date - ±60 days */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Policy Due Date</label>
                     <input
@@ -2982,15 +3063,15 @@ const openEditModal = (lead) => {
                       onChange={(e) => {
                         const selected = new Date(e.target.value);
                         const today = new Date();
-                        const thirtyDaysBefore = new Date();
-                        thirtyDaysBefore.setDate(today.getDate() - 30);
+                        const sixtyDaysBefore = new Date();
+                        sixtyDaysBefore.setDate(today.getDate() - 60);
                         const sixtyDaysAfter = new Date();
                         sixtyDaysAfter.setDate(today.getDate() + 60);
-                        
-                        if (selected >= thirtyDaysBefore && selected <= sixtyDaysAfter) {
+
+                        if (selected >= sixtyDaysBefore && selected <= sixtyDaysAfter) {
                           handleRenewalDetailChange('policyDueDate', e.target.value);
                         } else {
-                          alert("Due date must be within 30 days before or 60 days after current date");
+                          alert("Due date must be within 60 days before or 60 days after current date");
                         }
                       }}
                       className={`w-full p-2 border rounded-lg text-sm ${validationErrors.renewalDueDate ? 'border-red-500' : 'border-gray-300'}`}
@@ -3593,6 +3674,53 @@ const openEditModal = (lead) => {
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
+
+                  {/* #1c: Proposer PAN fields in Family Members */}
+                  {member.type === 'proposer' && (
+                    <>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">PAN Number</label>
+                        <input
+                          type="text"
+                          value={member.panNumber || ''}
+                          onChange={(e) => {
+                            const val = e.target.value.toUpperCase();
+                            if (val.length > 10) return;
+                            const newMembers = [...healthDetails.members];
+                            newMembers[index].panNumber = val;
+                            setHealthDetails(prev => ({ ...prev, members: newMembers, panNumber: val }));
+                          }}
+                          maxLength="10"
+                          className="w-full p-2 border border-gray-300 rounded-lg uppercase text-sm"
+                          placeholder="ABCDE1234F"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium text-gray-700">Upload PAN</label>
+                        {typeof member.panFile === "string" && member.panFile && (
+                          <div className="mb-1">
+                            <a href={member.panFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                              View current PAN file
+                            </a>
+                          </div>
+                        )}
+                        <input
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg"
+                          onChange={(e) => {
+                            const file = e.target.files[0];
+                            if (!file) return;
+                            const newMembers = [...healthDetails.members];
+                            newMembers[index].panFile = file;
+                            setHealthDetails(prev => ({ ...prev, members: newMembers, panFile: file }));
+                          }}
+                          className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                        />
+                        {member.panFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+                      </div>
+                    </>
+                  )}
+
                   <div>
                     <label className="text-xs font-medium text-gray-700">Want Rider?</label>
                     <select
@@ -4932,8 +5060,9 @@ const openEditModal = (lead) => {
             <>
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
-                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-40 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
-                  {INSURER_OPTIONS.slice(0, 10).map(ins => (
+                {/* #2: Show all insurers instead of slicing to 10, bumped max-h to 64 */}
+                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+                  {INSURER_OPTIONS.map(ins => (
                     <label key={ins} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -5135,9 +5264,26 @@ const openEditModal = (lead) => {
 
           <div>
             <label className="text-sm font-medium text-gray-700">Payment Status</label>
+            {/* #3: Auto-sync main Status from Payment Status */}
             <select
               value={workflowDetails.paymentStatus}
-              onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentStatus: e.target.value }))}
+              onChange={(e) => {
+                const val = e.target.value;
+                const statusOrder = ["Open", "Quotation Generated", "Payment Link Generated", "Payment Done", "Policy Issued"];
+                let nextStatus = workflowDetails.status;
+
+                // Auto-advance the main Status to match Payment Status, never move backwards
+                if (val === "URL Shared") nextStatus = "Payment Link Generated";
+                else if (val === "Payment Done" || val === "e-Mandate Status Done") nextStatus = "Payment Done";
+
+                const curIdx = statusOrder.indexOf(workflowDetails.status);
+                const nextIdx = statusOrder.indexOf(nextStatus);
+                setWorkflowDetails(prev => ({
+                  ...prev,
+                  paymentStatus: val,
+                  status: nextIdx > curIdx ? nextStatus : prev.status,
+                }));
+              }}
               className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
               disabled={isPolicyIssued}
             >
