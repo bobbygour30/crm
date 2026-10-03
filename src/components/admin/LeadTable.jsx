@@ -688,6 +688,42 @@ useEffect(() => {
   }, [workflowDetails.policyStartDate, formData.policyTenure]);
 
   // ============================================================
+  // SYNC proposer's top-level Aadhaar/PAN/name into the "Self" member row
+  // ============================================================
+  useEffect(() => {
+    if (healthDetails.proposerIsMember !== "Yes") return;
+
+    setHealthDetails(prev => {
+      const idx = (prev.members || []).findIndex(m => m.type === 'proposer');
+      if (idx === -1) return prev;
+
+      const m = prev.members[idx];
+      const patch = {
+        name: formData.name || '',
+        aadhaarNumber: prev.aadhaarNumber || '',
+        aadhaarFile: prev.aadhaarFile || null,
+        panNumber: prev.panNumber || '',
+        panFile: prev.panFile || null,
+      };
+
+      const changed = Object.keys(patch).some(k => m[k] !== patch[k]);
+      if (!changed) return prev;
+
+      const members = [...prev.members];
+      members[idx] = { ...m, ...patch };
+      return { ...prev, members };
+    });
+  }, [
+    formData.name,
+    healthDetails.proposerIsMember,
+    healthDetails.aadhaarNumber,
+    healthDetails.aadhaarFile,
+    healthDetails.panNumber,
+    healthDetails.panFile,
+    healthDetails.members?.length,
+  ]);
+
+  // ============================================================
   // API CALLS
   // ============================================================
   const fetchLeads = async () => {
@@ -1977,17 +2013,20 @@ const handleUpdateLead = async (e) => {
     return;
   }
 
-  // #4a: Frontend guard - Policy Issued requires payment confirmation
-  const isPaymentConfirmed =
+  // Frontend guard - Policy Issued requires payment confirmation
+  const isPaymentConfirmed = !!(
     workflowDetails.paymentUrl ||
     workflowDetails.utrNumber ||
-    workflowDetails.paymentStatus === "Payment Done" ||
-    workflowDetails.paymentStatus === "e-Mandate Status Done";
+    ["Payment Done", "e-Mandate Status Done", "Policy Issued"].includes(workflowDetails.paymentStatus)
+  );
 
   if (workflowDetails.status === "Policy Issued" && !isPaymentConfirmed) {
     setValidationPopup({
       show: true,
-      errors: [{ field: "general", message: "Set Payment Status to 'Payment Done' (with UTR Number) or share a Payment URL before marking status as Policy Issued." }]
+      errors: [{
+        field: "general",
+        message: "Set Payment Status to 'Payment Done' (with UTR Number) or share a Payment URL before marking status as Policy Issued."
+      }]
     });
     return;
   }
@@ -3657,6 +3696,8 @@ const openEditModal = (lead) => {
                       {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
+
+                  {/* Aadhaar Number (all members) */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Aadhaar Number</label>
                     <input
@@ -3664,15 +3705,56 @@ const openEditModal = (lead) => {
                       value={member.aadhaarNumber || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
-                        if (val.length <= 12) {
-                          const newMembers = [...healthDetails.members];
-                          newMembers[index].aadhaarNumber = val;
-                          setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                        }
+                        if (val.length > 12) return;
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].aadhaarNumber = val;
+                        setHealthDetails(prev => ({
+                          ...prev,
+                          members: newMembers,
+                          // keep top-level proposer Aadhaar in sync
+                          ...(member.type === 'proposer' ? { aadhaarNumber: val } : {}),
+                        }));
                       }}
                       maxLength="12"
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="12 digits"
                     />
+                  </div>
+
+                  {/* Upload Aadhaar (all members, not mandatory) */}
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Upload Aadhaar (Not Mandatory)</label>
+                    {typeof member.aadhaarFile === "string" && member.aadhaarFile && (
+                      <div className="mb-1">
+                        <a
+                          href={member.aadhaarFile}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-indigo-600 underline"
+                        >
+                          View current Aadhaar file
+                        </a>
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg"
+                      onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].aadhaarFile = file;
+                        setHealthDetails(prev => ({
+                          ...prev,
+                          members: newMembers,
+                          ...(member.type === 'proposer' ? { aadhaarFile: file } : {}),
+                        }));
+                      }}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                    />
+                    {member.aadhaarFile instanceof File && (
+                      <p className="text-xs text-green-500 mt-1">✓ New file selected</p>
+                    )}
                   </div>
 
                   {/* #1c: Proposer PAN fields in Family Members */}
@@ -5020,7 +5102,9 @@ const openEditModal = (lead) => {
   // RENDER: WORKFLOW FORM (Edit Modal)
   // ============================================================
   const renderWorkflowForm = () => {
-    const isPolicyIssued = workflowDetails.status === "Policy Issued";
+    // Lock only when the lead was ALREADY saved as Policy Issued
+    // (not the instant the dropdown changes, which hid the policy fields)
+    const isPolicyIssued = editLead?.status === "Policy Issued";
 
     // #5: Payment Mode EMI restriction by LOB
     const isEMIEligibleLOB = formData.lob && (
@@ -5270,19 +5354,23 @@ const openEditModal = (lead) => {
               onChange={(e) => {
                 const val = e.target.value;
                 const statusOrder = ["Open", "Quotation Generated", "Payment Link Generated", "Payment Done", "Policy Issued"];
-                let nextStatus = workflowDetails.status;
+                const paymentToStatus = {
+                  "URL Shared": "Payment Link Generated",
+                  "Payment Done": "Payment Done",
+                  "e-Mandate Status Done": "Payment Done",
+                  "Policy Issued": "Policy Issued",
+                };
+                const target = paymentToStatus[val];
 
-                // Auto-advance the main Status to match Payment Status, never move backwards
-                if (val === "URL Shared") nextStatus = "Payment Link Generated";
-                else if (val === "Payment Done" || val === "e-Mandate Status Done") nextStatus = "Payment Done";
-
-                const curIdx = statusOrder.indexOf(workflowDetails.status);
-                const nextIdx = statusOrder.indexOf(nextStatus);
-                setWorkflowDetails(prev => ({
-                  ...prev,
-                  paymentStatus: val,
-                  status: nextIdx > curIdx ? nextStatus : prev.status,
-                }));
+                setWorkflowDetails(prev => {
+                  const curIdx = statusOrder.indexOf(prev.status);
+                  const nextIdx = target ? statusOrder.indexOf(target) : -1;
+                  return {
+                    ...prev,
+                    paymentStatus: val,
+                    status: nextIdx > curIdx ? target : prev.status, // never move backwards
+                  };
+                });
               }}
               className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
               disabled={isPolicyIssued}
@@ -5342,7 +5430,7 @@ const openEditModal = (lead) => {
             </>
           )}
 
-          {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
+          {(workflowDetails.paymentStatus === "Policy Issued" || workflowDetails.status === "Policy Issued") && (
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Number</label>
@@ -5350,7 +5438,8 @@ const openEditModal = (lead) => {
                   type="text"
                   value={workflowDetails.policyNumber}
                   onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
               <div>
@@ -5359,7 +5448,8 @@ const openEditModal = (lead) => {
                   type="date"
                   value={workflowDetails.policyIssuedOn}
                   onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
               {/* #6b: Policy Start Date with PYP due date check */}
@@ -5378,7 +5468,8 @@ const openEditModal = (lead) => {
                     setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }));
                   }}
                   min={motorDetails.odDueDate || motorDetails.tpDueDate || undefined}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
               <div>
@@ -5396,7 +5487,8 @@ const openEditModal = (lead) => {
                   type="file"
                   accept=".pdf"
                   onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
                 {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
               </div>

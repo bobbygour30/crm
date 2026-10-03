@@ -127,7 +127,7 @@ function EmployeeLeads() {
   ];
   
   const RELATIONSHIP_OPTIONS = [
-    "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"
+    "Self", "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"
   ];
   
   const YES_NO_OPTIONS = ["Yes", "No"];
@@ -672,6 +672,42 @@ function EmployeeLeads() {
       }
     }
   }, [workflowDetails.policyStartDate, formData.policyTenure]);
+
+  // ============================================================
+  // SYNC proposer's top-level Aadhaar/PAN/name into the "Self" member row
+  // ============================================================
+  useEffect(() => {
+    if (healthDetails.proposerIsMember !== "Yes") return;
+
+    setHealthDetails(prev => {
+      const idx = (prev.members || []).findIndex(m => m.type === 'proposer');
+      if (idx === -1) return prev;
+
+      const m = prev.members[idx];
+      const patch = {
+        name: formData.name || '',
+        aadhaarNumber: prev.aadhaarNumber || '',
+        aadhaarFile: prev.aadhaarFile || null,
+        panNumber: prev.panNumber || '',
+        panFile: prev.panFile || null,
+      };
+
+      const changed = Object.keys(patch).some(k => m[k] !== patch[k]);
+      if (!changed) return prev;
+
+      const members = [...prev.members];
+      members[idx] = { ...m, ...patch };
+      return { ...prev, members };
+    });
+  }, [
+    formData.name,
+    healthDetails.proposerIsMember,
+    healthDetails.aadhaarNumber,
+    healthDetails.aadhaarFile,
+    healthDetails.panNumber,
+    healthDetails.panFile,
+    healthDetails.members?.length,
+  ]);
 
   // ============================================================
   // API CALLS
@@ -1663,17 +1699,20 @@ const handleUpdate = async (e) => {
     return;
   }
 
-  // #4a: Frontend guard - Policy Issued requires payment confirmation
-  const isPaymentConfirmed =
+  // Frontend guard - Policy Issued requires payment confirmation
+  const isPaymentConfirmed = !!(
     workflowDetails.paymentUrl ||
     workflowDetails.utrNumber ||
-    workflowDetails.paymentStatus === "Payment Done" ||
-    workflowDetails.paymentStatus === "e-Mandate Status Done";
+    ["Payment Done", "e-Mandate Status Done", "Policy Issued"].includes(workflowDetails.paymentStatus)
+  );
 
   if (workflowDetails.status === "Policy Issued" && !isPaymentConfirmed) {
     setValidationPopup({
       show: true,
-      errors: [{ field: "general", message: "Set Payment Status to 'Payment Done' (with UTR Number) or share a Payment URL before marking status as Policy Issued." }]
+      errors: [{
+        field: "general",
+        message: "Set Payment Status to 'Payment Done' (with UTR Number) or share a Payment URL before marking status as Policy Issued."
+      }]
     });
     return;
   }
@@ -1714,8 +1753,12 @@ const handleUpdate = async (e) => {
       // Strip File objects
       if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
       if (healthData.panFile instanceof File) delete healthData.panFile;
-      if (healthData.renewalDetails?.uploadPolicy instanceof File) {
-        delete healthData.renewalDetails.uploadPolicy;
+      // Clone renewalDetails first so we never mutate React state
+      if (healthData.renewalDetails) {
+        healthData.renewalDetails = { ...healthData.renewalDetails };
+        if (healthData.renewalDetails.uploadPolicy instanceof File) {
+          delete healthData.renewalDetails.uploadPolicy;
+        }
       }
       if (healthData.portabilityDetails) {
         healthData.portabilityDetails = healthData.portabilityDetails.map((detail) => {
@@ -3076,29 +3119,43 @@ const handleUpdate = async (e) => {
                       {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
+
+                  {/* Aadhaar Number (all members) */}
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Aadhaar</label>
+                    <label className="text-xs font-medium text-gray-700">Aadhaar Number</label>
                     <input
                       type="text"
-                      value={member.aadhaarNumber}
+                      value={member.aadhaarNumber || ''}
                       onChange={(e) => {
                         const val = e.target.value.replace(/\D/g, '');
-                        if (val.length <= 12) {
-                          const newMembers = [...healthDetails.members];
-                          newMembers[index].aadhaarNumber = val;
-                          setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                        }
+                        if (val.length > 12) return;
+                        const newMembers = [...healthDetails.members];
+                        newMembers[index].aadhaarNumber = val;
+                        setHealthDetails(prev => ({
+                          ...prev,
+                          members: newMembers,
+                          // keep top-level proposer Aadhaar in sync
+                          ...(member.type === 'proposer' ? { aadhaarNumber: val } : {}),
+                        }));
                       }}
                       maxLength="12"
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      placeholder="12 digits"
                     />
                   </div>
+
+                  {/* Upload Aadhaar (all members, not mandatory) */}
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Upload Document</label>
+                    <label className="text-xs font-medium text-gray-700">Upload Aadhaar (Not Mandatory)</label>
                     {typeof member.aadhaarFile === "string" && member.aadhaarFile && (
                       <div className="mb-1">
-                        <a href={member.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                          View current document
+                        <a
+                          href={member.aadhaarFile}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-indigo-600 underline"
+                        >
+                          View current Aadhaar file
                         </a>
                       </div>
                     )}
@@ -3106,13 +3163,21 @@ const handleUpdate = async (e) => {
                       type="file"
                       accept=".pdf,.jpg,.jpeg"
                       onChange={(e) => {
+                        const file = e.target.files[0];
+                        if (!file) return;
                         const newMembers = [...healthDetails.members];
-                        newMembers[index].aadhaarFile = e.target.files[0] || newMembers[index].aadhaarFile;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
+                        newMembers[index].aadhaarFile = file;
+                        setHealthDetails(prev => ({
+                          ...prev,
+                          members: newMembers,
+                          ...(member.type === 'proposer' ? { aadhaarFile: file } : {}),
+                        }));
                       }}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
-                    {member.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+                    {member.aadhaarFile instanceof File && (
+                      <p className="text-xs text-green-500 mt-1">✓ New file selected</p>
+                    )}
                   </div>
 
                   {/* #1c: Proposer PAN fields in Family Members */}
@@ -4292,7 +4357,9 @@ const handleUpdate = async (e) => {
   // RENDER WORKFLOW FORM - ADDED (Admin Only)
   // ============================================================
   const renderWorkflowForm = () => {
-    const isPolicyIssued = workflowDetails.status === "Policy Issued";
+    // Lock only when the lead was ALREADY saved as Policy Issued,
+    // not the instant the dropdown changes (that hid the policy fields)
+    const isPolicyIssued = editLead?.status === "Policy Issued";
 
     // #5: Payment Mode EMI restriction by LOB
     const isEMIEligibleLOB = formData.lob && (
@@ -4609,19 +4676,23 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
               onChange={(e) => {
                 const val = e.target.value;
                 const statusOrder = ["Open", "Quotation Generated", "Payment Link Generated", "Payment Done", "Policy Issued"];
-                let nextStatus = workflowDetails.status;
+                const paymentToStatus = {
+                  "URL Shared": "Payment Link Generated",
+                  "Payment Done": "Payment Done",
+                  "e-Mandate Status Done": "Payment Done",
+                  "Policy Issued": "Policy Issued",
+                };
+                const target = paymentToStatus[val];
 
-                // Auto-advance the main Status to match Payment Status, never move backwards
-                if (val === "URL Shared") nextStatus = "Payment Link Generated";
-                else if (val === "Payment Done" || val === "e-Mandate Status Done") nextStatus = "Payment Done";
-
-                const curIdx = statusOrder.indexOf(workflowDetails.status);
-                const nextIdx = statusOrder.indexOf(nextStatus);
-                setWorkflowDetails(prev => ({
-                  ...prev,
-                  paymentStatus: val,
-                  status: nextIdx > curIdx ? nextStatus : prev.status,
-                }));
+                setWorkflowDetails(prev => {
+                  const curIdx = statusOrder.indexOf(prev.status);
+                  const nextIdx = target ? statusOrder.indexOf(target) : -1;
+                  return {
+                    ...prev,
+                    paymentStatus: val,
+                    status: nextIdx > curIdx ? target : prev.status, // never move backwards
+                  };
+                });
               }}
               className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
               disabled={isPolicyIssued}
@@ -4655,7 +4726,7 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
             </div>
           )}
 
-          {workflowDetails.paymentStatus === "Payment Done" && (
+          {(workflowDetails.paymentStatus === "Payment Done" || workflowDetails.paymentStatus === "Policy Issued") && (
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700">UTR Number</label>
@@ -4669,19 +4740,29 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Payment Snapshot</label>
+                {typeof workflowDetails.paymentSnapshot === "string" && workflowDetails.paymentSnapshot && (
+                  <div className="mb-1">
+                    <a href={workflowDetails.paymentSnapshot} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                      View current snapshot
+                    </a>
+                  </div>
+                )}
                 <input
                   type="file"
                   accept=".pdf,.jpg,.jpeg"
-                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: e.target.files[0] }))}
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) setWorkflowDetails(prev => ({ ...prev, paymentSnapshot: file }));
+                  }}
                   className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
                   disabled={isPolicyIssued}
                 />
-                {workflowDetails.paymentSnapshot && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {workflowDetails.paymentSnapshot instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               </div>
             </>
           )}
 
-          {workflowDetails.paymentStatus === "Policy Issued" && !isPolicyIssued && (
+          {(workflowDetails.paymentStatus === "Policy Issued" || workflowDetails.status === "Policy Issued") && (
             <>
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Number</label>
@@ -4689,7 +4770,8 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                   type="text"
                   value={workflowDetails.policyNumber}
                   onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyNumber: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
               <div>
@@ -4698,10 +4780,10 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                   type="date"
                   value={workflowDetails.policyIssuedOn}
                   onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyIssuedOn: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
-              {/* #6b: Policy Start Date with PYP due date check */}
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Start Date</label>
                 <input
@@ -4717,7 +4799,8 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                     setWorkflowDetails(prev => ({ ...prev, policyStartDate: e.target.value }));
                   }}
                   min={motorDetails.odDueDate || motorDetails.tpDueDate || undefined}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
               </div>
               <div>
@@ -4732,13 +4815,24 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-700">Upload Policy Copy</label>
+                {typeof workflowDetails.policyCopy === "string" && workflowDetails.policyCopy && (
+                  <div className="mb-1">
+                    <a href={workflowDetails.policyCopy} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                      View current policy copy
+                    </a>
+                  </div>
+                )}
                 <input
                   type="file"
                   accept=".pdf"
-                  onChange={(e) => setWorkflowDetails(prev => ({ ...prev, policyCopy: e.target.files[0] }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) setWorkflowDetails(prev => ({ ...prev, policyCopy: file }));
+                  }}
+                  className={`w-full p-2 border rounded-lg ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                  disabled={isPolicyIssued}
                 />
-                {workflowDetails.policyCopy && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+                {workflowDetails.policyCopy instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
               </div>
             </>
           )}
