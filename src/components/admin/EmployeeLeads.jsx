@@ -47,6 +47,8 @@ import {
   FaPhone,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
+import PersonalAccidentForm, { emptyPA, hydratePA, validatePA, appendPA } from "../lob/PersonalAccidentForm";
+import TravelInsuranceForm, { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "../lob/TravelInsuranceForm";
 
 function EmployeeLeads() {
   // ============================================================
@@ -530,6 +532,14 @@ function EmployeeLeads() {
     purchaseInvoice: null,
   });
 
+  // ============================================================
+  // PERSONAL ACCIDENT & TRAVEL STATE
+  // ============================================================
+  const [paDetails, setPaDetails] = useState(emptyPA());
+  const [travelDetails, setTravelDetails] = useState(emptyTravel());
+  const [showPASection, setShowPASection] = useState(false);
+  const [showTravelSection, setShowTravelSection] = useState(false);
+
   // Workflow Details State - ADDED
   const [workflowDetails, setWorkflowDetails] = useState({
     status: "Open",
@@ -822,6 +832,8 @@ function EmployeeLeads() {
       setShowHealthSection(false);
       setShowMotorSection(false);
       setShowElectronicSection(false);
+      setShowPASection(false);
+      setShowTravelSection(false);
       return;
     }
 
@@ -858,6 +870,8 @@ function EmployeeLeads() {
     setShowHealthSection(isHealth);
     setShowMotorSection(isMotor);
     setShowElectronicSection(isElectronic);
+    setShowPASection(lob === "PERSONAL ACCIDENT");
+    setShowTravelSection(lob === "Travel Insurance");
   };
 
   // ============================================================
@@ -1483,6 +1497,22 @@ function EmployeeLeads() {
         errorList.push({ field: "electronicPan", message: "PAN format: ABCDE1234F" });
       }
     }
+
+    // ============================================
+    // PERSONAL ACCIDENT & TRAVEL VALIDATION
+    // ============================================
+    if (showPASection) {
+      validatePA(paDetails).forEach(({ field, message }) => {
+        errors[field] = message;
+        errorList.push({ field, message });
+      });
+    }
+    if (showTravelSection) {
+      validateTravel(travelDetails).forEach(({ field, message }) => {
+        errors[field] = message;
+        errorList.push({ field, message });
+      });
+    }
     
     setValidationErrors(errors);
     
@@ -1638,6 +1668,12 @@ function EmployeeLeads() {
         devicePhotos: lead.electronicDetails.devicePhotos || [],
       });
     }
+
+    // ============================================
+    // HYDRATE PERSONAL ACCIDENT & TRAVEL
+    // ============================================
+    setPaDetails(hydratePA(lead.paDetails));
+    setTravelDetails(hydrateTravel(lead.travelDetails));
 
     // Workflow Details - ADDED with recalc on load
     const loadedTenure = lead.policyTenure || formData.policyTenure;
@@ -1887,6 +1923,12 @@ const handleUpdate = async (e) => {
       }
     });
   }
+
+  // ============================================
+  // PERSONAL ACCIDENT & TRAVEL APPEND
+  // ============================================
+  if (showPASection) appendPA(submitData, paDetails);
+  if (showTravelSection) appendTravel(submitData, travelDetails);
 
   // Health file uploads
   if (healthDetails.aadhaarFile instanceof File) {
@@ -5131,6 +5173,23 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
             {showMotorSection && renderMotorForm()}
             {showElectronicSection && renderElectronicForm()}
 
+            {showPASection && (
+              <PersonalAccidentForm
+                details={paDetails}
+                setDetails={setPaDetails}
+                errors={validationErrors}
+                insurerOptions={INSURER_OPTIONS}
+              />
+            )}
+            {showTravelSection && (
+              <TravelInsuranceForm
+                details={travelDetails}
+                setDetails={setTravelDetails}
+                errors={validationErrors}
+                lead={formData}
+              />
+            )}
+
             {/* Workflow Management Section - ADDED */}
             {renderWorkflowForm()}
 
@@ -5252,6 +5311,24 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                   <div>Device: {selectedLead.electronicDetails.deviceType || "-"}</div>
                   <div>Purchase Date: {selectedLead.electronicDetails.dateOfPurchase || "-"}</div>
                   <div>IMEI: {selectedLead.electronicDetails.imeiNumber || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.paDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Personal Accident Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Insurer: {selectedLead.paDetails.insurerName || "-"}</div>
+                  <div>Plan: {selectedLead.paDetails.planType || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.travelDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Travel Insurance Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Insurer: {selectedLead.travelDetails.insurerName || "-"}</div>
+                  <div>Destination: {selectedLead.travelDetails.destination || "-"}</div>
                 </div>
               </div>
             )}

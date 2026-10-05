@@ -45,6 +45,8 @@ import {
 } from "react-icons/fa";
 import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
+import PersonalAccidentForm, { emptyPA, hydratePA, validatePA, appendPA } from "../lob/PersonalAccidentForm";
+import TravelInsuranceForm, { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "../lob/TravelInsuranceForm";
 
 function LeadTable() {
   // ============================================================
@@ -482,6 +484,14 @@ function LeadTable() {
   });
 
   // ============================================================
+  // PERSONAL ACCIDENT & TRAVEL STATE
+  // ============================================================
+  const [paDetails, setPaDetails] = useState(emptyPA());
+  const [travelDetails, setTravelDetails] = useState(emptyTravel());
+  const [showPASection, setShowPASection] = useState(false);
+  const [showTravelSection, setShowTravelSection] = useState(false);
+
+  // ============================================================
   // QUOTE FILES STATE
   // ============================================================
   const [quoteFiles, setQuoteFiles] = useState({}); // { insurerName: File }
@@ -826,6 +836,8 @@ useEffect(() => {
       setShowHealthSection(false);
       setShowMotorSection(false);
       setShowElectronicSection(false);
+      setShowPASection(false);
+      setShowTravelSection(false);
       return;
     }
 
@@ -862,6 +874,8 @@ useEffect(() => {
     setShowHealthSection(isHealth);
     setShowMotorSection(isMotor);
     setShowElectronicSection(isElectronic);
+    setShowPASection(lob === "PERSONAL ACCIDENT");
+    setShowTravelSection(lob === "Travel Insurance");
   };
 
   // ============================================================
@@ -1758,6 +1772,22 @@ if (showMotorSection) {
         errorList.push({ field: "electronicPan", message: "PAN format: ABCDE1234F" });
       }
     }
+
+    // ============================================
+    // PERSONAL ACCIDENT & TRAVEL VALIDATION
+    // ============================================
+    if (showPASection) {
+      validatePA(paDetails).forEach(({ field, message }) => {
+        errors[field] = message;
+        errorList.push({ field, message });
+      });
+    }
+    if (showTravelSection) {
+      validateTravel(travelDetails).forEach(({ field, message }) => {
+        errors[field] = message;
+        errorList.push({ field, message });
+      });
+    }
     
     setValidationErrors(errors);
     
@@ -1917,6 +1947,12 @@ if (showMotorSection) {
     }
 
     // ============================================
+    // PERSONAL ACCIDENT & TRAVEL APPEND
+    // ============================================
+    if (showPASection) appendPA(submitData, paDetails);
+    if (showTravelSection) appendTravel(submitData, travelDetails);
+
+    // ============================================
     // NEW FILE APPEND LOGIC (Health, Electronic)
     // ============================================
     // ===== HEALTH FILES =====
@@ -1986,11 +2022,10 @@ if (showMotorSection) {
         alert("Lead created successfully!");
       } else {
         const error = await res.json();
-        const errorMsg = error.error || error.message || "Unknown error";
-        setValidationPopup({
-          show: true,
-          errors: [{ field: "general", message: errorMsg }]
-        });
+        const list = error.errors
+          ? error.errors.map((m) => ({ field: "general", message: m }))
+          : [{ field: "general", message: error.error || error.message || "Unknown error" }];
+        setValidationPopup({ show: true, errors: list });
       }
     } catch (err) {
       console.error("Create error:", err);
@@ -2108,6 +2143,12 @@ const handleUpdateLead = async (e) => {
     }
     submitData.append("electronicDetails", JSON.stringify(electronicData));
   }
+
+  // ============================================
+  // PERSONAL ACCIDENT & TRAVEL APPEND
+  // ============================================
+  if (showPASection) appendPA(submitData, paDetails);
+  if (showTravelSection) appendTravel(submitData, travelDetails);
 
   // Workflow - clean empty enums before sending
   const cleanWorkflow = { ...workflowDetails };
@@ -2444,6 +2485,12 @@ const openEditModal = (lead) => {
     });
   }
 
+  // ============================================
+  // HYDRATE PERSONAL ACCIDENT & TRAVEL
+  // ============================================
+  setPaDetails(hydratePA(safeLead.paDetails));
+  setTravelDetails(hydrateTravel(safeLead.travelDetails));
+
   detectLOB(safeLead.lob);
   
   setWorkflowDetails({
@@ -2568,6 +2615,14 @@ const openEditModal = (lead) => {
       devicePhotos: [],
       purchaseInvoice: null,
     });
+    // ============================================
+    // RESET PERSONAL ACCIDENT & TRAVEL
+    // ============================================
+    setPaDetails(emptyPA());
+    setTravelDetails(emptyTravel());
+    setShowPASection(false);
+    setShowTravelSection(false);
+    
     setQuoteFiles({});
     setPayoutDetails({ payoutSlabPercent: "", gstReturnSlabPercent: "", totalCommissionDiscount: "", tdsPercent: "2" });
     setShowHealthSection(false);
@@ -5763,6 +5818,23 @@ const openEditModal = (lead) => {
             {showMotorSection && renderMotorForm()}
             {showElectronicSection && renderElectronicForm()}
 
+            {showPASection && (
+              <PersonalAccidentForm
+                details={paDetails}
+                setDetails={setPaDetails}
+                errors={validationErrors}
+                insurerOptions={INSURER_OPTIONS}
+              />
+            )}
+            {showTravelSection && (
+              <TravelInsuranceForm
+                details={travelDetails}
+                setDetails={setTravelDetails}
+                errors={validationErrors}
+                lead={formData}
+              />
+            )}
+
             {renderPreviousPolicyPopup()}
             {renderValidationPopup()}
 
@@ -6071,6 +6143,23 @@ const openEditModal = (lead) => {
             {showMotorSection && renderMotorForm()}
             {showElectronicSection && renderElectronicForm()}
 
+            {showPASection && (
+              <PersonalAccidentForm
+                details={paDetails}
+                setDetails={setPaDetails}
+                errors={validationErrors}
+                insurerOptions={INSURER_OPTIONS}
+              />
+            )}
+            {showTravelSection && (
+              <TravelInsuranceForm
+                details={travelDetails}
+                setDetails={setTravelDetails}
+                errors={validationErrors}
+                lead={formData}
+              />
+            )}
+
             {renderWorkflowForm()}
             {renderPayoutSection()}
 
@@ -6192,6 +6281,24 @@ const openEditModal = (lead) => {
                   <div>Device: {selectedLead.electronicDetails.deviceType || "-"}</div>
                   <div>Purchase Date: {selectedLead.electronicDetails.dateOfPurchase || "-"}</div>
                   <div>IMEI: {selectedLead.electronicDetails.imeiNumber || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.paDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Personal Accident Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Insurer: {selectedLead.paDetails.insurerName || "-"}</div>
+                  <div>Plan: {selectedLead.paDetails.planType || "-"}</div>
+                </div>
+              </div>
+            )}
+            {selectedLead.travelDetails && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-indigo-600">Travel Insurance Details</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Insurer: {selectedLead.travelDetails.insurerName || "-"}</div>
+                  <div>Destination: {selectedLead.travelDetails.destination || "-"}</div>
                 </div>
               </div>
             )}
