@@ -47,6 +47,18 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import * as XLSX from "xlsx";
 import PersonalAccidentForm, { emptyPA, hydratePA, validatePA, appendPA } from "../lob/PersonalAccidentForm";
 import TravelInsuranceForm, { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "../lob/TravelInsuranceForm";
+import {
+  OTHER_MANUFACTURER,
+  getManufacturerOptions,
+  isManufacturerValidForType,
+  getDisplayManufacturer,
+  isMotorLob,
+  emptyMotorDetails,
+  getMotorPremiumParts,
+  computeMotorPayout,
+  validateMotorPayout,
+  isAdminUser,
+} from "../lob/motorInsurance";
 
 function LeadTable() {
   // ============================================================
@@ -208,38 +220,8 @@ function LeadTable() {
     "Tata AIA Life Insurance",
   ];
 
-  const MANUFACTURER_OPTIONS = [
-    "Maruti Suzuki",
-    "Hyundai",
-    "Tata Motors",
-    "Mahindra",
-    "Honda",
-    "Toyota",
-    "Ford",
-    "Volkswagen",
-    "Renault",
-    "Nissan",
-    "Skoda",
-    "Kia",
-    "MG Motor",
-    "Jeep",
-    "Mercedes-Benz",
-    "BMW",
-    "Audi",
-    "Volvo",
-    "Land Rover",
-    "Jaguar",
-    "Porsche",
-    "Lamborghini",
-    "Ferrari",
-    "Maserati",
-    "Bentley",
-    "Rolls-Royce",
-    "Aston Martin",
-    "McLaren",
-    "Bugatti",
-    "Koegnigsegg"
-  ];
+  // NOTE: Manufacturer lists now live in ../lob/motorInsurance.js
+  // (Two Wheeler / Four Wheeler lists + "Other")
 
   const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
   
@@ -356,6 +338,18 @@ function LeadTable() {
     };
   };
 
+  // Empty payout state (now includes Motor OD/TP split fields)
+  const emptyPayoutDetails = () => ({
+    payoutSlabPercent: "",
+    gstReturnSlabPercent: "",
+    totalCommissionDiscount: "",
+    tdsPercent: "2",
+    odPremium: "",
+    tpPremium: "",
+    odPayoutPercent: "",
+    tpPayoutPercent: "",
+  });
+
   // ============================================================
   // STATE
   // ============================================================
@@ -432,41 +426,7 @@ function LeadTable() {
     seniorOneDOB: "",
   });
 
-  const [motorDetails, setMotorDetails] = useState({
-    vehicleType: "",
-    previousInsuranceStatus: "",
-    manufacturer: "",
-    model: "",
-    fuelType: "",
-    rtoCode: "",
-    chesisNo: "",
-    yearOfManufacturing: "",
-    monthOfManufacturing: "",
-    idvAsPerInvoice: "",
-    insuranceType: "",
-    odDueDate: "",
-    tpDueDate: "",
-    policyNo: "",
-    previousInsurerName: "",
-    idvAsPerPYP: "",
-    saodOdDueDate: "",
-    saodTpDueDate: "",
-    saodPolicyNo: "",
-    saodPreviousInsurerName: "",
-    saodIdvAsPerPYP: "",
-    tpInsuranceDueDate: "",
-    registrationNumber: "",
-    autoRtoCode: "",
-    claimTaken: "",
-    ncb: "",
-    addOnRequired: "",
-    selectedAddOns: [],
-    pypFile: null,
-    rcFrontFile: null,
-    rcBackFile: null,
-    chesisPhoto: null,
-    invoiceCopy: null,
-  });
+  const [motorDetails, setMotorDetails] = useState(emptyMotorDetails());
 
   const [electronicDetails, setElectronicDetails] = useState({
     deviceType: "",
@@ -499,12 +459,7 @@ function LeadTable() {
   // ============================================================
   // PAYOUT DETAILS STATE
   // ============================================================
-  const [payoutDetails, setPayoutDetails] = useState({
-    payoutSlabPercent: "",
-    gstReturnSlabPercent: "",
-    totalCommissionDiscount: "",
-    tdsPercent: "2",
-  });
+  const [payoutDetails, setPayoutDetails] = useState(emptyPayoutDetails());
 
   // ============================================================
   // WORKFLOW STATE
@@ -514,6 +469,7 @@ function LeadTable() {
     quoteNumber: "",
     selectedInsurers: [],
     insurerQuotes: [],
+    acceptedInsurer: "",
     paymentStatus: "",
     paymentUrl: "",
     utrNumber: "",
@@ -844,27 +800,7 @@ useEffect(() => {
     const isHealth = lob.toLowerCase().includes("health") || 
                      lob === "Mediclaim Health Insurance" || 
                      lob === "Group Health Insurance";
-    const isMotor = lob.toLowerCase().includes("motor") || 
-                    lob.includes("Car") || 
-                    lob.includes("Two-Wheeler") || 
-                    lob.includes("Taxi") ||
-                    lob.includes("Commercial Vehicle") ||
-                    lob.includes("E-Rikshaw") ||
-                    lob.includes("School Bus") ||
-                    lob.includes("Truck") ||
-                    lob.includes("Tractor") ||
-                    lob.includes("Auto Rickshaw") ||
-                    lob === "Private Car-OD" ||
-                    lob === "Private Car-SOD" ||
-                    lob === "Private Car-Comprehensive" ||
-                    lob === "Private Car-TP" ||
-                    lob === "Taxi-Comprehensive" ||
-                    lob === "Taxi-TP" ||
-                    lob === "Commercial Vehicle-Comprehensive" ||
-                    lob === "Commercial Vehicle-TP" ||
-                    lob === "E-Rikshaw-TP" ||
-                    lob === "E-Rikshaw-Comprehensive" ||
-                    lob === "Two-Wheeler-TP";
+    const isMotor = isMotorLob(lob);
     const isElectronic = lob.toLowerCase().includes("mobile") || 
                          lob.toLowerCase().includes("electronic") || 
                          lob.toLowerCase().includes("equipment") ||
@@ -881,6 +817,42 @@ useEffect(() => {
   // ============================================================
   // #1: FLOATER MEMBERS (Fixed stale state bug — accepts overrides)
   // ============================================================
+  const buildEmptyMember = (id, type) => ({
+    id,
+    type,
+    name: '',
+    dob: '',
+    monthlyIncome: '',
+    height: '',
+    weight: '',
+    qualification: '',
+    occupation: '',
+    relationship: '',
+    aadhaarNumber: '',
+    aadhaarFile: null,
+    panNumber: '',
+    panFile: null,
+    epicFile: null,
+    birthCertificate: null,
+    ped: '',
+    treatmentHistory: '',
+    medicalRemarks: '',
+    wantRider: '',
+    selectedRider: '',
+    riderDetails: {
+      instaShield: '',
+      asthma: '',
+      diabetes: '',
+      hypertension: '',
+      hyperlipidaemia: '',
+    },
+    fetalFlourish: '',
+    nrInsure: '',
+    lossOfIncome: '',
+    majorIllness: '',
+    internationalCover: '',
+  });
+
   const generateFloaterMembers = (adultsOverride, childrenOverride, proposerOverride) => {
     let adults = parseInt(adultsOverride ?? healthDetails.numberOfAdults) || 0;
     let children = parseInt(childrenOverride ?? healthDetails.numberOfChildren) || 0;
@@ -890,8 +862,7 @@ useEffect(() => {
     
     if (proposerIsMember === "Yes") {
       members.push({
-        id: `proposer`,
-        type: 'proposer',
+        ...buildEmptyMember('proposer', 'proposer'),
         name: formData.name || '',
         dob: healthDetails.proposerDOB || '',
         monthlyIncome: healthDetails.familyIncome || '',
@@ -905,141 +876,20 @@ useEffect(() => {
         aadhaarFile: healthDetails.aadhaarFile || null,
         panNumber: healthDetails.panNumber || '',
         panFile: healthDetails.panFile || null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-        wantRider: '',
-        selectedRider: '',
-        riderDetails: {
-          instaShield: '',
-          asthma: '',
-          diabetes: '',
-          hypertension: '',
-          hyperlipidaemia: '',
-        },
-        fetalFlourish: '',
-        nrInsure: '',
-        lossOfIncome: '',
-        majorIllness: '',
-        internationalCover: '',
       });
       
       const remainingAdults = adults > 1 ? adults - 1 : 0;
       for (let i = 1; i <= remainingAdults; i++) {
-        members.push({
-          id: `adult-${i}`,
-          type: 'adult',
-          name: '',
-          dob: '',
-          monthlyIncome: '',
-          height: '',
-          weight: '',
-          qualification: '',
-          occupation: '',
-          relationship: '',
-          aadhaarNumber: '',
-          aadhaarFile: null,
-          panNumber: '',
-          panFile: null,
-          epicFile: null,
-          birthCertificate: null,
-          ped: '',
-          treatmentHistory: '',
-          medicalRemarks: '',
-          wantRider: '',
-          selectedRider: '',
-          riderDetails: {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          },
-          fetalFlourish: '',
-          nrInsure: '',
-          lossOfIncome: '',
-          majorIllness: '',
-          internationalCover: '',
-        });
+        members.push(buildEmptyMember(`adult-${i}`, 'adult'));
       }
     } else {
       for (let i = 1; i <= adults; i++) {
-        members.push({
-          id: `adult-${i}`,
-          type: 'adult',
-          name: '',
-          dob: '',
-          monthlyIncome: '',
-          height: '',
-          weight: '',
-          qualification: '',
-          occupation: '',
-          relationship: '',
-          aadhaarNumber: '',
-          aadhaarFile: null,
-          panNumber: '',
-          panFile: null,
-          epicFile: null,
-          birthCertificate: null,
-          ped: '',
-          treatmentHistory: '',
-          medicalRemarks: '',
-          wantRider: '',
-          selectedRider: '',
-          riderDetails: {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          },
-          fetalFlourish: '',
-          nrInsure: '',
-          lossOfIncome: '',
-          majorIllness: '',
-          internationalCover: '',
-        });
+        members.push(buildEmptyMember(`adult-${i}`, 'adult'));
       }
     }
     
     for (let i = 1; i <= children; i++) {
-      members.push({
-        id: `child-${i}`,
-        type: 'child',
-        name: '',
-        dob: '',
-        monthlyIncome: '',
-        height: '',
-        weight: '',
-        qualification: '',
-        occupation: '',
-        relationship: '',
-        aadhaarNumber: '',
-        aadhaarFile: null,
-        panNumber: '',
-        panFile: null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-        wantRider: '',
-        selectedRider: '',
-        riderDetails: {
-          instaShield: '',
-          asthma: '',
-          diabetes: '',
-          hypertension: '',
-          hyperlipidaemia: '',
-        },
-        fetalFlourish: '',
-        nrInsure: '',
-        lossOfIncome: '',
-        majorIllness: '',
-        internationalCover: '',
-      });
+      members.push(buildEmptyMember(`child-${i}`, 'child'));
     }
     
     setHealthDetails(prev => ({ ...prev, members }));
@@ -1185,13 +1035,50 @@ const formatDateForInput = (dateValue) => {
 };
 
   // ============================================================
+  // ACCEPTED QUOTE (the quote the policy was actually issued on)
+  // ============================================================
+  const getAcceptedQuote = () => {
+    const quotes = workflowDetails.insurerQuotes || [];
+    const acceptedName = workflowDetails.acceptedInsurer || workflowDetails.previousInsurerName;
+    return quotes.find(q => q.insurerName === acceptedName) || quotes[0] || {};
+  };
+
+  // Resolved TDS % (blank -> default 2, same as before)
+  const getResolvedTdsPercent = () =>
+    payoutDetails.tdsPercent === "" || payoutDetails.tdsPercent === undefined || payoutDetails.tdsPercent === null
+      ? 2
+      : parseFloat(payoutDetails.tdsPercent) || 0;
+
+  // ============================================================
   // COMPUTE PAYOUT DERIVED VALUES
   // ============================================================
  const computePayoutDerived = () => {
-  const acceptedQuote =
-    (workflowDetails.insurerQuotes || []).find(q => q.insurerName === workflowDetails.previousInsurerName) ||
-    (workflowDetails.insurerQuotes || [])[0] || {};
+  const acceptedQuote = getAcceptedQuote();
 
+  // ---------------- MOTOR: OD / TP split payout ----------------
+  if (showMotorSection) {
+    const motor = computeMotorPayout({
+      insuranceType: motorDetails.insuranceType,
+      odPremium: payoutDetails.odPremium,
+      tpPremium: payoutDetails.tpPremium,
+      odPayoutPercent: payoutDetails.odPayoutPercent,
+      tpPayoutPercent: payoutDetails.tpPayoutPercent,
+      gstReturnSlabPercent: payoutDetails.gstReturnSlabPercent,
+      tdsPercent: getResolvedTdsPercent(),
+      deduction: payoutDetails.totalCommissionDiscount,
+    });
+    return {
+      ...motor,
+      payoutOnEMI: 0,
+      receivedInsurerPayout: motor.totalPayoutToReceive,
+      isEMIMode: false,
+      isMotor: true,
+      acceptedInsurer: acceptedQuote.insurerName || "",
+      acceptedNetPremium: parseFloat(acceptedQuote.netPremium) || 0,
+    };
+  }
+
+  // ---------------- NON-MOTOR (existing logic) ----------------
   const quoteDerived = computeQuoteDerived(acceptedQuote);
   const isEMIMode = quoteDerived.isEMI; // false for "One Time" and "Yearly"
 
@@ -1226,8 +1113,31 @@ const formatDateForInput = (dateValue) => {
     tdsAmount,
     arshyanPayout,
     isEMIMode,
+    isMotor: false,
+    acceptedInsurer: acceptedQuote.insurerName || "",
   };
 };
+
+  // ============================================================
+  // MOTOR PAYOUT CROSS-VALIDATION
+  // ============================================================
+  const getMotorPayoutValidation = () => {
+    const acceptedQuote = getAcceptedQuote();
+    return validateMotorPayout(
+      {
+        insuranceType: motorDetails.insuranceType,
+        netPremium: acceptedQuote.netPremium,
+        odPremium: payoutDetails.odPremium,
+        tpPremium: payoutDetails.tpPremium,
+        odPayoutPercent: payoutDetails.odPayoutPercent,
+        tpPayoutPercent: payoutDetails.tpPayoutPercent,
+        gstReturnSlabPercent: payoutDetails.gstReturnSlabPercent,
+        tdsPercent: payoutDetails.tdsPercent,
+        deduction: payoutDetails.totalCommissionDiscount,
+      },
+      { fieldPrefix: "payout" }
+    );
+  };
 
   // ============================================================
   // FILTER LEADS
@@ -1305,6 +1215,8 @@ const formatDateForInput = (dateValue) => {
       State: lead.state || "",
       City: lead.city || "",
       Insurer: lead.insurer || "",
+      "Vehicle Manufacturer": getDisplayManufacturer(lead.motorDetails),
+      "Vehicle Model": lead.motorDetails?.model || "",
       Remarks: lead.remarks || "",
       "Policy Start Date": lead.policyStartDate || "",
       "Policy Expiry Date": lead.policyExpiryDate || "",
@@ -1591,6 +1503,11 @@ if (showMotorSection) {
       errors.manufacturer = "Manufacturer is required for New Vehicle";
       errorList.push({ field: "manufacturer", message: "Manufacturer is required for New Vehicle" });
     }
+    // "Other" manufacturer -> manual company name is mandatory
+    if (motorDetails.manufacturer === OTHER_MANUFACTURER && !motorDetails.otherManufacturer?.trim()) {
+      errors.otherManufacturer = "Enter the Manufacturer Name (Other selected)";
+      errorList.push({ field: "otherManufacturer", message: "Enter the Manufacturer Name (Other selected)" });
+    }
     if (!motorDetails.model) {
       errors.model = "Model is required for New Vehicle";
       errorList.push({ field: "model", message: "Model is required for New Vehicle" });
@@ -1746,6 +1663,18 @@ if (showMotorSection) {
       errors.invoiceCopy = "Invoice Copy is required for New Vehicle";
       errorList.push({ field: "invoiceCopy", message: "Invoice Copy is required for New Vehicle" });
     }
+  }
+
+  // ============================================
+  // MOTOR PAYOUT CROSS-VALIDATION (Edit, Admin, Policy Issued)
+  // ============================================
+  const isAdmin = isAdminUser();
+  if (isEdit && isAdmin && workflowDetails.status === "Policy Issued") {
+    const { errors: payoutErrors } = getMotorPayoutValidation();
+    payoutErrors.forEach(({ field, message }) => {
+      errors[field] = message;
+      errorList.push({ field, message });
+    });
   }
 }
     
@@ -1905,6 +1834,12 @@ if (showMotorSection) {
         if (!motorData.insuranceType) delete motorData.insuranceType;
         if (!motorData.claimTaken) delete motorData.claimTaken;
         if (!motorData.addOnRequired) delete motorData.addOnRequired;
+        // Only keep the manual manufacturer name when "Other" is selected
+        if (motorData.manufacturer !== OTHER_MANUFACTURER) delete motorData.otherManufacturer;
+        // Strip File objects (sent separately below)
+        ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach(f => {
+          if (motorData[f] instanceof File) delete motorData[f];
+        });
         
         if (Object.keys(motorData).length > 0) {
           submitData.append("motorDetails", JSON.stringify(motorData));
@@ -2098,8 +2033,11 @@ const handleUpdateLead = async (e) => {
     // Remove File instances - keep URLs as strings
     if (healthData.aadhaarFile instanceof File) delete healthData.aadhaarFile;
     if (healthData.panFile instanceof File) delete healthData.panFile;
-    if (healthData.renewalDetails?.uploadPolicy instanceof File) {
-      delete healthData.renewalDetails.uploadPolicy;
+    if (healthData.renewalDetails) {
+      healthData.renewalDetails = { ...healthData.renewalDetails };
+      if (healthData.renewalDetails.uploadPolicy instanceof File) {
+        delete healthData.renewalDetails.uploadPolicy;
+      }
     }
     if (healthData.portabilityDetails) {
       healthData.portabilityDetails = healthData.portabilityDetails.map(p => {
@@ -2128,6 +2066,7 @@ const handleUpdateLead = async (e) => {
     ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach(f => {
       if (motorData[f] instanceof File) delete motorData[f];
     });
+    if (motorData.manufacturer !== OTHER_MANUFACTURER) motorData.otherManufacturer = "";
     submitData.append("motorDetails", JSON.stringify(motorData));
   }
 
@@ -2288,7 +2227,6 @@ submitData.append("payoutDetails", JSON.stringify({ ...payoutDetails, ...payoutD
   // ============================================================
   // OPEN EDIT MODAL
   // ============================================================
- // ============================================================
 const openEditModal = (lead) => {
   // CRITICAL FIX: Ensure _id is a string
   const safeLead = {
@@ -2318,12 +2256,17 @@ const openEditModal = (lead) => {
   // Reset quote files
   setQuoteFiles({});
   
-  // Reset payout details
+  // Reset payout details (incl. Motor OD/TP split)
+  const pd = safeLead.payoutDetails || {};
   setPayoutDetails({
-    payoutSlabPercent: safeLead.payoutDetails?.payoutSlabPercent || "",
-    gstReturnSlabPercent: safeLead.payoutDetails?.gstReturnSlabPercent || "",
-    totalCommissionDiscount: safeLead.payoutDetails?.totalCommissionDiscount || "",
-    tdsPercent: safeLead.payoutDetails?.tdsPercent || "2",
+    payoutSlabPercent: pd.payoutSlabPercent ?? "",
+    gstReturnSlabPercent: pd.gstReturnSlabPercent ?? "",
+    totalCommissionDiscount: pd.totalCommissionDiscount ?? "",
+    tdsPercent: pd.tdsPercent ?? "2",
+    odPremium: pd.odPremium ?? "",
+    tpPremium: pd.tpPremium ?? "",
+    odPayoutPercent: pd.odPayoutPercent ?? "",
+    tpPayoutPercent: pd.tpPayoutPercent ?? "",
   });
 
   // Health - with date formatting
@@ -2407,7 +2350,9 @@ const openEditModal = (lead) => {
   // Motor - with date formatting
   if (safeLead.motorDetails) {
     setMotorDetails({
+      ...emptyMotorDetails(),
       ...safeLead.motorDetails,
+      otherManufacturer: safeLead.motorDetails.otherManufacturer || "",
       odDueDate: formatDateForInput(safeLead.motorDetails.odDueDate),
       tpDueDate: formatDateForInput(safeLead.motorDetails.tpDueDate),
       saodOdDueDate: formatDateForInput(safeLead.motorDetails.saodOdDueDate),
@@ -2420,41 +2365,7 @@ const openEditModal = (lead) => {
       invoiceCopy: safeLead.motorDetails.invoiceCopy || null,
     });
   } else {
-    setMotorDetails({
-      vehicleType: "",
-      previousInsuranceStatus: "",
-      manufacturer: "",
-      model: "",
-      fuelType: "",
-      rtoCode: "",
-      chesisNo: "",
-      yearOfManufacturing: "",
-      monthOfManufacturing: "",
-      idvAsPerInvoice: "",
-      insuranceType: "",
-      odDueDate: "",
-      tpDueDate: "",
-      policyNo: "",
-      previousInsurerName: "",
-      idvAsPerPYP: "",
-      saodOdDueDate: "",
-      saodTpDueDate: "",
-      saodPolicyNo: "",
-      saodPreviousInsurerName: "",
-      saodIdvAsPerPYP: "",
-      tpInsuranceDueDate: "",
-      registrationNumber: "",
-      autoRtoCode: "",
-      claimTaken: "",
-      ncb: "",
-      addOnRequired: "",
-      selectedAddOns: [],
-      pypFile: null,
-      rcFrontFile: null,
-      rcBackFile: null,
-      chesisPhoto: null,
-      invoiceCopy: null,
-    });
+    setMotorDetails(emptyMotorDetails());
   }
 
   // Electronic - with date formatting
@@ -2498,6 +2409,12 @@ const openEditModal = (lead) => {
     quoteNumber: safeLead.quoteNumber || safeLead.workflowDetails?.quoteNumber || "",
     selectedInsurers: safeLead.selectedInsurers || safeLead.workflowDetails?.selectedInsurers || [],
     insurerQuotes: safeLead.insurerQuotes || safeLead.workflowDetails?.insurerQuotes || [],
+    acceptedInsurer:
+      safeLead.workflowDetails?.acceptedInsurer ||
+      safeLead.payoutDetails?.acceptedInsurer ||
+      safeLead.previousInsurerName ||
+      safeLead.workflowDetails?.previousInsurerName ||
+      "",
     paymentStatus: safeLead.paymentStatus || safeLead.workflowDetails?.paymentStatus || "",
     paymentUrl: safeLead.paymentUrl || safeLead.workflowDetails?.paymentUrl || "",
     utrNumber: safeLead.utrNumber || safeLead.workflowDetails?.utrNumber || "",
@@ -2566,41 +2483,7 @@ const openEditModal = (lead) => {
       proposerIsMember: "",
       seniorOneDOB: "",
     });
-    setMotorDetails({
-      vehicleType: "",
-      previousInsuranceStatus: "",
-      manufacturer: "",
-      model: "",
-      fuelType: "",
-      rtoCode: "",
-      chesisNo: "",
-      yearOfManufacturing: "",
-      monthOfManufacturing: "",
-      idvAsPerInvoice: "",
-      insuranceType: "",
-      odDueDate: "",
-      tpDueDate: "",
-      policyNo: "",
-      previousInsurerName: "",
-      idvAsPerPYP: "",
-      saodOdDueDate: "",
-      saodTpDueDate: "",
-      saodPolicyNo: "",
-      saodPreviousInsurerName: "",
-      saodIdvAsPerPYP: "",
-      tpInsuranceDueDate: "",
-      registrationNumber: "",
-      autoRtoCode: "",
-      claimTaken: "",
-      ncb: "",
-      addOnRequired: "",
-      selectedAddOns: [],
-      pypFile: null,
-      rcFrontFile: null,
-      rcBackFile: null,
-      chesisPhoto: null,
-      invoiceCopy: null,
-    });
+    setMotorDetails(emptyMotorDetails());
     setElectronicDetails({
       deviceType: "",
       otherDeviceType: "",
@@ -2624,7 +2507,7 @@ const openEditModal = (lead) => {
     setShowTravelSection(false);
     
     setQuoteFiles({});
-    setPayoutDetails({ payoutSlabPercent: "", gstReturnSlabPercent: "", totalCommissionDiscount: "", tdsPercent: "2" });
+    setPayoutDetails(emptyPayoutDetails());
     setShowHealthSection(false);
     setShowMotorSection(false);
     setShowElectronicSection(false);
@@ -2767,6 +2650,26 @@ const openEditModal = (lead) => {
       }
     };
 
+    const renderAlertGroup = (list, title, titleClass, dueText) => (
+      list.length > 0 && (
+        <div className="space-y-2">
+          <h4 className={`text-sm font-medium ${titleClass}`}>{title}</h4>
+          {list.map((alert, idx) => (
+            <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="font-medium">{alert.customerName}</p>
+                  <p className="text-sm">Policy: {alert.policyNumber}</p>
+                  <p className="text-sm">{dueText(alert)}</p>
+                </div>
+                {getIcon(alert.priority)}
+              </div>
+            </div>
+          ))}
+        </div>
+      )
+    );
+
     return (
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -2782,77 +2685,10 @@ const openEditModal = (lead) => {
         </div>
 
         <div className="space-y-3 max-h-60 overflow-y-auto">
-          {groupedAlerts.expired.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-red-600">⚠️ Expired Policies</h4>
-              {groupedAlerts.expired.map((alert, idx) => (
-                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.customerName}</p>
-                      <p className="text-sm">Policy: {alert.policyNumber}</p>
-                      <p className="text-sm">Expired {Math.abs(alert.daysLeft)} days ago</p>
-                    </div>
-                    {getIcon(alert.priority)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {groupedAlerts.urgent.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-orange-600">🔴 Urgent (Due in 7 days)</h4>
-              {groupedAlerts.urgent.map((alert, idx) => (
-                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.customerName}</p>
-                      <p className="text-sm">Policy: {alert.policyNumber}</p>
-                      <p className="text-sm">Due in {alert.daysLeft} days</p>
-                    </div>
-                    {getIcon(alert.priority)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {groupedAlerts.priority.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-yellow-600">🟡 Priority (Due in 15 days)</h4>
-              {groupedAlerts.priority.map((alert, idx) => (
-                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.customerName}</p>
-                      <p className="text-sm">Policy: {alert.policyNumber}</p>
-                      <p className="text-sm">Due in {alert.daysLeft} days</p>
-                    </div>
-                    {getIcon(alert.priority)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {groupedAlerts.normal.length > 0 && (
-            <div className="space-y-2">
-              <h4 className="text-sm font-medium text-blue-600">🔵 Upcoming (Due in 30 days)</h4>
-              {groupedAlerts.normal.map((alert, idx) => (
-                <div key={idx} className={`border-l-4 p-3 rounded-r-lg ${getPriorityColor(alert.priority)}`}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-medium">{alert.customerName}</p>
-                      <p className="text-sm">Policy: {alert.policyNumber}</p>
-                      <p className="text-sm">Due in {alert.daysLeft} days</p>
-                    </div>
-                    {getIcon(alert.priority)}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {renderAlertGroup(groupedAlerts.expired, "⚠️ Expired Policies", "text-red-600", (a) => `Expired ${Math.abs(a.daysLeft)} days ago`)}
+          {renderAlertGroup(groupedAlerts.urgent, "🔴 Urgent (Due in 7 days)", "text-orange-600", (a) => `Due in ${a.daysLeft} days`)}
+          {renderAlertGroup(groupedAlerts.priority, "🟡 Priority (Due in 15 days)", "text-yellow-600", (a) => `Due in ${a.daysLeft} days`)}
+          {renderAlertGroup(groupedAlerts.normal, "🔵 Upcoming (Due in 30 days)", "text-blue-600", (a) => `Due in ${a.daysLeft} days`)}
         </div>
       </motion.div>
     );
@@ -3240,6 +3076,12 @@ const openEditModal = (lead) => {
       setHealthDetails(prev => ({ ...prev, members: newMembers }));
     };
 
+    const updateMemberField = (index, field, value) => {
+      const newMembers = [...healthDetails.members];
+      newMembers[index][field] = value;
+      setHealthDetails(prev => ({ ...prev, members: newMembers }));
+    };
+
     const maxDate = getMaxDate();
 
     return (
@@ -3446,7 +3288,7 @@ const openEditModal = (lead) => {
               type="text"
               value={healthDetails.height}
               onChange={(e) => setHealthDetails(prev => ({ ...prev, height: e.target.value }))}
-              placeholder="e.g., 5'8\"
+              placeholder={`e.g., 5'8"`}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -3656,11 +3498,7 @@ const openEditModal = (lead) => {
                     <input
                       type="text"
                       value={member.name || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].name = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'name', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                       readOnly={member.type === 'proposer'}
                     />
@@ -3671,11 +3509,7 @@ const openEditModal = (lead) => {
                       type="date"
                       max={maxDate}
                       value={member.dob || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].dob = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'dob', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -3683,11 +3517,7 @@ const openEditModal = (lead) => {
                     <label className="text-xs font-medium text-gray-700">Relationship</label>
                     <select
                       value={member.relationship || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].relationship = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'relationship', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                       disabled={member.type === 'proposer'}
                     >
@@ -3700,11 +3530,7 @@ const openEditModal = (lead) => {
                     <input
                       type="text"
                       value={member.height || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].height = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'height', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -3713,11 +3539,7 @@ const openEditModal = (lead) => {
                     <input
                       type="number"
                       value={member.weight || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].weight = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'weight', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -3725,11 +3547,7 @@ const openEditModal = (lead) => {
                     <label className="text-xs font-medium text-gray-700">Qualification</label>
                     <select
                       value={member.qualification || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].qualification = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'qualification', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="">Select</option>
@@ -3740,11 +3558,7 @@ const openEditModal = (lead) => {
                     <label className="text-xs font-medium text-gray-700">Occupation</label>
                     <select
                       value={member.occupation || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].occupation = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'occupation', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="">Select</option>
@@ -3884,137 +3698,47 @@ const openEditModal = (lead) => {
                       </div>
                       {member.selectedRider === "Insta Shield" && (
                         <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                          <div>
-                            <label className="text-xs font-medium text-gray-700">Asthma</label>
-                            <select
-                              value={member.riderDetails?.asthma || ''}
-                              onChange={(e) => handleMemberRiderDetailChange(index, 'asthma', e.target.value)}
-                              className="w-full p-1 border border-gray-300 rounded text-xs"
-                            >
-                              <option value="">Select</option>
-                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
+                          {[
+                            ["asthma", "Asthma"],
+                            ["diabetes", "Diabetes"],
+                            ["hypertension", "Hypertension (Blood Pressure)"],
+                            ["hyperlipidaemia", "Hyperlipidaemia"],
+                          ].map(([key, label]) => (
+                            <div key={key}>
+                              <label className="text-xs font-medium text-gray-700">{label}</label>
+                              <select
+                                value={member.riderDetails?.[key] || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, key, e.target.value)}
+                                className="w-full p-1 border border-gray-300 rounded text-xs"
+                              >
+                                <option value="">Select</option>
+                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                              </select>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {[
+                        ["Fetal Flourish", "fetalFlourish", "Fetal Flourish"],
+                        ["NRInsure", "nrInsure", "NRInsure"],
+                        ["Loss of Income (Any Illness excluding Infection)", "lossOfIncome", "Loss of Income"],
+                        ["Major Illness and Accident Multiplier", "majorIllness", "Major Illness and Accident Multiplier"],
+                        ["International Cover-Emergency Care", "internationalCover", "International Cover"],
+                      ].map(([riderName, key, label]) => (
+                        member.selectedRider === riderName && (
+                          <div key={key}>
+                            <label className="text-xs font-medium text-gray-700">{label}</label>
+                            <input
+                              type="text"
+                              value={member[key] || ''}
+                              onChange={(e) => updateMemberField(index, key, e.target.value)}
+                              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                              placeholder="Enter details"
+                            />
                           </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-700">Diabetes</label>
-                            <select
-                              value={member.riderDetails?.diabetes || ''}
-                              onChange={(e) => handleMemberRiderDetailChange(index, 'diabetes', e.target.value)}
-                              className="w-full p-1 border border-gray-300 rounded text-xs"
-                            >
-                              <option value="">Select</option>
-                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-700">Hypertension (Blood Pressure)</label>
-                            <select
-                              value={member.riderDetails?.hypertension || ''}
-                              onChange={(e) => handleMemberRiderDetailChange(index, 'hypertension', e.target.value)}
-                              className="w-full p-1 border border-gray-300 rounded text-xs"
-                            >
-                              <option value="">Select</option>
-                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          </div>
-                          <div>
-                            <label className="text-xs font-medium text-gray-700">Hyperlipidaemia</label>
-                            <select
-                              value={member.riderDetails?.hyperlipidaemia || ''}
-                              onChange={(e) => handleMemberRiderDetailChange(index, 'hyperlipidaemia', e.target.value)}
-                              className="w-full p-1 border border-gray-300 rounded text-xs"
-                            >
-                              <option value="">Select</option>
-                              {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                            </select>
-                          </div>
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Fetal Flourish" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Fetal Flourish</label>
-                          <input
-                            type="text"
-                            value={member.fetalFlourish || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].fetalFlourish = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "NRInsure" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">NRInsure</label>
-                          <input
-                            type="text"
-                            value={member.nrInsure || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].nrInsure = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Loss of Income (Any Illness excluding Infection)" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Loss of Income</label>
-                          <input
-                            type="text"
-                            value={member.lossOfIncome || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].lossOfIncome = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Major Illness and Accident Multiplier" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Major Illness and Accident Multiplier</label>
-                          <input
-                            type="text"
-                            value={member.majorIllness || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].majorIllness = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "International Cover-Emergency Care" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">International Cover</label>
-                          <input
-                            type="text"
-                            value={member.internationalCover || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].internationalCover = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
+                        )
+                      ))}
                     </>
                   )}
 
@@ -4022,11 +3746,7 @@ const openEditModal = (lead) => {
                     <label className="text-xs font-medium text-gray-700">Remarks (PED/Treatment)</label>
                     <textarea
                       value={member.medicalRemarks || ''}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].medicalRemarks = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      onChange={(e) => updateMemberField(index, 'medicalRemarks', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                       rows="2"
                     />
@@ -4041,7 +3761,7 @@ const openEditModal = (lead) => {
   };
 
   // ============================================================
-  // RENDER: MOTOR FORM - UPDATED with new requirements
+  // RENDER: MOTOR FORM - UPDATED with manufacturer lists + Other
   // ============================================================
   const renderMotorForm = () => {
     const maxDate = getMaxDate();
@@ -4068,6 +3788,10 @@ const openEditModal = (lead) => {
     const showSAODFields = motorDetails.insuranceType === "SAOD (On Damage)";
     const showTPFields = motorDetails.insuranceType === "TP (Third Party)";
 
+    // Manufacturer dropdown depends on Vehicle Type
+    const manufacturerInfo = getManufacturerOptions(motorDetails.vehicleType, motorDetails.manufacturer);
+    const isOtherManufacturer = motorDetails.manufacturer === OTHER_MANUFACTURER;
+
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
         <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
@@ -4081,7 +3805,19 @@ const openEditModal = (lead) => {
             <select
               data-field="vehicleType"
               value={motorDetails.vehicleType}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, vehicleType: e.target.value }))}
+              onChange={(e) => {
+                const vehicleType = e.target.value;
+                setMotorDetails(prev => {
+                  // Clear the manufacturer if it doesn't belong to the new vehicle type's list
+                  const keep = isManufacturerValidForType(vehicleType, prev.manufacturer);
+                  return {
+                    ...prev,
+                    vehicleType,
+                    manufacturer: keep ? prev.manufacturer : "",
+                    otherManufacturer: keep ? prev.otherManufacturer : "",
+                  };
+                });
+              }}
               className={`w-full p-2 border rounded-lg ${validationErrors.vehicleType ? 'border-red-500' : 'border-gray-300'}`}
             >
               <option value="">Select Vehicle Type</option>
@@ -4192,24 +3928,58 @@ const openEditModal = (lead) => {
                 <select
                   data-field="manufacturer"
                   value={motorDetails.manufacturer}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, manufacturer: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'}`}
+                  disabled={!motorDetails.vehicleType}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMotorDetails(prev => ({
+                      ...prev,
+                      manufacturer: value,
+                      otherManufacturer: value === OTHER_MANUFACTURER ? prev.otherManufacturer : "",
+                    }));
+                  }}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'} ${!motorDetails.vehicleType ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
-                  <option value="">Select Manufacturer</option>
-                  {MANUFACTURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="">{motorDetails.vehicleType ? "Select Manufacturer" : "Select Vehicle Type first"}</option>
+                  {manufacturerInfo.legacyValue && (
+                    <option value={manufacturerInfo.legacyValue}>{manufacturerInfo.legacyValue} (saved earlier)</option>
+                  )}
+                  {manufacturerInfo.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {motorDetails.vehicleType && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {manufacturerInfo.count} manufacturers for {motorDetails.vehicleType}. Not listed? Choose "Other".
+                  </p>
+                )}
                 {validationErrors.manufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.manufacturer}</p>}
               </div>
 
+              {/* Manual manufacturer name when "Other" is selected */}
+              {isOtherManufacturer && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Manufacturer Name (Manual) <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="otherManufacturer"
+                    type="text"
+                    value={motorDetails.otherManufacturer || ""}
+                    onChange={(e) => setMotorDetails(prev => ({ ...prev, otherManufacturer: e.target.value }))}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.otherManufacturer ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Enter manufacturer / company name"
+                  />
+                  {validationErrors.otherManufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.otherManufacturer}</p>}
+                </div>
+              )}
+
               <div>
-                <label className="text-sm font-medium text-gray-700">Model <span className="text-red-500">*</span></label>
+                <label className="text-sm font-medium text-gray-700">
+                  {isOtherManufacturer ? "Model Name (Manual)" : "Model"} <span className="text-red-500">*</span>
+                </label>
                 <input
                   data-field="model"
                   type="text"
                   value={motorDetails.model}
                   onChange={(e) => setMotorDetails(prev => ({ ...prev, model: e.target.value }))}
                   className={`w-full p-2 border rounded-lg ${validationErrors.model ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter model name"
+                  placeholder={isOtherManufacturer ? "Enter model name manually" : "Enter model name"}
                 />
                 {validationErrors.model && <p className="text-red-500 text-xs mt-1">{validationErrors.model}</p>}
               </div>
@@ -5042,20 +4812,276 @@ const openEditModal = (lead) => {
   // RENDER: PAYOUT SECTION (Admin Only)
   // ============================================================
  const renderPayoutSection = () => {
-  const isAdmin = localStorage.getItem("userRole") === "Admin";
+  const isAdmin = isAdminUser();
   const isPolicyIssued = workflowDetails.status === "Policy Issued";
 
   // Payout tab only for Admins, and only once the lead has reached "Policy Issued"
-  if (!isAdmin || !isPolicyIssued) return null;
+  if (!isAdmin) return null;
+  if (!isPolicyIssued) {
+    // Don't hide silently - tell the admin how to unlock it
+    return (
+      <div className="border-t-2 border-emerald-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-emerald-700 mb-2 flex items-center gap-2">
+          <FaMoneyBillWave /> PayOut{showMotorSection ? " — Motor" : ""} (Admin Only)
+        </h3>
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600 flex items-start gap-2">
+          <FaClock className="mt-0.5 text-gray-400 flex-shrink-0" />
+          <span>
+            PayOut opens when Status is <span className="font-medium">Policy Issued</span>. Current status:{" "}
+            <span className="font-medium">{workflowDetails.status || "Open"}</span>. Set Payment Status to
+            Payment Done (with UTR) or share a Payment URL, then change Status to Policy Issued.
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const derived = computePayoutDerived();
+  const acceptedQuote = getAcceptedQuote();
+  const acceptedNet = parseFloat(acceptedQuote.netPremium) || 0;
 
+  // Insurers that can be marked as "accepted" (the one the policy was issued with)
+  const insurerChoices = [
+    ...new Set([
+      ...(workflowDetails.selectedInsurers || []),
+      ...(workflowDetails.insurerQuotes || []).map(q => q.insurerName).filter(Boolean),
+    ]),
+  ];
+
+  const acceptedInsurerBlock = (
+    <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-3 gap-4 bg-white p-3 rounded-lg border border-emerald-200">
+      <div>
+        <label className="text-sm font-medium text-gray-700">Policy Issued With (Accepted Quote)</label>
+        <select
+          data-field="payoutAcceptedInsurer"
+          value={workflowDetails.acceptedInsurer || acceptedQuote.insurerName || ""}
+          onChange={(e) => setWorkflowDetails(prev => ({ ...prev, acceptedInsurer: e.target.value }))}
+          className="w-full p-2 border border-gray-300 rounded-lg"
+        >
+          <option value="">{insurerChoices.length ? "Select insurer" : "No insurer quotes added"}</option>
+          {insurerChoices.map(ins => <option key={ins} value={ins}>{ins}</option>)}
+        </select>
+      </div>
+      <div>
+        <label className="text-sm font-medium text-gray-700">Quote Net Premium</label>
+        <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={acceptedNet.toFixed(2)} />
+      </div>
+      <div>
+        <label className="text-sm font-medium text-gray-700">Payment Mode</label>
+        <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={acceptedQuote.paymentMode || "One Time"} />
+      </div>
+    </div>
+  );
+
+  // ======================================================
+  // MOTOR PAYOUT (OD / TP split with cross-validation)
+  // ======================================================
+  if (showMotorSection) {
+    const { hasOD, hasTP } = getMotorPremiumParts(motorDetails.insuranceType);
+    const { errors: motorErrors, warnings: motorWarnings } = getMotorPayoutValidation();
+    const errFor = (suffix) => motorErrors.find(e => e.field === `payout${suffix}`)?.message;
+    const splitEntered = derived.premiumSplitTotal > 0;
+    const splitMatches = acceptedNet > 0 && Math.abs(derived.premiumSplitTotal - acceptedNet) <= 1;
+    const inputCls = (suffix) =>
+      `w-full p-2 border rounded-lg ${errFor(suffix) ? 'border-red-500' : 'border-gray-300'}`;
+
+    return (
+      <div className="border-t-2 border-emerald-200 pt-4 mt-4">
+        <h3 className="text-lg font-semibold text-emerald-700 mb-1 flex items-center gap-2">
+          <FaMoneyBillWave /> PayOut — Motor (Admin Only)
+        </h3>
+        <p className="text-xs text-gray-500 mb-4">
+          Insurance Type: <span className="font-medium text-gray-700">{motorDetails.insuranceType || "Not selected"}</span>
+          {" "}· PayOut is earned on {hasOD && hasTP ? "OD and TP premium separately" : hasOD ? "OD premium only (SAOD)" : "TP premium only"}.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {acceptedInsurerBlock}
+
+          {/* ---- Premium split ---- */}
+          {hasOD && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">OD Premium (Net) <span className="text-red-500">*</span></label>
+              <input
+                data-field="payoutOdPremium"
+                type="number"
+                min="0"
+                className={inputCls("OdPremium")}
+                value={payoutDetails.odPremium}
+                onChange={(e) => setPayoutDetails(prev => ({ ...prev, odPremium: e.target.value }))}
+                placeholder="Own Damage premium"
+              />
+              {errFor("OdPremium") && <p className="text-red-500 text-xs mt-1">{errFor("OdPremium")}</p>}
+            </div>
+          )}
+          {hasTP && (
+            <div>
+              <label className="text-sm font-medium text-gray-700">TP Premium (Net) <span className="text-red-500">*</span></label>
+              <input
+                data-field="payoutTpPremium"
+                type="number"
+                min="0"
+                className={inputCls("TpPremium")}
+                value={payoutDetails.tpPremium}
+                onChange={(e) => setPayoutDetails(prev => ({ ...prev, tpPremium: e.target.value }))}
+                placeholder="Third Party premium"
+              />
+              {errFor("TpPremium") && <p className="text-red-500 text-xs mt-1">{errFor("TpPremium")}</p>}
+            </div>
+          )}
+          <div>
+            <label className="text-sm font-medium text-gray-700">
+              {hasOD && hasTP ? "OD + TP Total" : "Premium Used"} (must equal Net Premium)
+            </label>
+            <input
+              type="text"
+              readOnly
+              className={`w-full p-2 border rounded-lg bg-gray-100 font-medium ${
+                !splitEntered ? 'text-gray-600 border-gray-300' : splitMatches ? 'text-green-700 border-green-400' : 'text-red-600 border-red-400'
+              }`}
+              value={derived.premiumSplitTotal.toFixed(2)}
+            />
+            {splitEntered && (
+              <p className={`text-xs mt-1 ${splitMatches ? 'text-green-600' : 'text-red-500'}`}>
+                {splitMatches ? "✓ Matches quote Net Premium" : `Difference: ₹${(derived.premiumSplitTotal - acceptedNet).toFixed(2)}`}
+              </p>
+            )}
+            {errFor("NetPremium") && <p className="text-red-500 text-xs mt-1">{errFor("NetPremium")}</p>}
+          </div>
+
+          {/* ---- Slabs ---- */}
+          {hasOD && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">OD PayOut Slab (%) <span className="text-red-500">*</span></label>
+                <input
+                  data-field="payoutOdPayoutPercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  className={inputCls("OdPayoutPercent")}
+                  value={payoutDetails.odPayoutPercent}
+                  onChange={(e) => setPayoutDetails(prev => ({ ...prev, odPayoutPercent: e.target.value }))}
+                  placeholder="e.g., 25"
+                />
+                {errFor("OdPayoutPercent") && <p className="text-red-500 text-xs mt-1">{errFor("OdPayoutPercent")}</p>}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">OD PayOut Amount</label>
+                <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.odPayoutAmount.toFixed(2)} />
+              </div>
+            </>
+          )}
+          {hasTP && (
+            <>
+              <div>
+                <label className="text-sm font-medium text-gray-700">TP PayOut Slab (%) <span className="text-red-500">*</span></label>
+                <input
+                  data-field="payoutTpPayoutPercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  className={inputCls("TpPayoutPercent")}
+                  value={payoutDetails.tpPayoutPercent}
+                  onChange={(e) => setPayoutDetails(prev => ({ ...prev, tpPayoutPercent: e.target.value }))}
+                  placeholder="e.g., 2.5"
+                />
+                {errFor("TpPayoutPercent") && <p className="text-red-500 text-xs mt-1">{errFor("TpPayoutPercent")}</p>}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-700">TP PayOut Amount</label>
+                <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100" value={derived.tpPayoutAmount.toFixed(2)} />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="text-sm font-medium text-gray-700">Total PayOut to be Received</label>
+            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-medium" value={derived.totalPayoutToReceive.toFixed(2)} />
+            <p className="text-xs text-gray-500 mt-1">Effective rate: {derived.effectivePayoutPercent.toFixed(2)}% of premium</p>
+          </div>
+
+          {/* ---- GST / TDS / Discount ---- */}
+          <div>
+            <label className="text-sm font-medium text-gray-700">GST % Return Slab</label>
+            <input
+              data-field="payoutGstReturn"
+              type="number"
+              className={inputCls("GstReturn")}
+              value={payoutDetails.gstReturnSlabPercent}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, gstReturnSlabPercent: e.target.value }))}
+              placeholder="e.g., 18"
+            />
+            {errFor("GstReturn") && <p className="text-red-500 text-xs mt-1">{errFor("GstReturn")}</p>}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">GST Return Amount (Auto Calculated)</label>
+            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-medium text-emerald-700" value={derived.gstReturnAmount.toFixed(2)} />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">Total Commission/Discount Made</label>
+            <input
+              type="number"
+              className="w-full p-2 border border-gray-300 rounded-lg"
+              value={payoutDetails.totalCommissionDiscount}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, totalCommissionDiscount: e.target.value }))}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">TDS %</label>
+            <input
+              data-field="payoutTds"
+              type="number"
+              className={inputCls("Tds")}
+              value={payoutDetails.tdsPercent}
+              onChange={(e) => setPayoutDetails(prev => ({ ...prev, tdsPercent: e.target.value }))}
+            />
+            {errFor("Tds") && <p className="text-red-500 text-xs mt-1">{errFor("Tds")}</p>}
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700">TDS Amount (Auto Calculated)</label>
+            <input type="text" readOnly className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 font-medium text-red-600" value={derived.tdsAmount.toFixed(2)} />
+            <p className="text-xs text-gray-500 mt-1">= Total PayOut to be Received × TDS%</p>
+          </div>
+
+          {motorWarnings.length > 0 && (
+            <div className="lg:col-span-3 bg-yellow-50 border border-yellow-300 rounded-lg p-3 space-y-1">
+              {motorWarnings.map((w, i) => (
+                <p key={i} className="text-xs text-yellow-800 flex items-start gap-1">
+                  <FaExclamationTriangle className="mt-0.5 flex-shrink-0" /> {w}
+                </p>
+              ))}
+            </div>
+          )}
+
+          <div className="lg:col-span-3 bg-emerald-50 p-3 rounded-lg border border-emerald-200">
+            <label className="text-sm font-semibold text-emerald-800">Arshyan Payout (Auto Calculated)</label>
+            <input
+              type="text"
+              readOnly
+              className="w-full p-2 border border-emerald-300 rounded-lg bg-white font-bold text-emerald-700 text-lg"
+              value={derived.arshyanPayout.toFixed(2)}
+            />
+            <p className="text-xs text-emerald-600 mt-1">
+              = (OD PayOut + TP PayOut) + GST Return − TDS ({payoutDetails.tdsPercent || 2}%) − Commission/Discount
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ======================================================
+  // NON-MOTOR PAYOUT (unchanged logic)
+  // ======================================================
   return (
     <div className="border-t-2 border-emerald-200 pt-4 mt-4">
       <h3 className="text-lg font-semibold text-emerald-700 mb-4 flex items-center gap-2">
         <FaMoneyBillWave /> PayOut (Admin Only)
       </h3>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {acceptedInsurerBlock}
+
         <div>
           <label className="text-sm font-medium text-gray-700">PayOut Slab (%)</label>
           <input
@@ -5161,6 +5187,11 @@ const openEditModal = (lead) => {
     // (not the instant the dropdown changes, which hid the policy fields)
     const isPolicyIssued = editLead?.status === "Policy Issued";
 
+    // Quotes stay locked after issue - unless the lead was issued without any quote,
+    // otherwise the payout (which needs the quote's Net Premium) could never be entered.
+    const savedHadQuotes = (editLead?.workflowDetails?.selectedInsurers?.length || 0) > 0;
+    const quoteLocked = isPolicyIssued && savedHadQuotes;
+
     // #5: Payment Mode EMI restriction by LOB
     const isEMIEligibleLOB = formData.lob && (
       formData.lob.toLowerCase().includes("health") ||
@@ -5171,6 +5202,14 @@ const openEditModal = (lead) => {
     );
 
     const paymentModeOptionsForLOB = isEMIEligibleLOB ? PAYMENT_TERM_OPTIONS : ["One Time"];
+
+    // Keep quotes visible after "Quotation Generated" too (read-only once Policy Issued),
+    // so the admin can see the quote the payout is calculated from.
+    const showQuotesBlock =
+      workflowDetails.status === "Quotation Generated" ||
+      showInsurerQuotes ||
+      (workflowDetails.selectedInsurers?.length || 0) > 0 ||
+      (isAdminUser() && workflowDetails.status === "Policy Issued");
 
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
@@ -5195,19 +5234,19 @@ const openEditModal = (lead) => {
             {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
           </div>
 
-          {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
+          {showQuotesBlock && (
             <>
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
                 {/* #2: Show all insurers instead of slicing to 10, bumped max-h to 64 */}
-                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto ${quoteLocked ? 'bg-gray-100' : ''}`}>
                   {INSURER_OPTIONS.map(ins => (
                     <label key={ins} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={workflowDetails.selectedInsurers?.includes(ins) || false}
                         onChange={(e) => {
-                          if (isPolicyIssued) return;
+                          if (quoteLocked) return;
                           const current = workflowDetails.selectedInsurers || [];
                           let updated;
                           if (e.target.checked) {
@@ -5217,14 +5256,14 @@ const openEditModal = (lead) => {
                           }
                           setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
                         }}
-                        className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
-                        disabled={isPolicyIssued}
+                        className={`rounded text-indigo-600 ${quoteLocked ? 'cursor-not-allowed' : ''}`}
+                        disabled={quoteLocked}
                       />
                       {ins}
                     </label>
                   ))}
                 </div>
-                {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
+                {quoteLocked && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
               </div>
               {workflowDetails.selectedInsurers?.length > 0 && (
                 <div className="lg:col-span-3">
@@ -5233,15 +5272,20 @@ const openEditModal = (lead) => {
                     const quote = getInsurerQuote(insurer);
                     const derived = computeQuoteDerived(quote);
                     return (
-                      <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
-                        <h6 className="font-medium text-indigo-600">{insurer}</h6>
+                      <div key={idx} className={`border rounded-lg p-3 mb-3 ${quoteLocked ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                        <h6 className="font-medium text-indigo-600">
+                          {insurer}
+                          {workflowDetails.acceptedInsurer === insurer && (
+                            <span className="ml-2 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Policy issued with this quote</span>
+                          )}
+                        </h6>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-2">
                           <div>
                             <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
                             <input
                               type="text"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               placeholder="Enter quote number"
                               value={quote.quoteNumber || ''}
                               onChange={(e) => updateInsurerQuote(insurer, 'quoteNumber', e.target.value)}
@@ -5259,8 +5303,8 @@ const openEditModal = (lead) => {
                             <input
                               type="file"
                               accept=".pdf,.jpg,.jpeg"
-                              disabled={isPolicyIssued}
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
                               onChange={(e) => {
                                 const file = e.target.files[0];
                                 if (file) setQuoteFiles(prev => ({ ...prev, [insurer]: file }));
@@ -5272,8 +5316,8 @@ const openEditModal = (lead) => {
                             <label className="text-xs font-medium text-gray-700">Payment Mode</label>
                             {/* #5: Payment Mode options restricted by LOB */}
                             <select
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               value={quote.paymentMode || (isEMIEligibleLOB ? '' : 'One Time')}
                               onChange={(e) => updateInsurerQuote(insurer, 'paymentMode', e.target.value)}
                             >
@@ -5289,8 +5333,8 @@ const openEditModal = (lead) => {
                             <label className="text-xs font-medium text-gray-700">Net Premium</label>
                             <input
                               type="number"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               value={quote.netPremium || ''}
                               onChange={(e) => updateInsurerQuote(insurer, 'netPremium', e.target.value)}
                             />
@@ -5299,8 +5343,8 @@ const openEditModal = (lead) => {
                             <label className="text-xs font-medium text-gray-700">GST %</label>
                             <input
                               type="number"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               value={quote.gstPercent || ''}
                               onChange={(e) => updateInsurerQuote(insurer, 'gstPercent', e.target.value)}
                             />
@@ -5320,8 +5364,8 @@ const openEditModal = (lead) => {
                                 <label className="text-xs font-medium text-gray-700">Premium per EMI (Net)</label>
                                 <input
                                   type="number"
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiNetPremium || ''}
                                   onChange={(e) => updateInsurerQuote(insurer, 'emiNetPremium', e.target.value)}
                                 />
@@ -5330,8 +5374,8 @@ const openEditModal = (lead) => {
                                 <label className="text-xs font-medium text-gray-700">GST % on EMI</label>
                                 <input
                                   type="number"
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiGstPercent || ''}
                                   onChange={(e) => updateInsurerQuote(insurer, 'emiGstPercent', e.target.value)}
                                 />
@@ -5347,8 +5391,8 @@ const openEditModal = (lead) => {
                               <div>
                                 <label className="text-xs font-medium text-gray-700">EMIs Received So Far</label>
                                 <select
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiReceivedCount || ''}
                                   onChange={(e) => updateInsurerQuote(insurer, 'emiReceivedCount', e.target.value)}
                                 >
@@ -5382,8 +5426,8 @@ const openEditModal = (lead) => {
                             <label className="text-xs font-medium text-gray-700">Final Discount</label>
                             <input
                               type="number"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               value={quote.finalDiscount || ''}
                               onChange={(e) => updateInsurerQuote(insurer, 'finalDiscount', e.target.value)}
                             />
@@ -5562,6 +5606,53 @@ const openEditModal = (lead) => {
             {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Remarks are locked when Policy Issued</p>}
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER: SOURCE-DEPENDENT FIELD (shared by Add & Edit)
+  // ============================================================
+  const renderSourceDependentField = () => {
+    if (!sourceDependentField) return null;
+    return (
+      <div>
+        <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
+        {formData.source === "Employee" ? (
+          <select
+            value={formData.sourceDependentValue}
+            onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+            className="w-full p-2 border border-gray-300 rounded-lg"
+          >
+            <option value="">Select Employee</option>
+            {employees.map((emp) => (
+              <option key={emp._id} value={emp.fullName || emp.username}>
+                {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
+              </option>
+            ))}
+          </select>
+        ) : formData.source === "Channel Partner" ? (
+          <select
+            value={formData.sourceDependentValue}
+            onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+            className="w-full p-2 border border-gray-300 rounded-lg"
+          >
+            <option value="">Select Channel Partner</option>
+            {channelPartners.map((partner) => (
+              <option key={partner._id} value={partner.fullName || partner.username}>
+                {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <input
+            type="text"
+            value={formData.sourceDependentValue}
+            onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
+            className="w-full p-2 border border-gray-300 rounded-lg"
+            placeholder={`Enter ${sourceDependentField}`}
+          />
+        )}
       </div>
     );
   };
@@ -5747,46 +5838,8 @@ const openEditModal = (lead) => {
                 </select>
               </div>
 
-            {sourceDependentField && (
-  <div>
-    <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-    {formData.source === "Employee" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Employee</option>
-        {employees.map((emp) => (
-          <option key={emp._id} value={emp.fullName || emp.username}>
-            {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : formData.source === "Channel Partner" ? (
-      <select
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-      >
-        <option value="">Select Channel Partner</option>
-        {channelPartners.map((partner) => (
-          <option key={partner._id} value={partner.fullName || partner.username}>
-            {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
-          </option>
-        ))}
-      </select>
-    ) : (
-      <input
-        type="text"
-        value={formData.sourceDependentValue}
-        onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-        className="w-full p-2 border border-gray-300 rounded-lg"
-        placeholder={`Enter ${sourceDependentField}`}
-      />
-    )}
-  </div>
-)}
+              {renderSourceDependentField()}
+
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Discussed with Customer Remarks</label>
                 <textarea
@@ -6033,46 +6086,7 @@ const openEditModal = (lead) => {
                 </select>
               </div>
 
-              {sourceDependentField && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">{sourceDependentField}</label>
-                  {formData.source === "Employee" ? (
-                    <select
-                      value={formData.sourceDependentValue}
-                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Employee</option>
-                      {employees.map((emp) => (
-                        <option key={emp._id} value={emp.fullName || emp.username}>
-                          {emp.fullName || emp.username} {emp.employeeId ? `(${emp.employeeId})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : formData.source === "Channel Partner" ? (
-                    <select
-                      value={formData.sourceDependentValue}
-                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                    >
-                      <option value="">Select Channel Partner</option>
-                      {channelPartners.map((partner) => (
-                        <option key={partner._id} value={partner.fullName || partner.username}>
-                          {partner.fullName || partner.username} {partner.companyName ? `(${partner.companyName})` : ''}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <input
-                      type="text"
-                      value={formData.sourceDependentValue}
-                      onChange={(e) => setFormData({ ...formData, sourceDependentValue: e.target.value })}
-                      className="w-full p-2 border border-gray-300 rounded-lg"
-                      placeholder={`Enter ${sourceDependentField}`}
-                    />
-                  )}
-                </div>
-              )}
+              {renderSourceDependentField()}
 
               <div>
                 <label className="text-sm font-medium text-gray-700">Policy Tenure</label>
@@ -6098,17 +6112,23 @@ const openEditModal = (lead) => {
                 </select>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-gray-700">Sum Insured</label>
-                <select
-                  value={formData.sumInsured}
-                  onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
+              {/* Motor uses a manual IDV in the Motor section, so hide the lakh-dropdown here for motor */}
+              {!showMotorSection && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Sum Insured</label>
+                  <select
+                    value={formData.sumInsured}
+                    onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select</option>
+                    {formData.sumInsured && !SUM_INSURED_OPTIONS.includes(formData.sumInsured) && (
+                      <option value={formData.sumInsured}>{formData.sumInsured}</option>
+                    )}
+                    {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Remarks</label>
@@ -6263,14 +6283,27 @@ const openEditModal = (lead) => {
                   <div>Insurance Type: {selectedLead.motorDetails.insuranceType || "-"}</div>
                   <div>NCB: {selectedLead.motorDetails.ncb || "-"}</div>
                   <div>Claim Taken: {selectedLead.motorDetails.claimTaken || "-"}</div>
-                  {selectedLead.motorDetails.manufacturer && <div>Manufacturer: {selectedLead.motorDetails.manufacturer}</div>}
+                  {selectedLead.motorDetails.manufacturer && <div>Manufacturer: {getDisplayManufacturer(selectedLead.motorDetails)}</div>}
                   {selectedLead.motorDetails.model && <div>Model: {selectedLead.motorDetails.model}</div>}
+                  {selectedLead.motorDetails.fuelType && <div>Fuel Type: {selectedLead.motorDetails.fuelType}</div>}
                   {selectedLead.motorDetails.chesisNo && <div>Chesis No.: {selectedLead.motorDetails.chesisNo}</div>}
                   {selectedLead.motorDetails.yearOfManufacturing && <div>Year: {selectedLead.motorDetails.yearOfManufacturing}</div>}
                   {selectedLead.motorDetails.monthOfManufacturing && <div>Month: {selectedLead.motorDetails.monthOfManufacturing}</div>}
                   {selectedLead.motorDetails.selectedAddOns && selectedLead.motorDetails.selectedAddOns.length > 0 && (
                     <div className="sm:col-span-2">Add-Ons: {selectedLead.motorDetails.selectedAddOns.join(", ")}</div>
                   )}
+                </div>
+              </div>
+            )}
+            {selectedLead.payoutDetails?.isMotor && (
+              <div className="sm:col-span-2 border-t pt-2 mt-2">
+                <h4 className="font-semibold text-emerald-600">Motor PayOut</h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-1 text-sm">
+                  <div>Accepted Insurer: {selectedLead.payoutDetails.acceptedInsurer || "-"}</div>
+                  <div>OD Premium: ₹{Number(selectedLead.payoutDetails.odPremium || 0).toFixed(2)} @ {selectedLead.payoutDetails.odPayoutPercent ?? 0}%</div>
+                  <div>TP Premium: ₹{Number(selectedLead.payoutDetails.tpPremium || 0).toFixed(2)} @ {selectedLead.payoutDetails.tpPayoutPercent ?? 0}%</div>
+                  <div>Total PayOut: ₹{Number(selectedLead.payoutDetails.totalPayoutToReceive || 0).toFixed(2)}</div>
+                  <div>Arshyan Payout: ₹{Number(selectedLead.payoutDetails.arshyanPayout || 0).toFixed(2)}</div>
                 </div>
               </div>
             )}
@@ -6338,7 +6371,7 @@ const openEditModal = (lead) => {
       >
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-wrap">
           <button
-            onClick={() => setShowLeadForm(true)}
+            onClick={() => { resetForm(); setShowLeadForm(true); }}
             className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-all flex items-center gap-2"
           >
             <FaUserPlus /> Add New Lead
@@ -6472,20 +6505,19 @@ const openEditModal = (lead) => {
                   <td className="p-3">{lead.policyTenure || "-"}</td>
                   <td className="p-3">{lead.sumInsured || "-"}</td>
                   <td className="p-3 flex gap-2 items-center">
-        
-<button 
-  onClick={() => {
-    // Ensure _id is a string
-    const safeLead = {
-      ...lead,
-      _id: typeof lead._id === 'string' ? lead._id : String(lead._id || '')
-    };
-    setSelectedLead(safeLead);
-  }} 
-  className="text-indigo-600 hover:text-indigo-800"
->
-  <FaEye className="h-5 w-5" />
-</button>
+                    <button 
+                      onClick={() => {
+                        // Ensure _id is a string
+                        const safeLead = {
+                          ...lead,
+                          _id: typeof lead._id === 'string' ? lead._id : String(lead._id || '')
+                        };
+                        setSelectedLead(safeLead);
+                      }} 
+                      className="text-indigo-600 hover:text-indigo-800"
+                    >
+                      <FaEye className="h-5 w-5" />
+                    </button>
                     <button onClick={() => openEditModal(lead)} className="text-blue-600 hover:text-blue-800">
                       <FaEdit className="h-5 w-5" />
                     </button>

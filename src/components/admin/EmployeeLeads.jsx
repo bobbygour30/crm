@@ -49,6 +49,18 @@ import {
 import * as XLSX from "xlsx";
 import PersonalAccidentForm, { emptyPA, hydratePA, validatePA, appendPA } from "../lob/PersonalAccidentForm";
 import TravelInsuranceForm, { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "../lob/TravelInsuranceForm";
+import {
+  OTHER_MANUFACTURER,
+  getManufacturerOptions,
+  isManufacturerValidForType,
+  getDisplayManufacturer,
+  isMotorLob,
+  emptyMotorDetails,
+  getMotorPremiumParts,
+  computeMotorPayout,
+  validateMotorPayout,
+  isAdminUser,
+} from "../lob/motorInsurance";
 
 function EmployeeLeads() {
   // ============================================================
@@ -210,38 +222,8 @@ function EmployeeLeads() {
     "Tata AIA Life Insurance",
   ];
 
-  const MANUFACTURER_OPTIONS = [
-    "Maruti Suzuki",
-    "Hyundai",
-    "Tata Motors",
-    "Mahindra",
-    "Honda",
-    "Toyota",
-    "Ford",
-    "Volkswagen",
-    "Renault",
-    "Nissan",
-    "Skoda",
-    "Kia",
-    "MG Motor",
-    "Jeep",
-    "Mercedes-Benz",
-    "BMW",
-    "Audi",
-    "Volvo",
-    "Land Rover",
-    "Jaguar",
-    "Porsche",
-    "Lamborghini",
-    "Ferrari",
-    "Maserati",
-    "Bentley",
-    "Rolls-Royce",
-    "Aston Martin",
-    "McLaren",
-    "Bugatti",
-    "Koegnigsegg"
-  ];
+  // NOTE: Manufacturer lists now live in ../lob/motorInsurance.js
+  // (Two Wheeler / Four Wheeler lists + "Other")
 
   const POLICY_TENURE_OPTIONS = ["1 Year", "2 Years", "3 Years"];
   
@@ -337,7 +319,92 @@ function EmployeeLeads() {
   };
 
   // ============================================================
-  // EMI / PAYOUT CALCULATION HELPERS - ADDED
+  // HELPERS
+  // ============================================================
+  const safeNumber = (value) => {
+    const num = parseFloat(value);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const formatCurrency = (val) => {
+    return val ? Number(val).toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "0.00";
+  };
+
+  const formatDate = (dateString) => {
+    if (!dateString) return "-";
+    return new Date(dateString).toLocaleDateString("en-IN");
+  };
+
+  // ============================================================
+  // EMPTY STATE FACTORIES
+  // ============================================================
+  const emptyHealthDetails = () => ({
+    policyType: "",
+    numberOfAdults: 0,
+    numberOfChildren: 0,
+    familyIncome: "",
+    height: "",
+    weight: "",
+    qualification: "",
+    occupation: "",
+    nomineeName: "",
+    nomineeDOB: "",
+    nomineeRelationship: "",
+    aadhaarNumber: "",
+    aadhaarFile: null,
+    panNumber: "",
+    panFile: null,
+    hasPreviousPolicy: "",
+    previousPolicyCase: "",
+    experienceYears: "",
+    proposerDOB: "",
+    renewalDetails: {
+      insurerName: "",
+      policyNumber: "",
+      policyDueDate: "",
+      uploadPolicy: null,
+    },
+    portabilityDetails: [],
+    medicalRemarks: "",
+    members: [],
+    proposerIsMember: "",
+    seniorOneDOB: "",
+  });
+
+  const emptyElectronicDetails = () => ({
+    deviceType: "",
+    otherDeviceType: "",
+    dateOfPurchase: "",
+    purchaseValue: "",
+    aadhaarNumber: "",
+    aadhaarFile: null,
+    panNumber: "",
+    panFile: null,
+    imeiNumber: "",
+    imeiImage: null,
+    devicePhotos: [],
+    purchaseInvoice: null,
+  });
+
+  const emptyWorkflowDetails = (status = "Open") => ({
+    status,
+    quoteNumber: "",
+    selectedInsurers: [],
+    insurerQuotes: [],
+    paymentStatus: "",
+    paymentUrl: "",
+    utrNumber: "",
+    paymentSnapshot: null,
+    policyNumber: "",
+    policyIssuedOn: "",
+    policyStartDate: "",
+    policyExpiryDate: "",
+    policyCopy: null,
+    remarks: "",
+  });
+
+  // ============================================================
+  // EMI / PAYOUT CALCULATION HELPERS
   // ============================================================
   const EMI_PER_YEAR = {
     "Monthly": 12,
@@ -362,7 +429,8 @@ function EmployeeLeads() {
 
   // Recalculates every derived field on a single insurer quote object.
   // TDS is fixed at 2% per requirement #11.
-  const recalcInsurerQuote = (quote, policyTenure) => {
+  // motorCtx = { isMotor, insuranceType } -> Motor uses the OD/TP split payout.
+  const recalcInsurerQuote = (quote, policyTenure, motorCtx = {}) => {
   const q = { ...quote };
 
   const netPremium = safeNumber(q.netPremium);
@@ -390,7 +458,31 @@ function EmployeeLeads() {
   const finalDiscount = safeNumber(q.finalDiscount);
   q.payableAmount = q.grossPremium - finalDiscount;
 
-  // ---- Payout (Admin only) ----
+  // ---- MOTOR Payout (Admin only): OD / TP split ----
+  if (motorCtx.isMotor) {
+    const m = computeMotorPayout({
+      insuranceType: motorCtx.insuranceType,
+      odPremium: q.odPremium,
+      tpPremium: q.tpPremium,
+      odPayoutPercent: q.odPayoutSlab,
+      tpPayoutPercent: q.tpPayoutSlab,
+      gstReturnSlabPercent: q.gstReturnSlabOnEMI,
+      tdsPercent: 2, // TDS fixed at 2%
+      deduction: finalDiscount,
+    });
+    q.odPayoutAmount = m.odPayoutAmount;
+    q.tpPayoutAmount = m.tpPayoutAmount;
+    q.totalPayoutReceivable = m.totalPayoutToReceive;
+    q.payoutOnEMI = 0;
+    q.gstReturnAmount = m.gstReturnAmount;
+    q.tdsAmount = m.tdsAmount;
+    q.arshyanPayout = m.arshyanPayout;
+    q.isEMIMode = false;
+    q.isMotorPayout = true;
+    return q;
+  }
+
+  // ---- Payout (Admin only) - non-motor ----
   const payoutSlab = safeNumber(q.payoutSlab);
   q.totalPayoutReceivable = netPremium * payoutSlab / 100;
   q.payoutOnEMI = isEMIMode ? (emiNet * payoutSlab / 100) : 0;
@@ -411,6 +503,7 @@ function EmployeeLeads() {
   q.arshyanPayout = receivedInsurerPayout + q.gstReturnAmount - q.tdsAmount - finalDiscount;
 
   q.isEMIMode = isEMIMode;
+  q.isMotorPayout = false;
 
   return q;
 };
@@ -448,89 +541,9 @@ function EmployeeLeads() {
     sumInsured: "",
   });
 
-  const [healthDetails, setHealthDetails] = useState({
-    policyType: "",
-    numberOfAdults: 0,
-    numberOfChildren: 0,
-    familyIncome: "",
-    height: "",
-    weight: "",
-    qualification: "",
-    occupation: "",
-    nomineeName: "",
-    nomineeDOB: "",
-    nomineeRelationship: "",
-    aadhaarNumber: "",
-    aadhaarFile: null,
-    panNumber: "",
-    panFile: null,
-    hasPreviousPolicy: "",
-    previousPolicyCase: "",
-    experienceYears: "",
-    proposerDOB: "",
-    renewalDetails: {
-      insurerName: "",
-      policyNumber: "",
-      policyDueDate: "",
-      uploadPolicy: null,
-    },
-    portabilityDetails: [],
-    medicalRemarks: "",
-    members: [],
-    proposerIsMember: "",
-    seniorOneDOB: "",
-  });
-
-  const [motorDetails, setMotorDetails] = useState({
-    vehicleType: "",
-    previousInsuranceStatus: "",
-    manufacturer: "",
-    model: "",
-    fuelType: "",
-    rtoCode: "",
-    chesisNo: "",
-    yearOfManufacturing: "",
-    monthOfManufacturing: "",
-    idvAsPerInvoice: "",
-    insuranceType: "",
-    odDueDate: "",
-    tpDueDate: "",
-    policyNo: "",
-    previousInsurerName: "",
-    idvAsPerPYP: "",
-    saodOdDueDate: "",
-    saodTpDueDate: "",
-    saodPolicyNo: "",
-    saodPreviousInsurerName: "",
-    saodIdvAsPerPYP: "",
-    tpInsuranceDueDate: "",
-    registrationNumber: "",
-    autoRtoCode: "",
-    claimTaken: "",
-    ncb: "",
-    addOnRequired: "",
-    selectedAddOns: [],
-    pypFile: null,
-    rcFrontFile: null,
-    rcBackFile: null,
-    chesisPhoto: null,
-    invoiceCopy: null,
-  });
-
-  const [electronicDetails, setElectronicDetails] = useState({
-    deviceType: "",
-    otherDeviceType: "",
-    dateOfPurchase: "",
-    purchaseValue: "",
-    aadhaarNumber: "",
-    aadhaarFile: null,
-    panNumber: "",
-    panFile: null,
-    imeiNumber: "",
-    imeiImage: null,
-    devicePhotos: [],
-    purchaseInvoice: null,
-  });
+  const [healthDetails, setHealthDetails] = useState(emptyHealthDetails());
+  const [motorDetails, setMotorDetails] = useState(emptyMotorDetails());
+  const [electronicDetails, setElectronicDetails] = useState(emptyElectronicDetails());
 
   // ============================================================
   // PERSONAL ACCIDENT & TRAVEL STATE
@@ -540,23 +553,8 @@ function EmployeeLeads() {
   const [showPASection, setShowPASection] = useState(false);
   const [showTravelSection, setShowTravelSection] = useState(false);
 
-  // Workflow Details State - ADDED
-  const [workflowDetails, setWorkflowDetails] = useState({
-    status: "Open",
-    quoteNumber: "",
-    selectedInsurers: [],
-    insurerQuotes: [],
-    paymentStatus: "",
-    paymentUrl: "",
-    utrNumber: "",
-    paymentSnapshot: null,
-    policyNumber: "",
-    policyIssuedOn: "",
-    policyStartDate: "",
-    policyExpiryDate: "",
-    policyCopy: null,
-    remarks: "",
-  });
+  // Workflow Details State
+  const [workflowDetails, setWorkflowDetails] = useState(emptyWorkflowDetails());
 
   const [showHealthSection, setShowHealthSection] = useState(false);
   const [showMotorSection, setShowMotorSection] = useState(false);
@@ -587,6 +585,12 @@ function EmployeeLeads() {
   
   const filterDropdownRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
+
+  // Motor context used by every payout recalculation
+  const getMotorCtx = (lob = formData.lob, insuranceType = motorDetails.insuranceType) => ({
+    isMotor: isMotorLob(lob),
+    insuranceType,
+  });
 
   // ============================================================
   // EFFECTS
@@ -663,9 +667,34 @@ function EmployeeLeads() {
     }
   }, [error]);
 
+  // Auto-fetch RTO from Registration Number (only for non-New vehicles)
+  useEffect(() => {
+    const isNewVehicle = motorDetails.previousInsuranceStatus === "New";
+    if (!isNewVehicle && motorDetails.registrationNumber && motorDetails.registrationNumber.length >= 4) {
+      const reg = motorDetails.registrationNumber.toUpperCase();
+      const rtoMatch = reg.match(/^([A-Z]{2}[0-9]+)/);
+      if (rtoMatch && rtoMatch[1] !== motorDetails.autoRtoCode) {
+        setMotorDetails(prev => ({ ...prev, autoRtoCode: rtoMatch[1] }));
+      }
+    }
+  }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
+
+  // Motor: when Insurance Type changes (OD/TP parts change), refresh quote payouts
+  useEffect(() => {
+    if (!showMotorSection) return;
+    setWorkflowDetails(prev => {
+      if (!prev.insurerQuotes || prev.insurerQuotes.length === 0) return prev;
+      return {
+        ...prev,
+        insurerQuotes: prev.insurerQuotes.map(q =>
+          q ? recalcInsurerQuote(q, formData.policyTenure, { isMotor: true, insuranceType: motorDetails.insuranceType }) : q
+        ),
+      };
+    });
+  }, [motorDetails.insuranceType, showMotorSection]);
+
   // ============================================================
   // #6a: AUTO-CALCULATE POLICY EXPIRY DATE FROM START DATE + TENURE
-  // (Removed && formData.policyTenure guard; getTenureYears already defaults to 1)
   // ============================================================
   useEffect(() => {
     if (workflowDetails.policyStartDate) {
@@ -840,27 +869,7 @@ function EmployeeLeads() {
     const isHealth = lob.toLowerCase().includes("health") || 
                      lob === "Mediclaim Health Insurance" || 
                      lob === "Group Health Insurance";
-    const isMotor = lob.toLowerCase().includes("motor") || 
-                    lob.includes("Car") || 
-                    lob.includes("Two-Wheeler") || 
-                    lob.includes("Taxi") ||
-                    lob.includes("Commercial Vehicle") ||
-                    lob.includes("E-Rikshaw") ||
-                    lob.includes("School Bus") ||
-                    lob.includes("Truck") ||
-                    lob.includes("Tractor") ||
-                    lob.includes("Auto Rickshaw") ||
-                    lob === "Private Car-OD" ||
-                    lob === "Private Car-SOD" ||
-                    lob === "Private Car-Comprehensive" ||
-                    lob === "Private Car-TP" ||
-                    lob === "Taxi-Comprehensive" ||
-                    lob === "Taxi-TP" ||
-                    lob === "Commercial Vehicle-Comprehensive" ||
-                    lob === "Commercial Vehicle-TP" ||
-                    lob === "E-Rikshaw-TP" ||
-                    lob === "E-Rikshaw-Comprehensive" ||
-                    lob === "Two-Wheeler-TP";
+    const isMotor = isMotorLob(lob);
     const isElectronic = lob.toLowerCase().includes("mobile") || 
                          lob.toLowerCase().includes("electronic") || 
                          lob.toLowerCase().includes("equipment") ||
@@ -877,6 +886,42 @@ function EmployeeLeads() {
   // ============================================================
   // #1: FLOATER MEMBERS (Fixed stale state bug — accepts overrides)
   // ============================================================
+  const buildEmptyMember = (id, type) => ({
+    id,
+    type,
+    name: '',
+    dob: '',
+    monthlyIncome: '',
+    height: '',
+    weight: '',
+    qualification: '',
+    occupation: '',
+    relationship: '',
+    aadhaarNumber: '',
+    aadhaarFile: null,
+    panNumber: '',
+    panFile: null,
+    epicFile: null,
+    birthCertificate: null,
+    ped: '',
+    treatmentHistory: '',
+    medicalRemarks: '',
+    wantRider: '',
+    selectedRider: '',
+    riderDetails: {
+      instaShield: '',
+      asthma: '',
+      diabetes: '',
+      hypertension: '',
+      hyperlipidaemia: '',
+    },
+    fetalFlourish: '',
+    nrInsure: '',
+    lossOfIncome: '',
+    majorIllness: '',
+    internationalCover: '',
+  });
+
   const generateFloaterMembers = (adultsOverride, childrenOverride, proposerOverride) => {
     let adults = parseInt(adultsOverride ?? healthDetails.numberOfAdults) || 0;
     let children = parseInt(childrenOverride ?? healthDetails.numberOfChildren) || 0;
@@ -886,8 +931,7 @@ function EmployeeLeads() {
     
     if (proposerIsMember === "Yes") {
       members.push({
-        id: `proposer`,
-        type: 'proposer',
+        ...buildEmptyMember('proposer', 'proposer'),
         name: formData.name || '',
         dob: healthDetails.proposerDOB || '',
         monthlyIncome: healthDetails.familyIncome || '',
@@ -901,141 +945,20 @@ function EmployeeLeads() {
         aadhaarFile: healthDetails.aadhaarFile || null,
         panNumber: healthDetails.panNumber || '',
         panFile: healthDetails.panFile || null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-        wantRider: '',
-        selectedRider: '',
-        riderDetails: {
-          instaShield: '',
-          asthma: '',
-          diabetes: '',
-          hypertension: '',
-          hyperlipidaemia: '',
-        },
-        fetalFlourish: '',
-        nrInsure: '',
-        lossOfIncome: '',
-        majorIllness: '',
-        internationalCover: '',
       });
       
       const remainingAdults = adults > 1 ? adults - 1 : 0;
       for (let i = 1; i <= remainingAdults; i++) {
-        members.push({
-          id: `adult-${i}`,
-          type: 'adult',
-          name: '',
-          dob: '',
-          monthlyIncome: '',
-          height: '',
-          weight: '',
-          qualification: '',
-          occupation: '',
-          relationship: '',
-          aadhaarNumber: '',
-          aadhaarFile: null,
-          panNumber: '',
-          panFile: null,
-          epicFile: null,
-          birthCertificate: null,
-          ped: '',
-          treatmentHistory: '',
-          medicalRemarks: '',
-          wantRider: '',
-          selectedRider: '',
-          riderDetails: {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          },
-          fetalFlourish: '',
-          nrInsure: '',
-          lossOfIncome: '',
-          majorIllness: '',
-          internationalCover: '',
-        });
+        members.push(buildEmptyMember(`adult-${i}`, 'adult'));
       }
     } else {
       for (let i = 1; i <= adults; i++) {
-        members.push({
-          id: `adult-${i}`,
-          type: 'adult',
-          name: '',
-          dob: '',
-          monthlyIncome: '',
-          height: '',
-          weight: '',
-          qualification: '',
-          occupation: '',
-          relationship: '',
-          aadhaarNumber: '',
-          aadhaarFile: null,
-          panNumber: '',
-          panFile: null,
-          epicFile: null,
-          birthCertificate: null,
-          ped: '',
-          treatmentHistory: '',
-          medicalRemarks: '',
-          wantRider: '',
-          selectedRider: '',
-          riderDetails: {
-            instaShield: '',
-            asthma: '',
-            diabetes: '',
-            hypertension: '',
-            hyperlipidaemia: '',
-          },
-          fetalFlourish: '',
-          nrInsure: '',
-          lossOfIncome: '',
-          majorIllness: '',
-          internationalCover: '',
-        });
+        members.push(buildEmptyMember(`adult-${i}`, 'adult'));
       }
     }
     
     for (let i = 1; i <= children; i++) {
-      members.push({
-        id: `child-${i}`,
-        type: 'child',
-        name: '',
-        dob: '',
-        monthlyIncome: '',
-        height: '',
-        weight: '',
-        qualification: '',
-        occupation: '',
-        relationship: '',
-        aadhaarNumber: '',
-        aadhaarFile: null,
-        panNumber: '',
-        panFile: null,
-        epicFile: null,
-        birthCertificate: null,
-        ped: '',
-        treatmentHistory: '',
-        medicalRemarks: '',
-        wantRider: '',
-        selectedRider: '',
-        riderDetails: {
-          instaShield: '',
-          asthma: '',
-          diabetes: '',
-          hypertension: '',
-          hyperlipidaemia: '',
-        },
-        fetalFlourish: '',
-        nrInsure: '',
-        lossOfIncome: '',
-        majorIllness: '',
-        internationalCover: '',
-      });
+      members.push(buildEmptyMember(`child-${i}`, 'child'));
     }
     
     setHealthDetails(prev => ({ ...prev, members }));
@@ -1113,22 +1036,8 @@ function EmployeeLeads() {
   };
 
   // ============================================================
-  // HELPERS
+  // DISPLAY HELPERS
   // ============================================================
-  const safeNumber = (value) => {
-    const num = parseFloat(value);
-    return isNaN(num) ? 0 : num;
-  };
-
-  const formatCurrency = (val) => {
-    return val ? Number(val).toLocaleString("en-IN", { maximumFractionDigits: 2 }) : "0.00";
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return "-";
-    return new Date(dateString).toLocaleDateString("en-IN");
-  };
-
   const getEmployeeName = (employeeId) => {
     if (!employeeId) return "Unknown";
 
@@ -1178,75 +1087,66 @@ function EmployeeLeads() {
     }
   };
 
+  // Payout block is visible to Admin once the lead is (or is being marked) Policy Issued
+  const isPayoutVisible = () =>
+    isAdminUser() &&
+    (editLead?.status === "Policy Issued" || workflowDetails.status === "Policy Issued");
+
+  // Motor payout cross-validation for one quote
+  const getQuoteMotorValidation = (quote, idx) => {
+    const insurerName = quote?.insurerName || workflowDetails.selectedInsurers?.[idx] || `Quote ${idx + 1}`;
+    return validateMotorPayout(
+      {
+        insuranceType: motorDetails.insuranceType,
+        netPremium: quote?.netPremium,
+        odPremium: quote?.odPremium,
+        tpPremium: quote?.tpPremium,
+        odPayoutPercent: quote?.odPayoutSlab,
+        tpPayoutPercent: quote?.tpPayoutSlab,
+        gstReturnSlabPercent: quote?.gstReturnSlabOnEMI,
+        tdsPercent: 2,
+        deduction: quote?.finalDiscount,
+      },
+      { fieldPrefix: `quote${idx}_`, labelPrefix: insurerName }
+    );
+  };
+
   // ============================================================
   // VALIDATE ALL FIELDS
   // ============================================================
   const validateAllFields = () => {
     const errors = {};
     const errorList = [];
+    const push = (key, field, message) => {
+      errors[key] = message;
+      errorList.push({ field, message });
+    };
     
     // Basic validation
-    if (!formData.name) {
-      errors.name = "Name is required";
-      errorList.push({ field: "name", message: "Name is required" });
-    }
-    if (!formData.mobileNo) {
-      errors.mobileNo = "Mobile number is required";
-      errorList.push({ field: "mobileNo", message: "Mobile number is required" });
-    }
-    if (formData.mobileNo && !validateMobile(formData.mobileNo)) {
-      errors.mobileNo = "Enter valid 10-digit mobile number";
-      errorList.push({ field: "mobileNo", message: "Enter valid 10-digit mobile number" });
-    }
-    if (formData.email && !validateEmail(formData.email)) {
-      errors.email = "Invalid email format";
-      errorList.push({ field: "email", message: "Invalid email format" });
-    }
-    if (formData.pinCode && !validatePIN(formData.pinCode)) {
-      errors.pinCode = "Enter valid 6-digit PIN code";
-      errorList.push({ field: "pinCode", message: "Enter valid 6-digit PIN code" });
-    }
-    if (!formData.lob) {
-      errors.lob = "LOB is required";
-      errorList.push({ field: "lob", message: "LOB is required" });
-    }
+    if (!formData.name) push("name", "name", "Name is required");
+    if (!formData.mobileNo) push("mobileNo", "mobileNo", "Mobile number is required");
+    if (formData.mobileNo && !validateMobile(formData.mobileNo)) push("mobileNo", "mobileNo", "Enter valid 10-digit mobile number");
+    if (formData.email && !validateEmail(formData.email)) push("email", "email", "Invalid email format");
+    if (formData.pinCode && !validatePIN(formData.pinCode)) push("pinCode", "pinCode", "Enter valid 6-digit PIN code");
+    if (!formData.lob) push("lob", "lob", "LOB is required");
     
     // Health validation
     if (showHealthSection) {
-      if (!healthDetails.policyType) {
-        errors.policyType = "Policy Type is required";
-        errorList.push({ field: "policyType", message: "Policy Type is required" });
-      }
+      if (!healthDetails.policyType) push("policyType", "policyType", "Policy Type is required");
       
       if (healthDetails.policyType === "Individual") {
-        if (!healthDetails.nomineeName) {
-          errors.nomineeName = "Nominee Name is required for Individual policy";
-          errorList.push({ field: "nomineeName", message: "Nominee Name is required for Individual policy" });
-        }
-        if (!healthDetails.nomineeDOB) {
-          errors.nomineeDOB = "Nominee DOB is required for Individual policy";
-          errorList.push({ field: "nomineeDOB", message: "Nominee DOB is required for Individual policy" });
-        }
-        if (!healthDetails.nomineeRelationship) {
-          errors.nomineeRelationship = "Nominee Relationship is required for Individual policy";
-          errorList.push({ field: "nomineeRelationship", message: "Nominee Relationship is required for Individual policy" });
-        }
+        if (!healthDetails.nomineeName) push("nomineeName", "nomineeName", "Nominee Name is required for Individual policy");
+        if (!healthDetails.nomineeDOB) push("nomineeDOB", "nomineeDOB", "Nominee DOB is required for Individual policy");
+        if (!healthDetails.nomineeRelationship) push("nomineeRelationship", "nomineeRelationship", "Nominee Relationship is required for Individual policy");
       }
       
       if (healthDetails.policyType === "Floater") {
-        if (!healthDetails.numberOfAdults || healthDetails.numberOfAdults <= 0) {
-          errors.numberOfAdults = "Number of Adults is required for Floater policy";
-          errorList.push({ field: "numberOfAdults", message: "Number of Adults is required for Floater policy" });
-        }
-        if (!healthDetails.proposerIsMember) {
-          errors.proposerIsMember = "Proposer is a Member within the Plan is required";
-          errorList.push({ field: "proposerIsMember", message: "Proposer is a Member within the Plan is required" });
-        }
+        if (!healthDetails.numberOfAdults || healthDetails.numberOfAdults <= 0) push("numberOfAdults", "numberOfAdults", "Number of Adults is required for Floater policy");
+        if (!healthDetails.proposerIsMember) push("proposerIsMember", "proposerIsMember", "Proposer is a Member within the Plan is required");
       }
       
       if (healthDetails.aadhaarNumber && !validateAadhaar(healthDetails.aadhaarNumber)) {
-        errors.aadhaar = "Aadhaar must be exactly 12 digits";
-        errorList.push({ field: "aadhaarNumber", message: "Aadhaar must be exactly 12 digits" });
+        push("aadhaar", "aadhaarNumber", "Aadhaar must be exactly 12 digits");
       }
       
       if (healthDetails.panNumber && !validatePAN(healthDetails.panNumber)) {
@@ -1255,242 +1155,117 @@ function EmployeeLeads() {
       }
       
       if (healthDetails.hasPreviousPolicy === "Yes") {
-        if (!healthDetails.previousPolicyCase) {
-          errors.previousPolicyCase = "Previous Policy Case is required";
-          errorList.push({ field: "previousPolicyCase", message: "Previous Policy Case is required" });
-        }
+        if (!healthDetails.previousPolicyCase) push("previousPolicyCase", "previousPolicyCase", "Previous Policy Case is required");
         
         if (healthDetails.previousPolicyCase === "Portability Case") {
           if (!healthDetails.experienceYears || healthDetails.experienceYears <= 0) {
-            errors.experienceYears = "Experience years are required for Portability Case";
-            errorList.push({ field: "experienceYears", message: "Experience years are required for Portability Case" });
+            push("experienceYears", "experienceYears", "Experience years are required for Portability Case");
           }
           healthDetails.portabilityDetails.forEach((detail, idx) => {
-            if (!detail.insurerName) {
-              errors[`portabilityInsurer_${idx}`] = `Insurer Name is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilityInsurer_${idx}`, message: `Insurer Name is required for Policy ${idx + 1}` });
-            }
-            if (!detail.policyNumber) {
-              errors[`portabilityPolicy_${idx}`] = `Policy Number is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilityPolicy_${idx}`, message: `Policy Number is required for Policy ${idx + 1}` });
-            }
-            if (!detail.policyActiveFrom) {
-              errors[`portabilityActive_${idx}`] = `Policy Active From is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilityActive_${idx}`, message: `Policy Active From is required for Policy ${idx + 1}` });
-            }
-            if (!detail.policyTillDate) {
-              errors[`portabilityTill_${idx}`] = `Policy Till Date is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilityTill_${idx}`, message: `Policy Till Date is required for Policy ${idx + 1}` });
-            }
-            if (!detail.sumAssured) {
-              errors[`portabilitySum_${idx}`] = `SUM ASSURED is required for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilitySum_${idx}`, message: `SUM ASSURED is required for Policy ${idx + 1}` });
-            }
-            if (!detail.uploadPYP) {
-              errors[`portabilityUpload_${idx}`] = `Upload PYP is mandatory for Policy ${idx + 1}`;
-              errorList.push({ field: `portabilityUpload_${idx}`, message: `Upload PYP is mandatory for Policy ${idx + 1}` });
-            }
+            if (!detail.insurerName) push(`portabilityInsurer_${idx}`, `portabilityInsurer_${idx}`, `Insurer Name is required for Policy ${idx + 1}`);
+            if (!detail.policyNumber) push(`portabilityPolicy_${idx}`, `portabilityPolicy_${idx}`, `Policy Number is required for Policy ${idx + 1}`);
+            if (!detail.policyActiveFrom) push(`portabilityActive_${idx}`, `portabilityActive_${idx}`, `Policy Active From is required for Policy ${idx + 1}`);
+            if (!detail.policyTillDate) push(`portabilityTill_${idx}`, `portabilityTill_${idx}`, `Policy Till Date is required for Policy ${idx + 1}`);
+            if (!detail.sumAssured) push(`portabilitySum_${idx}`, `portabilitySum_${idx}`, `SUM ASSURED is required for Policy ${idx + 1}`);
+            if (!detail.uploadPYP) push(`portabilityUpload_${idx}`, `portabilityUpload_${idx}`, `Upload PYP is mandatory for Policy ${idx + 1}`);
           });
         }
         
         if (healthDetails.previousPolicyCase === "Renew Case") {
-          if (!healthDetails.renewalDetails?.insurerName) {
-            errors.renewalInsurer = "Insurer Name is required for Renew Case";
-            errorList.push({ field: "renewalInsurer", message: "Insurer Name is required for Renew Case" });
-          }
-          if (!healthDetails.renewalDetails?.policyNumber) {
-            errors.renewalPolicy = "Policy Number is required for Renew Case";
-            errorList.push({ field: "renewalPolicy", message: "Policy Number is required for Renew Case" });
-          }
-          if (!healthDetails.renewalDetails?.policyDueDate) {
-            errors.renewalDueDate = "Policy Due Date is required for Renew Case";
-            errorList.push({ field: "renewalDueDate", message: "Policy Due Date is required for Renew Case" });
-          }
+          if (!healthDetails.renewalDetails?.insurerName) push("renewalInsurer", "renewalInsurer", "Insurer Name is required for Renew Case");
+          if (!healthDetails.renewalDetails?.policyNumber) push("renewalPolicy", "renewalPolicy", "Policy Number is required for Renew Case");
+          if (!healthDetails.renewalDetails?.policyDueDate) push("renewalDueDate", "renewalDueDate", "Policy Due Date is required for Renew Case");
         }
       }
     }
     
     // Motor validation
     if (showMotorSection) {
-      if (!motorDetails.vehicleType) {
-        errors.vehicleType = "Vehicle type is required";
-        errorList.push({ field: "vehicleType", message: "Vehicle type is required" });
-      }
-      
-      if (!motorDetails.previousInsuranceStatus) {
-        errors.previousInsuranceStatus = "Previous Insurance Status is required";
-        errorList.push({ field: "previousInsuranceStatus", message: "Previous Insurance Status is required" });
-      }
+      if (!motorDetails.vehicleType) push("vehicleType", "vehicleType", "Vehicle type is required");
+      if (!motorDetails.previousInsuranceStatus) push("previousInsuranceStatus", "previousInsuranceStatus", "Previous Insurance Status is required");
       
       const isNewVehicle = motorDetails.previousInsuranceStatus === "New";
-      if (!isNewVehicle && !motorDetails.registrationNumber) {
-        errors.registration = "Registration number is required";
-        errorList.push({ field: "registrationNumber", message: "Registration number is required" });
-      }
-      
-      if (!motorDetails.insuranceType) {
-        errors.insuranceType = "Insurance type is required";
-        errorList.push({ field: "insuranceType", message: "Insurance type is required" });
-      }
+      if (!isNewVehicle && !motorDetails.registrationNumber) push("registration", "registrationNumber", "Registration number is required");
+      if (!motorDetails.insuranceType) push("insuranceType", "insuranceType", "Insurance type is required");
       
       if (motorDetails.previousInsuranceStatus === "New") {
-        if (!motorDetails.manufacturer) {
-          errors.manufacturer = "Manufacturer is required for New Vehicle";
-          errorList.push({ field: "manufacturer", message: "Manufacturer is required for New Vehicle" });
+        if (!motorDetails.manufacturer) push("manufacturer", "manufacturer", "Manufacturer is required for New Vehicle");
+        // "Other" manufacturer -> manual company name is mandatory
+        if (motorDetails.manufacturer === OTHER_MANUFACTURER && !motorDetails.otherManufacturer?.trim()) {
+          push("otherManufacturer", "otherManufacturer", "Enter the Manufacturer Name (Other selected)");
         }
-        if (!motorDetails.model) {
-          errors.model = "Model is required for New Vehicle";
-          errorList.push({ field: "model", message: "Model is required for New Vehicle" });
-        }
-        if (!motorDetails.fuelType) {
-          errors.fuelType = "Fuel Type is required for New Vehicle";
-          errorList.push({ field: "fuelType", message: "Fuel Type is required for New Vehicle" });
-        }
-        if (!motorDetails.rtoCode) {
-          errors.rtoCode = "RTO Code is required for New Vehicle";
-          errorList.push({ field: "rtoCode", message: "RTO Code is required for New Vehicle" });
-        }
-        if (!motorDetails.chesisNo) {
-          errors.chesisNo = "Chesis No. is required for New Vehicle";
-          errorList.push({ field: "chesisNo", message: "Chesis No. is required for New Vehicle" });
-        }
-        if (!motorDetails.yearOfManufacturing) {
-          errors.yearOfManufacturing = "Year of Manufacturing is required for New Vehicle";
-          errorList.push({ field: "yearOfManufacturing", message: "Year of Manufacturing is required for New Vehicle" });
-        }
-        if (!motorDetails.monthOfManufacturing) {
-          errors.monthOfManufacturing = "Month of Manufacturing is required for New Vehicle";
-          errorList.push({ field: "monthOfManufacturing", message: "Month of Manufacturing is required for New Vehicle" });
-        }
-        if (!motorDetails.idvAsPerInvoice) {
-          errors.idvAsPerInvoice = "IDV (As per Invoice) is required for New Vehicle";
-          errorList.push({ field: "idvAsPerInvoice", message: "IDV (As per Invoice) is required for New Vehicle" });
-        }
-        if (!motorDetails.invoiceCopy) {
-          errors.invoiceCopy = "Invoice Copy is required for New Vehicle";
-          errorList.push({ field: "invoiceCopy", message: "Invoice Copy is required for New Vehicle" });
-        }
+        if (!motorDetails.model) push("model", "model", "Model is required for New Vehicle");
+        if (!motorDetails.fuelType) push("fuelType", "fuelType", "Fuel Type is required for New Vehicle");
+        if (!motorDetails.rtoCode) push("rtoCode", "rtoCode", "RTO Code is required for New Vehicle");
+        if (!motorDetails.chesisNo) push("chesisNo", "chesisNo", "Chesis No. is required for New Vehicle");
+        if (!motorDetails.yearOfManufacturing) push("yearOfManufacturing", "yearOfManufacturing", "Year of Manufacturing is required for New Vehicle");
+        if (!motorDetails.monthOfManufacturing) push("monthOfManufacturing", "monthOfManufacturing", "Month of Manufacturing is required for New Vehicle");
+        if (!motorDetails.idvAsPerInvoice) push("idvAsPerInvoice", "idvAsPerInvoice", "IDV (As per Invoice) is required for New Vehicle");
+        if (!motorDetails.invoiceCopy) push("invoiceCopy", "invoiceCopy", "Invoice Copy is required for New Vehicle");
       }
       
       if (motorDetails.previousInsuranceStatus === "Active") {
         if (motorDetails.insuranceType === "Comprehensive (OD+TP)" || motorDetails.insuranceType === "SAOD (On Damage)") {
-          if (!motorDetails.odDueDate) {
-            errors.odDueDate = "OD Due Date is required for Active Policy";
-            errorList.push({ field: "odDueDate", message: "OD Due Date is required for Active Policy" });
-          }
-          if (!motorDetails.tpDueDate) {
-            errors.tpDueDate = "TP Due Date is required for Active Policy";
-            errorList.push({ field: "tpDueDate", message: "TP Due Date is required for Active Policy" });
-          }
+          if (!motorDetails.odDueDate) push("odDueDate", "odDueDate", "OD Due Date is required for Active Policy");
+          if (!motorDetails.tpDueDate) push("tpDueDate", "tpDueDate", "TP Due Date is required for Active Policy");
         }
         
-        if (!motorDetails.policyNo) {
-          errors.policyNo = "Policy No. is required for Active Policy";
-          errorList.push({ field: "policyNo", message: "Policy No. is required for Active Policy" });
-        }
-        if (!motorDetails.previousInsurerName) {
-          errors.previousInsurerName = "Previous Insurer Name is required for Active Policy";
-          errorList.push({ field: "previousInsurerName", message: "Previous Insurer Name is required for Active Policy" });
-        }
-        if (!motorDetails.idvAsPerPYP) {
-          errors.idvAsPerPYP = "IDV (As per PYP) is required for Active Policy";
-          errorList.push({ field: "idvAsPerPYP", message: "IDV (As per PYP) is required for Active Policy" });
-        }
+        if (!motorDetails.policyNo) push("policyNo", "policyNo", "Policy No. is required for Active Policy");
+        if (!motorDetails.previousInsurerName) push("previousInsurerName", "previousInsurerName", "Previous Insurer Name is required for Active Policy");
+        if (!motorDetails.idvAsPerPYP) push("idvAsPerPYP", "idvAsPerPYP", "IDV (As per PYP) is required for Active Policy");
         
-        if (!motorDetails.claimTaken) {
-          errors.claimTaken = "Claim Taken is required for Active Policy";
-          errorList.push({ field: "claimTaken", message: "Claim Taken is required for Active Policy" });
-        }
-        if (motorDetails.claimTaken === "No" && !motorDetails.ncb) {
-          errors.ncb = "NCB selection is required when Claim Taken is No";
-          errorList.push({ field: "ncb", message: "NCB selection is required when Claim Taken is No" });
-        }
+        if (!motorDetails.claimTaken) push("claimTaken", "claimTaken", "Claim Taken is required for Active Policy");
+        if (motorDetails.claimTaken === "No" && !motorDetails.ncb) push("ncb", "ncb", "NCB selection is required when Claim Taken is No");
         
         if (motorDetails.insuranceType === "SAOD (On Damage)") {
-          if (!motorDetails.saodOdDueDate) {
-            errors.saodOdDueDate = "OD Due Date is required for SAOD";
-            errorList.push({ field: "saodOdDueDate", message: "OD Due Date is required for SAOD" });
-          }
-          if (!motorDetails.saodTpDueDate) {
-            errors.saodTpDueDate = "TP Due Date is required for SAOD";
-            errorList.push({ field: "saodTpDueDate", message: "TP Due Date is required for SAOD" });
-          }
-          if (!motorDetails.saodPolicyNo) {
-            errors.saodPolicyNo = "Previous Policy No. is required for SAOD";
-            errorList.push({ field: "saodPolicyNo", message: "Previous Policy No. is required for SAOD" });
-          }
-          if (!motorDetails.saodPreviousInsurerName) {
-            errors.saodPreviousInsurerName = "Previous Insurer Name is required for SAOD";
-            errorList.push({ field: "saodPreviousInsurerName", message: "Previous Insurer Name is required for SAOD" });
-          }
-          if (!motorDetails.saodIdvAsPerPYP) {
-            errors.saodIdvAsPerPYP = "IDV (As per PYP) is required for SAOD";
-            errorList.push({ field: "saodIdvAsPerPYP", message: "IDV (As per PYP) is required for SAOD" });
-          }
+          if (!motorDetails.saodOdDueDate) push("saodOdDueDate", "saodOdDueDate", "OD Due Date is required for SAOD");
+          if (!motorDetails.saodTpDueDate) push("saodTpDueDate", "saodTpDueDate", "TP Due Date is required for SAOD");
+          if (!motorDetails.saodPolicyNo) push("saodPolicyNo", "saodPolicyNo", "Previous Policy No. is required for SAOD");
+          if (!motorDetails.saodPreviousInsurerName) push("saodPreviousInsurerName", "saodPreviousInsurerName", "Previous Insurer Name is required for SAOD");
+          if (!motorDetails.saodIdvAsPerPYP) push("saodIdvAsPerPYP", "saodIdvAsPerPYP", "IDV (As per PYP) is required for SAOD");
         }
       }
       
       if (motorDetails.insuranceType === "TP (Third Party)") {
-        if (!motorDetails.tpInsuranceDueDate) {
-          errors.tpInsuranceDueDate = "TP Due Date is required for TP Insurance";
-          errorList.push({ field: "tpInsuranceDueDate", message: "TP Due Date is required for TP Insurance" });
-        }
+        if (!motorDetails.tpInsuranceDueDate) push("tpInsuranceDueDate", "tpInsuranceDueDate", "TP Due Date is required for TP Insurance");
       }
       
       if (motorDetails.insuranceType !== "TP (Third Party)") {
-        if (!motorDetails.addOnRequired) {
-          errors.addOnRequired = "Add-On selection is required";
-          errorList.push({ field: "addOnRequired", message: "Add-On selection is required" });
-        }
+        if (!motorDetails.addOnRequired) push("addOnRequired", "addOnRequired", "Add-On selection is required");
         if (motorDetails.addOnRequired === "Yes" && (!motorDetails.selectedAddOns || motorDetails.selectedAddOns.length === 0)) {
-          errors.selectedAddOns = "Please select at least one Add-On";
-          errorList.push({ field: "selectedAddOns", message: "Please select at least one Add-On" });
+          push("selectedAddOns", "selectedAddOns", "Please select at least one Add-On");
         }
       }
       
       if (motorDetails.previousInsuranceStatus === "Active") {
-        if (!motorDetails.pypFile) {
-          errors.pypFile = "Upload PYP is required for Active Policy";
-          errorList.push({ field: "pypFile", message: "Upload PYP is required for Active Policy" });
-        }
+        if (!motorDetails.pypFile) push("pypFile", "pypFile", "Upload PYP is required for Active Policy");
       }
       
       if (motorDetails.previousInsuranceStatus !== "New") {
-        if (!motorDetails.rcFrontFile) {
-          errors.rcFrontFile = "RC Front Upload is required";
-          errorList.push({ field: "rcFrontFile", message: "RC Front Upload is required" });
-        }
-        if (!motorDetails.rcBackFile) {
-          errors.rcBackFile = "RC Back Upload is required";
-          errorList.push({ field: "rcBackFile", message: "RC Back Upload is required" });
-        }
+        if (!motorDetails.rcFrontFile) push("rcFrontFile", "rcFrontFile", "RC Front Upload is required");
+        if (!motorDetails.rcBackFile) push("rcBackFile", "rcBackFile", "RC Back Upload is required");
       }
-      
-      if (motorDetails.previousInsuranceStatus === "New") {
-        if (!motorDetails.invoiceCopy) {
-          errors.invoiceCopy = "Invoice Copy is required for New Vehicle";
-          errorList.push({ field: "invoiceCopy", message: "Invoice Copy is required for New Vehicle" });
-        }
+
+      // ============================================
+      // MOTOR PAYOUT CROSS-VALIDATION (per insurer quote, Admin)
+      // ============================================
+      if (isPayoutVisible()) {
+        (workflowDetails.selectedInsurers || []).forEach((insurer, idx) => {
+          const quote = workflowDetails.insurerQuotes?.[idx];
+          if (!quote) return;
+          const { errors: qErrors } = getQuoteMotorValidation(quote, idx);
+          qErrors.forEach(({ field, message }) => push(field, field, message));
+        });
       }
     }
     
     // Electronic validation
     if (showElectronicSection) {
-      if (!electronicDetails.deviceType) {
-        errors.deviceType = "Device type is required";
-        errorList.push({ field: "deviceType", message: "Device type is required" });
-      }
-      if (!electronicDetails.dateOfPurchase) {
-        errors.dateOfPurchase = "Date of Purchase is required";
-        errorList.push({ field: "dateOfPurchase", message: "Date of Purchase is required" });
-      }
-      if (!electronicDetails.purchaseValue) {
-        errors.purchaseValue = "Purchase Value is required";
-        errorList.push({ field: "purchaseValue", message: "Purchase Value is required" });
-      }
+      if (!electronicDetails.deviceType) push("deviceType", "deviceType", "Device type is required");
+      if (!electronicDetails.dateOfPurchase) push("dateOfPurchase", "dateOfPurchase", "Date of Purchase is required");
+      if (!electronicDetails.purchaseValue) push("purchaseValue", "purchaseValue", "Purchase Value is required");
       if (electronicDetails.aadhaarNumber && !validateAadhaar(electronicDetails.aadhaarNumber)) {
-        errors.electronicAadhaar = "Aadhaar must be exactly 12 digits";
-        errorList.push({ field: "electronicAadhaar", message: "Aadhaar must be exactly 12 digits" });
+        push("electronicAadhaar", "electronicAadhaar", "Aadhaar must be exactly 12 digits");
       }
       if (electronicDetails.panNumber && !validatePAN(electronicDetails.panNumber)) {
         errors.electronicPan = "PAN format: ABCDE1234F (5 letters, 4 digits, 1 letter)";
@@ -1502,16 +1277,10 @@ function EmployeeLeads() {
     // PERSONAL ACCIDENT & TRAVEL VALIDATION
     // ============================================
     if (showPASection) {
-      validatePA(paDetails).forEach(({ field, message }) => {
-        errors[field] = message;
-        errorList.push({ field, message });
-      });
+      validatePA(paDetails).forEach(({ field, message }) => push(field, field, message));
     }
     if (showTravelSection) {
-      validateTravel(travelDetails).forEach(({ field, message }) => {
-        errors[field] = message;
-        errorList.push({ field, message });
-      });
+      validateTravel(travelDetails).forEach(({ field, message }) => push(field, field, message));
     }
     
     setValidationErrors(errors);
@@ -1557,7 +1326,7 @@ function EmployeeLeads() {
       updatedQuotes[idx] = { insurerName: workflowDetails.selectedInsurers[idx] };
     }
     updatedQuotes[idx] = { ...updatedQuotes[idx], [field]: value };
-    updatedQuotes[idx] = recalcInsurerQuote(updatedQuotes[idx], formData.policyTenure);
+    updatedQuotes[idx] = recalcInsurerQuote(updatedQuotes[idx], formData.policyTenure, getMotorCtx());
     setWorkflowDetails(prev => ({ ...prev, insurerQuotes: updatedQuotes }));
   };
 
@@ -1573,6 +1342,7 @@ function EmployeeLeads() {
   // Open Edit Modal - WITH workflow details
   const handleEdit = (lead) => {
     setEditLead(lead);
+    setValidationErrors({});
     
     setFormData({
       name: lead.name || "",
@@ -1590,10 +1360,18 @@ function EmployeeLeads() {
       paymentTerm: lead.paymentTerm || "",
       sumInsured: lead.sumInsured || "",
     });
+
+    // Reset popup visibility flags before hydrating (prevents carry-over from previous lead)
+    setShowFloaterMembers(false);
+    setShowPreviousPolicyPopup(false);
+    setShowRenewalFields(false);
+    setShowPortabilityFields(false);
+    setShowFreshCaseFields(false);
     
     // Health Details
     if (lead.healthDetails) {
       setHealthDetails({
+        ...emptyHealthDetails(),
         ...lead.healthDetails,
         aadhaarFile: lead.healthDetails.aadhaarFile || null,
         panFile: lead.healthDetails.panFile || null,
@@ -1637,12 +1415,16 @@ function EmployeeLeads() {
           setShowFreshCaseFields(true);
         }
       }
+    } else {
+      setHealthDetails(emptyHealthDetails());
     }
     
     // Motor Details
     if (lead.motorDetails) {
       setMotorDetails({
+        ...emptyMotorDetails(),
         ...lead.motorDetails,
+        otherManufacturer: lead.motorDetails.otherManufacturer || "",
         odDueDate: formatDateForInput(lead.motorDetails.odDueDate),
         tpDueDate: formatDateForInput(lead.motorDetails.tpDueDate),
         saodOdDueDate: formatDateForInput(lead.motorDetails.saodOdDueDate),
@@ -1654,11 +1436,14 @@ function EmployeeLeads() {
         chesisPhoto: lead.motorDetails.chesisPhoto || null,
         invoiceCopy: lead.motorDetails.invoiceCopy || null,
       });
+    } else {
+      setMotorDetails(emptyMotorDetails());
     }
     
     // Electronic Details
     if (lead.electronicDetails) {
       setElectronicDetails({
+        ...emptyElectronicDetails(),
         ...lead.electronicDetails,
         dateOfPurchase: formatDateForInput(lead.electronicDetails.dateOfPurchase),
         aadhaarFile: lead.electronicDetails.aadhaarFile || null,
@@ -1667,6 +1452,8 @@ function EmployeeLeads() {
         purchaseInvoice: lead.electronicDetails.purchaseInvoice || null,
         devicePhotos: lead.electronicDetails.devicePhotos || [],
       });
+    } else {
+      setElectronicDetails(emptyElectronicDetails());
     }
 
     // ============================================
@@ -1675,8 +1462,9 @@ function EmployeeLeads() {
     setPaDetails(hydratePA(lead.paDetails));
     setTravelDetails(hydrateTravel(lead.travelDetails));
 
-    // Workflow Details - ADDED with recalc on load
+    // Workflow Details - recalc on load (motor-aware)
     const loadedTenure = lead.policyTenure || formData.policyTenure;
+    const loadedMotorCtx = getMotorCtx(lead.lob, lead.motorDetails?.insuranceType || "");
     if (lead.workflowDetails) {
       setWorkflowDetails({
         status: lead.workflowDetails.status || lead.status || "Open",
@@ -1685,7 +1473,7 @@ function EmployeeLeads() {
         // FIX: recalc every quote on load so derived fields (gross, EMI count,
         // payout figures) stay correct even if tenure/mode changed since save
         insurerQuotes: (lead.workflowDetails.insurerQuotes || []).map((q) =>
-          recalcInsurerQuote({ ...q }, loadedTenure)
+          recalcInsurerQuote({ ...q }, loadedTenure, loadedMotorCtx)
         ),
         paymentStatus: lead.workflowDetails.paymentStatus || "",
         paymentUrl: lead.workflowDetails.paymentUrl || "",
@@ -1699,22 +1487,7 @@ function EmployeeLeads() {
         remarks: lead.workflowDetails.workflowRemarks || lead.remarks || "",
       });
     } else {
-      setWorkflowDetails({
-        status: lead.status || "Open",
-        quoteNumber: "",
-        selectedInsurers: [],
-        insurerQuotes: [],
-        paymentStatus: "",
-        paymentUrl: "",
-        utrNumber: "",
-        paymentSnapshot: null,
-        policyNumber: "",
-        policyIssuedOn: "",
-        policyStartDate: "",
-        policyExpiryDate: "",
-        policyCopy: null,
-        remarks: "",
-      });
+      setWorkflowDetails(emptyWorkflowDetails(lead.status || "Open"));
     }
     
     // Check if status is Quotation Generated to show insurer quotes
@@ -1845,6 +1618,8 @@ const handleUpdate = async (e) => {
       ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
         if (motorData[f] instanceof File) delete motorData[f];
       });
+      // Only keep the manual manufacturer name when "Other" is selected
+      if (motorData.manufacturer !== OTHER_MANUFACTURER) delete motorData.otherManufacturer;
       
       if (!motorData.vehicleType) delete motorData.vehicleType;
       if (!motorData.previousInsuranceStatus) delete motorData.previousInsuranceStatus;
@@ -1961,7 +1736,7 @@ const handleUpdate = async (e) => {
     }
   });
 
-  // ===== WORKFLOW DETAILS - ADDED =====
+  // ===== WORKFLOW DETAILS =====
   // Clean workflow data - strip empty enum fields and File objects
   const cleanWorkflow = { ...workflowDetails };
   
@@ -1974,12 +1749,15 @@ const handleUpdate = async (e) => {
   if (cleanWorkflow.paymentSnapshot instanceof File) delete cleanWorkflow.paymentSnapshot;
   if (cleanWorkflow.policyCopy instanceof File) delete cleanWorkflow.policyCopy;
   
-  // Strip File objects from insurerQuotes (upload separately) and queue them
+  // Recalculate every quote one last time (motor-aware), strip File objects (upload separately)
   if (cleanWorkflow.insurerQuotes && Array.isArray(cleanWorkflow.insurerQuotes)) {
+    const motorCtx = getMotorCtx();
     cleanWorkflow.insurerQuotes = cleanWorkflow.insurerQuotes.map((quote, idx) => {
-      const cleanQuote = { ...quote };
-      if (cleanQuote.quoteUpload instanceof File) {
-        submitData.append(`insurerQuoteFile_${idx}`, cleanQuote.quoteUpload);
+      if (!quote) return quote;
+      const fileToUpload = quote.quoteUpload instanceof File ? quote.quoteUpload : null;
+      const cleanQuote = recalcInsurerQuote({ ...quote }, formData.policyTenure, motorCtx);
+      if (fileToUpload) {
+        submitData.append(`insurerQuoteFile_${idx}`, fileToUpload);
         delete cleanQuote.quoteUpload; // keep existing URL string if present, else drop
       }
       return cleanQuote;
@@ -2136,6 +1914,8 @@ const handleUpdate = async (e) => {
       "Email": lead.email || "",
       "Policy Number": lead.policyNumber || "",
       "LOB": lead.lob || "",
+      "Vehicle Manufacturer": getDisplayManufacturer(lead.motorDetails),
+      "Vehicle Model": lead.motorDetails?.model || "",
       "Agency": lead.agency || "",
       "Sum Insured": lead.sumInsured || 0,
       "Net Premium": lead.netPremium || 0,
@@ -2174,8 +1954,6 @@ const handleUpdate = async (e) => {
   // ============================================================
   // RENDER FUNCTIONS
   // ============================================================
-  
-  // Render Add-On Modal
   const renderAddOnModal = () => {
     if (!showAddOnModal) return null;
 
@@ -2240,7 +2018,9 @@ const handleUpdate = async (e) => {
             </button>
             <button
               type="button"
-              onClick={() => setShowAddOnModal(false)}
+              onClick={() => {
+                setShowAddOnModal(false);
+              }}
               className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
             >
               <FaCheck /> Confirm Add-Ons
@@ -2251,7 +2031,7 @@ const handleUpdate = async (e) => {
     );
   };
 
-  // Render Validation Popup
+
   const renderValidationPopup = () => {
     if (!validationPopup.show) return null;
 
@@ -2310,7 +2090,6 @@ const handleUpdate = async (e) => {
     );
   };
 
-  // Render Previous Policy Popup
   const renderPreviousPolicyPopup = () => {
     if (!showPreviousPolicyPopup) return null;
     
@@ -2424,7 +2203,6 @@ const handleUpdate = async (e) => {
                             />
                             {validationErrors[`portabilityActive_${index}`] && <p className="text-red-500 text-xs mt-1">{validationErrors[`portabilityActive_${index}`]}</p>}
                           </div>
-                          {/* #6b: Portability End of Policy Date — ±60 days */}
                           <div>
                             <label className="text-xs font-medium text-gray-700">End of Policy Date (Policy Till Date)</label>
                             <input
@@ -2487,7 +2265,12 @@ const handleUpdate = async (e) => {
                             <label className="text-xs font-medium text-gray-700">Upload PYP (Mandatory)</label>
                             {typeof detail.uploadPYP === "string" && detail.uploadPYP && (
                               <div className="mb-1">
-                                <a href={detail.uploadPYP} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                                <a
+                                  href={detail.uploadPYP}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-indigo-600 underline"
+                                >
                                   View current PYP file
                                 </a>
                               </div>
@@ -2538,7 +2321,7 @@ const handleUpdate = async (e) => {
                     />
                     {validationErrors.renewalPolicy && <p className="text-red-500 text-xs mt-1">{validationErrors.renewalPolicy}</p>}
                   </div>
-                  {/* #6a: Renewal Policy Due Date — ±60 days */}
+                  {/* #6a: Renewal Policy Due Date - ±60 days */}
                   <div>
                     <label className="text-xs font-medium text-gray-700">Policy Due Date</label>
                     <input
@@ -2567,7 +2350,12 @@ const handleUpdate = async (e) => {
                     <label className="text-xs font-medium text-gray-700">Upload Policy (Not Mandatory)</label>
                     {typeof healthDetails.renewalDetails.uploadPolicy === "string" && healthDetails.renewalDetails.uploadPolicy && (
                       <div className="mb-1">
-                        <a href={healthDetails.renewalDetails.uploadPolicy} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                        <a
+                          href={healthDetails.renewalDetails.uploadPolicy}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-xs text-indigo-600 underline"
+                        >
                           View current policy file
                         </a>
                       </div>
@@ -2578,6 +2366,7 @@ const handleUpdate = async (e) => {
                       onChange={(e) => handleRenewalDetailChange('uploadPolicy', e.target.files[0])}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
+                    {healthDetails.renewalDetails.uploadPolicy && typeof healthDetails.renewalDetails.uploadPolicy !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                   </div>
                 </div>
               </div>
@@ -2598,7 +2387,9 @@ const handleUpdate = async (e) => {
               </button>
               <button
                 type="button"
-                onClick={() => setShowPreviousPolicyPopup(false)}
+                onClick={() => {
+                  setShowPreviousPolicyPopup(false);
+                }}
                 className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
               >
                 Save & Close
@@ -2610,7 +2401,6 @@ const handleUpdate = async (e) => {
     );
   };
 
-  // Render Health Form
   const renderHealthForm = () => {
     const handleMemberRiderChange = (index, field, value) => {
       const newMembers = [...healthDetails.members];
@@ -2621,6 +2411,12 @@ const handleUpdate = async (e) => {
     const handleMemberRiderDetailChange = (index, field, value) => {
       const newMembers = [...healthDetails.members];
       newMembers[index].riderDetails[field] = value;
+      setHealthDetails(prev => ({ ...prev, members: newMembers }));
+    };
+
+    const updateMemberField = (index, field, value) => {
+      const newMembers = [...healthDetails.members];
+      newMembers[index][field] = value;
       setHealthDetails(prev => ({ ...prev, members: newMembers }));
     };
 
@@ -2674,12 +2470,10 @@ const handleUpdate = async (e) => {
               data-field="policyType"
               value={healthDetails.policyType}
               onChange={(e) => {
-                const val = e.target.value;
-                setHealthDetails(prev => ({ ...prev, policyType: val }));
-                setShowFloaterMembers(val === "Floater");
-                setShowSeniorOneDOB(val === "Floater");
-                // #1: Pass fresh values directly to avoid stale state
-                if (val === "Floater") generateFloaterMembers(healthDetails.numberOfAdults, healthDetails.numberOfChildren, healthDetails.proposerIsMember);
+                setHealthDetails(prev => ({ ...prev, policyType: e.target.value }));
+                setShowFloaterMembers(e.target.value === "Floater");
+                setShowSeniorOneDOB(e.target.value === "Floater");
+                if (e.target.value === "Floater") generateFloaterMembers();
               }}
               className={`w-full p-2 border rounded-lg ${validationErrors.policyType ? 'border-red-500' : 'border-gray-300'}`}
             >
@@ -2832,7 +2626,7 @@ const handleUpdate = async (e) => {
               type="text"
               value={healthDetails.height}
               onChange={(e) => setHealthDetails(prev => ({ ...prev, height: e.target.value }))}
-              placeholder="e.g., 5'8\"
+              placeholder={`e.g., 5'8"`}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
           </div>
@@ -2873,7 +2667,7 @@ const handleUpdate = async (e) => {
 
           {healthDetails.policyType === "Floater" && (
             <div>
-              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan</label>
+              <label className="text-sm font-medium text-gray-700">Proposer is a Member within the Plan? <span className="text-red-500">*</span></label>
               <select
                 data-field="proposerIsMember"
                 value={healthDetails.proposerIsMember}
@@ -2895,18 +2689,18 @@ const handleUpdate = async (e) => {
           {healthDetails.policyType === "Individual" && (
             <>
               <div>
-                <label className="text-sm font-medium text-gray-700">Nominee Name</label>
+                <label className="text-sm font-medium text-gray-700">Nominee Name <span className="text-red-500">*</span></label>
                 <input
                   data-field="nomineeName"
                   type="text"
                   value={healthDetails.nomineeName}
                   onChange={(e) => setHealthDetails(prev => ({ ...prev, nomineeName: toUpperCase(e.target.value) }))}
-                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.nomineeName ? 'border-red-500' : 'border-gray-300'}`}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.nomineeName ? 'border-red-500' : 'border-gray-300'}`}
                 />
                 {validationErrors.nomineeName && <p className="text-red-500 text-xs mt-1">{validationErrors.nomineeName}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Nominee DOB</label>
+                <label className="text-sm font-medium text-gray-700">Nominee DOB <span className="text-red-500">*</span></label>
                 <input
                   data-field="nomineeDOB"
                   type="date"
@@ -2926,7 +2720,7 @@ const handleUpdate = async (e) => {
                 {validationErrors.nomineeDOB && <p className="text-red-500 text-xs mt-1">{validationErrors.nomineeDOB}</p>}
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-700">Relationship</label>
+                <label className="text-sm font-medium text-gray-700">Nominee Relationship <span className="text-red-500">*</span></label>
                 <select
                   data-field="nomineeRelationship"
                   value={healthDetails.nomineeRelationship}
@@ -2955,9 +2749,6 @@ const handleUpdate = async (e) => {
               className={`w-full p-2 border rounded-lg ${validationErrors.aadhaar ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="Enter 12 digits only"
             />
-            {healthDetails.aadhaarNumber && healthDetails.aadhaarNumber.length > 0 && !validateAadhaar(healthDetails.aadhaarNumber) && (
-              <p className="text-red-500 text-xs mt-1">Enter exactly 12 digits</p>
-            )}
             {validationErrors.aadhaar && <p className="text-red-500 text-xs mt-1">{validationErrors.aadhaar}</p>}
           </div>
 
@@ -2965,7 +2756,12 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
             {typeof healthDetails.aadhaarFile === "string" && healthDetails.aadhaarFile && (
               <div className="mb-1">
-                <a href={healthDetails.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                <a
+                  href={healthDetails.aadhaarFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
                   View current Aadhaar file
                 </a>
               </div>
@@ -2976,7 +2772,6 @@ const handleUpdate = async (e) => {
               onChange={(e) => setHealthDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {healthDetails.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -2993,9 +2788,6 @@ const handleUpdate = async (e) => {
               className={`w-full p-2 border rounded-lg uppercase ${validationErrors.pan ? 'border-red-500' : 'border-gray-300'}`}
               placeholder="ABCDE1234F"
             />
-            {healthDetails.panNumber && healthDetails.panNumber.length > 0 && !validatePAN(healthDetails.panNumber) && (
-              <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F (5 letters, 4 digits, 1 letter)</p>
-            )}
             {validationErrors.pan && <p className="text-red-500 text-xs mt-1">{validationErrors.pan}</p>}
           </div>
 
@@ -3003,7 +2795,12 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
             {typeof healthDetails.panFile === "string" && healthDetails.panFile && (
               <div className="mb-1">
-                <a href={healthDetails.panFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                <a
+                  href={healthDetails.panFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
                   View current PAN file
                 </a>
               </div>
@@ -3029,32 +2826,31 @@ const handleUpdate = async (e) => {
           </div>
         </div>
 
-        {showFloaterMembers && healthDetails.members.length > 0 && (
-          <div className="mt-4 border-t-2 border-indigo-200 pt-4">
-            <h4 className="text-md font-semibold text-indigo-600 mb-4 flex items-center gap-2">
-              <FaFloater /> Floater Members
+        {/* Floater Members Section - shows correct Adult count based on Proposer Is Member */}
+        {showFloaterMembers && healthDetails.members && healthDetails.members.length > 0 && (
+          <div className="mt-6 border-t pt-4">
+            <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+              <FaUsers /> Family Members ({healthDetails.members.length})
+              {healthDetails.proposerIsMember === "Yes" && (
+                <span className="text-xs font-normal text-green-600 ml-2">
+                  (Proposer included as Self + remaining adults)
+                </span>
+              )}
             </h4>
             {healthDetails.members.map((member, index) => (
-              <div key={member.id} className="border rounded-lg p-4 mb-4 bg-gray-50">
-                <h5 className="font-medium text-gray-700 mb-3 flex items-center gap-2">
-                  {member.type === 'proposer' ? <FaUserMd className="text-indigo-600" /> : 
-                   member.type === 'adult' ? <FaUser /> : <FaChild />}
-                  {member.type === 'proposer' ? 'Proposer' : 
-                   member.type === 'adult' ? `Adult ${Math.floor(index + 1)}` : 
-                   `Child ${index - (parseInt(healthDetails.numberOfAdults) || 0) + 1}`}
+              <div key={member.id || index} className="border rounded-lg p-4 mb-4 bg-gray-50">
+                <h5 className="font-medium text-gray-700 mb-3 capitalize">
+                  {member.type === 'proposer' ? 'Proposer (Self)' : member.type === 'adult' ? `Adult ${index + (healthDetails.proposerIsMember === "Yes" ? 0 : 1)}` : `Child ${index - (healthDetails.members.filter(m => m.type !== 'child').length) + 1}`}
                 </h5>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   <div>
                     <label className="text-xs font-medium text-gray-700">Name</label>
                     <input
                       type="text"
-                      value={member.name}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].name = toUpperCase(e.target.value);
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-lg uppercase text-sm"
+                      value={member.name || ''}
+                      onChange={(e) => updateMemberField(index, 'name', toUpperCase(e.target.value))}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      readOnly={member.type === 'proposer'}
                     />
                   </div>
                   <div>
@@ -3062,18 +2858,8 @@ const handleUpdate = async (e) => {
                     <input
                       type="date"
                       max={maxDate}
-                      value={member.dob}
-                      onChange={(e) => {
-                        const selected = new Date(e.target.value);
-                        const today = new Date();
-                        if (selected > today) {
-                          alert("DOB cannot be in the future");
-                          return;
-                        }
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].dob = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.dob || ''}
+                      onChange={(e) => updateMemberField(index, 'dob', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -3081,25 +2867,29 @@ const handleUpdate = async (e) => {
                     <label className="text-xs font-medium text-gray-700">Monthly Income</label>
                     <input
                       type="number"
-                      value={member.monthlyIncome}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].monthlyIncome = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.monthlyIncome || ''}
+                      onChange={(e) => updateMemberField(index, 'monthlyIncome', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-700">Relationship</label>
+                    <select
+                      value={member.relationship || ''}
+                      onChange={(e) => updateMemberField(index, 'relationship', e.target.value)}
+                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                      disabled={member.type === 'proposer'}
+                    >
+                      <option value="">Select</option>
+                      {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                    </select>
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Height</label>
                     <input
                       type="text"
-                      value={member.height}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].height = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.height || ''}
+                      onChange={(e) => updateMemberField(index, 'height', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
@@ -3107,24 +2897,16 @@ const handleUpdate = async (e) => {
                     <label className="text-xs font-medium text-gray-700">Weight</label>
                     <input
                       type="number"
-                      value={member.weight}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].weight = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.weight || ''}
+                      onChange={(e) => updateMemberField(index, 'weight', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     />
                   </div>
                   <div>
                     <label className="text-xs font-medium text-gray-700">Qualification</label>
                     <select
-                      value={member.qualification}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].qualification = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.qualification || ''}
+                      onChange={(e) => updateMemberField(index, 'qualification', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="">Select</option>
@@ -3134,31 +2916,12 @@ const handleUpdate = async (e) => {
                   <div>
                     <label className="text-xs font-medium text-gray-700">Occupation</label>
                     <select
-                      value={member.occupation}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].occupation = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.occupation || ''}
+                      onChange={(e) => updateMemberField(index, 'occupation', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="">Select</option>
                       {OCCUPATION_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-medium text-gray-700">Relationship</label>
-                    <select
-                      value={member.relationship}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].relationship = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
-                      className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                    >
-                      <option value="">Select</option>
-                      {RELATIONSHIP_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
 
@@ -3267,23 +3030,17 @@ const handleUpdate = async (e) => {
                       </div>
                     </>
                   )}
-                  
+
                   <div>
-                    <label className="text-xs font-medium text-gray-700">Do You want to Add Rider?</label>
+                    <label className="text-xs font-medium text-gray-700">Want Rider?</label>
                     <select
-                      value={member.wantRider}
+                      value={member.wantRider || ''}
                       onChange={(e) => {
                         const newMembers = [...healthDetails.members];
                         newMembers[index].wantRider = e.target.value;
                         if (e.target.value === "No") {
                           newMembers[index].selectedRider = '';
-                          newMembers[index].riderDetails = {
-                            instaShield: '',
-                            asthma: '',
-                            diabetes: '',
-                            hypertension: '',
-                            hyperlipidaemia: '',
-                          };
+                          newMembers[index].riderDetails = { instaShield: '', asthma: '', diabetes: '', hypertension: '', hyperlipidaemia: '' };
                         }
                         setHealthDetails(prev => ({ ...prev, members: newMembers }));
                       }}
@@ -3293,13 +3050,12 @@ const handleUpdate = async (e) => {
                       {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   </div>
-
                   {member.wantRider === "Yes" && (
                     <>
                       <div>
                         <label className="text-xs font-medium text-gray-700">Select Rider</label>
                         <select
-                          value={member.selectedRider}
+                          value={member.selectedRider || ''}
                           onChange={(e) => handleMemberRiderChange(index, 'selectedRider', e.target.value)}
                           className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                         >
@@ -3307,155 +3063,57 @@ const handleUpdate = async (e) => {
                           {RIDER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                       </div>
-
                       {member.selectedRider === "Insta Shield" && (
-                        <div className="lg:col-span-3 border-t pt-2 mt-2 border-gray-200">
-                          <h6 className="text-xs font-semibold text-gray-600 mb-2">Insta Shield Details</h6>
-                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">For Asthma</label>
+                        <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                          {[
+                            ["asthma", "Asthma"],
+                            ["diabetes", "Diabetes"],
+                            ["hypertension", "Hypertension (Blood Pressure)"],
+                            ["hyperlipidaemia", "Hyperlipidaemia"],
+                          ].map(([key, label]) => (
+                            <div key={key}>
+                              <label className="text-xs font-medium text-gray-700">{label}</label>
                               <select
-                                value={member.riderDetails?.asthma || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'asthma', e.target.value)}
+                                value={member.riderDetails?.[key] || ''}
+                                onChange={(e) => handleMemberRiderDetailChange(index, key, e.target.value)}
                                 className="w-full p-1 border border-gray-300 rounded text-xs"
                               >
                                 <option value="">Select</option>
                                 {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                               </select>
                             </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Diabetes</label>
-                              <select
-                                value={member.riderDetails?.diabetes || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'diabetes', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Hypertension (Blood Pressure)</label>
-                              <select
-                                value={member.riderDetails?.hypertension || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'hypertension', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs font-medium text-gray-700">Hyperlipidaemia</label>
-                              <select
-                                value={member.riderDetails?.hyperlipidaemia || ''}
-                                onChange={(e) => handleMemberRiderDetailChange(index, 'hyperlipidaemia', e.target.value)}
-                                className="w-full p-1 border border-gray-300 rounded text-xs"
-                              >
-                                <option value="">Select</option>
-                                {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                              </select>
-                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {[
+                        ["Fetal Flourish", "fetalFlourish", "Fetal Flourish"],
+                        ["NRInsure", "nrInsure", "NRInsure"],
+                        ["Loss of Income (Any Illness excluding Infection)", "lossOfIncome", "Loss of Income"],
+                        ["Major Illness and Accident Multiplier", "majorIllness", "Major Illness and Accident Multiplier"],
+                        ["International Cover-Emergency Care", "internationalCover", "International Cover"],
+                      ].map(([riderName, key, label]) => (
+                        member.selectedRider === riderName && (
+                          <div key={key}>
+                            <label className="text-xs font-medium text-gray-700">{label}</label>
+                            <input
+                              type="text"
+                              value={member[key] || ''}
+                              onChange={(e) => updateMemberField(index, key, e.target.value)}
+                              className="w-full p-2 border border-gray-300 rounded-lg text-sm"
+                              placeholder="Enter details"
+                            />
                           </div>
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Fetal Flourish" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Fetal Flourish</label>
-                          <input
-                            type="text"
-                            value={member.fetalFlourish || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].fetalFlourish = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "NRInsure" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">NRInsure</label>
-                          <input
-                            type="text"
-                            value={member.nrInsure || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].nrInsure = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Loss of Income (Any Illness excluding Infection)" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Loss of Income</label>
-                          <input
-                            type="text"
-                            value={member.lossOfIncome || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].lossOfIncome = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "Major Illness and Accident Multiplier" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">Major Illness and Accident Multiplier</label>
-                          <input
-                            type="text"
-                            value={member.majorIllness || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].majorIllness = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
-
-                      {member.selectedRider === "International Cover-Emergency Care" && (
-                        <div>
-                          <label className="text-xs font-medium text-gray-700">International Cover</label>
-                          <input
-                            type="text"
-                            value={member.internationalCover || ''}
-                            onChange={(e) => {
-                              const newMembers = [...healthDetails.members];
-                              newMembers[index].internationalCover = e.target.value;
-                              setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                            }}
-                            className="w-full p-2 border border-gray-300 rounded-lg text-sm"
-                            placeholder="Enter details"
-                          />
-                        </div>
-                      )}
+                        )
+                      ))}
                     </>
                   )}
 
                   <div className="lg:col-span-3">
                     <label className="text-xs font-medium text-gray-700">Remarks (PED/Treatment)</label>
                     <textarea
-                      value={member.medicalRemarks}
-                      onChange={(e) => {
-                        const newMembers = [...healthDetails.members];
-                        newMembers[index].medicalRemarks = e.target.value;
-                        setHealthDetails(prev => ({ ...prev, members: newMembers }));
-                      }}
+                      value={member.medicalRemarks || ''}
+                      onChange={(e) => updateMemberField(index, 'medicalRemarks', e.target.value)}
                       className="w-full p-2 border border-gray-300 rounded-lg text-sm"
                       rows="2"
                     />
@@ -3469,7 +3127,9 @@ const handleUpdate = async (e) => {
     );
   };
 
-  // Render Motor Form
+  // ============================================================
+  // RENDER: MOTOR FORM - UPDATED with manufacturer lists + Other
+  // ============================================================
   const renderMotorForm = () => {
     const maxDate = getMaxDate();
     const odRestrictions = getODDueDateRestrictions();
@@ -3495,6 +3155,10 @@ const handleUpdate = async (e) => {
     const showSAODFields = motorDetails.insuranceType === "SAOD (On Damage)";
     const showTPFields = motorDetails.insuranceType === "TP (Third Party)";
 
+    // Manufacturer dropdown depends on Vehicle Type
+    const manufacturerInfo = getManufacturerOptions(motorDetails.vehicleType, motorDetails.manufacturer);
+    const isOtherManufacturer = motorDetails.manufacturer === OTHER_MANUFACTURER;
+
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
         <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
@@ -3502,12 +3166,25 @@ const handleUpdate = async (e) => {
         </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* Vehicle Type */}
           <div>
             <label className="text-sm font-medium text-gray-700">Vehicle Type <span className="text-red-500">*</span></label>
             <select
               data-field="vehicleType"
               value={motorDetails.vehicleType}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, vehicleType: e.target.value }))}
+              onChange={(e) => {
+                const vehicleType = e.target.value;
+                setMotorDetails(prev => {
+                  // Clear the manufacturer if it doesn't belong to the new vehicle type's list
+                  const keep = isManufacturerValidForType(vehicleType, prev.manufacturer);
+                  return {
+                    ...prev,
+                    vehicleType,
+                    manufacturer: keep ? prev.manufacturer : "",
+                    otherManufacturer: keep ? prev.otherManufacturer : "",
+                  };
+                });
+              }}
               className={`w-full p-2 border rounded-lg ${validationErrors.vehicleType ? 'border-red-500' : 'border-gray-300'}`}
             >
               <option value="">Select Vehicle Type</option>
@@ -3516,6 +3193,7 @@ const handleUpdate = async (e) => {
             {validationErrors.vehicleType && <p className="text-red-500 text-xs mt-1">{validationErrors.vehicleType}</p>}
           </div>
 
+          {/* Previous Insurance Status */}
           <div>
             <label className="text-sm font-medium text-gray-700">Previous Insurance Status <span className="text-red-500">*</span></label>
             <select
@@ -3530,6 +3208,7 @@ const handleUpdate = async (e) => {
             {validationErrors.previousInsuranceStatus && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsuranceStatus}</p>}
           </div>
 
+          {/* Registration Number - Only for non-New vehicles */}
           {!showNewVehicleFields && (
             <div>
               <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
@@ -3545,6 +3224,7 @@ const handleUpdate = async (e) => {
             </div>
           )}
 
+          {/* Auto-fetched RTO Code - Only for non-New vehicles */}
           {!showNewVehicleFields && motorDetails.autoRtoCode && (
             <div>
               <label className="text-sm font-medium text-gray-700">RTO Code (Auto-fetched)</label>
@@ -3557,6 +3237,7 @@ const handleUpdate = async (e) => {
             </div>
           )}
 
+          {/* Insurance Type */}
           <div className={showNewVehicleFields ? "lg:col-span-3" : ""}>
             <label className="text-sm font-medium text-gray-700">Insurance Type <span className="text-red-500">*</span></label>
             <select
@@ -3602,6 +3283,7 @@ const handleUpdate = async (e) => {
 </div>
         </div>
 
+        {/* New Vehicle Details Section */}
         {showNewVehicleFields && (
           <div className="mt-4 border-t border-blue-200 pt-4">
             <h4 className="text-md font-semibold text-blue-600 mb-3 flex items-center gap-2">
@@ -3613,24 +3295,58 @@ const handleUpdate = async (e) => {
                 <select
                   data-field="manufacturer"
                   value={motorDetails.manufacturer}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, manufacturer: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'}`}
+                  disabled={!motorDetails.vehicleType}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setMotorDetails(prev => ({
+                      ...prev,
+                      manufacturer: value,
+                      otherManufacturer: value === OTHER_MANUFACTURER ? prev.otherManufacturer : "",
+                    }));
+                  }}
+                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'} ${!motorDetails.vehicleType ? 'bg-gray-100 cursor-not-allowed' : ''}`}
                 >
-                  <option value="">Select Manufacturer</option>
-                  {MANUFACTURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  <option value="">{motorDetails.vehicleType ? "Select Manufacturer" : "Select Vehicle Type first"}</option>
+                  {manufacturerInfo.legacyValue && (
+                    <option value={manufacturerInfo.legacyValue}>{manufacturerInfo.legacyValue} (saved earlier)</option>
+                  )}
+                  {manufacturerInfo.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                 </select>
+                {motorDetails.vehicleType && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    {manufacturerInfo.count} manufacturers for {motorDetails.vehicleType}. Not listed? Choose "Other".
+                  </p>
+                )}
                 {validationErrors.manufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.manufacturer}</p>}
               </div>
 
+              {/* Manual manufacturer name when "Other" is selected */}
+              {isOtherManufacturer && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Manufacturer Name (Manual) <span className="text-red-500">*</span></label>
+                  <input
+                    data-field="otherManufacturer"
+                    type="text"
+                    value={motorDetails.otherManufacturer || ""}
+                    onChange={(e) => setMotorDetails(prev => ({ ...prev, otherManufacturer: e.target.value }))}
+                    className={`w-full p-2 border rounded-lg ${validationErrors.otherManufacturer ? 'border-red-500' : 'border-gray-300'}`}
+                    placeholder="Enter manufacturer / company name"
+                  />
+                  {validationErrors.otherManufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.otherManufacturer}</p>}
+                </div>
+              )}
+
               <div>
-                <label className="text-sm font-medium text-gray-700">Model <span className="text-red-500">*</span></label>
+                <label className="text-sm font-medium text-gray-700">
+                  {isOtherManufacturer ? "Model Name (Manual)" : "Model"} <span className="text-red-500">*</span>
+                </label>
                 <input
                   data-field="model"
                   type="text"
                   value={motorDetails.model}
                   onChange={(e) => setMotorDetails(prev => ({ ...prev, model: e.target.value }))}
                   className={`w-full p-2 border rounded-lg ${validationErrors.model ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter model name"
+                  placeholder={isOtherManufacturer ? "Enter model name manually" : "Enter model name"}
                 />
                 {validationErrors.model && <p className="text-red-500 text-xs mt-1">{validationErrors.model}</p>}
               </div>
@@ -3720,7 +3436,12 @@ const handleUpdate = async (e) => {
                 <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
                 {typeof motorDetails.invoiceCopy === "string" && motorDetails.invoiceCopy && (
                   <div className="mb-1">
-                    <a href={motorDetails.invoiceCopy} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    <a
+                      href={motorDetails.invoiceCopy}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 underline"
+                    >
                       View current Invoice file
                     </a>
                   </div>
@@ -3732,7 +3453,7 @@ const handleUpdate = async (e) => {
                   onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] || prev.invoiceCopy }))}
                   className={`w-full p-2 border rounded-lg ${validationErrors.invoiceCopy ? 'border-red-500' : 'border-gray-300'}`}
                 />
-                {motorDetails.invoiceCopy instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+                {motorDetails.invoiceCopy && typeof motorDetails.invoiceCopy !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
                 {validationErrors.invoiceCopy && <p className="text-red-500 text-xs mt-1">{validationErrors.invoiceCopy}</p>}
               </div>
 
@@ -3740,7 +3461,12 @@ const handleUpdate = async (e) => {
                 <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
                 {typeof motorDetails.chesisPhoto === "string" && motorDetails.chesisPhoto && (
                   <div className="mb-1">
-                    <a href={motorDetails.chesisPhoto} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                    <a
+                      href={motorDetails.chesisPhoto}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-xs text-indigo-600 underline"
+                    >
                       View current Chesis photo
                     </a>
                   </div>
@@ -3751,12 +3477,13 @@ const handleUpdate = async (e) => {
                   onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] || prev.chesisPhoto }))}
                   className="w-full p-2 border border-gray-300 rounded-lg"
                 />
-                {motorDetails.chesisPhoto instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
+                {motorDetails.chesisPhoto && typeof motorDetails.chesisPhoto !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
               </div>
             </div>
           </div>
         )}
 
+        {/* Active Policy Fields */}
         {showActiveFields && (
           <div className="mt-4 border-t border-green-200 pt-4">
             <h4 className="text-md font-semibold text-green-600 mb-3 flex items-center gap-2">
@@ -3900,6 +3627,7 @@ const handleUpdate = async (e) => {
           </div>
         )}
 
+        {/* SAOD Specific Fields */}
         {showSAODFields && showActiveFields && (
           <div className="mt-4 border-t border-purple-200 pt-4">
             <h5 className="text-sm font-semibold text-purple-600 mb-3">SAOD (On Damage) Details</h5>
@@ -3977,6 +3705,7 @@ const handleUpdate = async (e) => {
           </div>
         )}
 
+        {/* TP Insurance Fields */}
         {showTPFields && (
           <div className="mt-4 border-t border-orange-200 pt-4">
             <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
@@ -3996,6 +3725,7 @@ const handleUpdate = async (e) => {
           </div>
         )}
 
+        {/* Add-On Section - For all types except TP */}
         {!isTP && (
           <div className="mt-4 border-t border-pink-200 pt-4">
             <h5 className="text-sm font-semibold text-pink-600 mb-3 flex items-center gap-2">
@@ -4062,6 +3792,7 @@ const handleUpdate = async (e) => {
           </div>
         )}
 
+        {/* TP Insurance - Add-On automatically set to No */}
         {isTP && (
           <div className="mt-4 border-t border-orange-200 pt-4">
             <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
@@ -4076,86 +3807,109 @@ const handleUpdate = async (e) => {
           </div>
         )}
 
-        <div className="mt-4 border-t border-gray-200 pt-4">
-          <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-700">
-                Upload PYP 
-                {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
-              </label>
-              {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
-                <div className="mb-1">
-                  <a href={motorDetails.pypFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                    View current PYP file
-                  </a>
-                </div>
-              )}
-              <input
-                data-field="pypFile"
-                type="file"
-                accept=".pdf"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] || prev.pypFile }))}
-                className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {motorDetails.pypFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
-              {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-700">
-                RC Front Upload
-                {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
-              </label>
-              {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
-                <div className="mb-1">
-                  <a href={motorDetails.rcFrontFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                    View current RC Front file
-                  </a>
-                </div>
-              )}
-              <input
-                data-field="rcFrontFile"
-                type="file"
-                accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] || prev.rcFrontFile }))}
-                className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {motorDetails.rcFrontFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
-              {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-700">
-                RC Back Upload
-                {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
-              </label>
-              {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
-                <div className="mb-1">
-                  <a href={motorDetails.rcBackFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                    View current RC Back file
-                  </a>
-                </div>
-              )}
-              <input
-                data-field="rcBackFile"
-                type="file"
-                accept=".pdf,.jpg,.jpeg"
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] || prev.rcBackFile }))}
-                className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
-              />
-              {motorDetails.rcBackFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
-              {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
-            </div>
-          </div>
+       {/* Uploads Section - Updated for all statuses */}
+<div className="mt-4 border-t border-gray-200 pt-4">
+  <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
+  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    
+    {/* PYP Upload - Show for ALL statuses (Active, Expired, New) */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        Upload PYP 
+        {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
+      </label>
+      {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.pypFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current PYP file
+          </a>
         </div>
+      )}
+      <input
+        data-field="pypFile"
+        type="file"
+        accept=".pdf"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] || prev.pypFile }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.pypFile && typeof motorDetails.pypFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
+    </div>
 
+    {/* RC Front Upload - Show for ALL statuses */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        RC Front Upload
+        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
+      </label>
+      {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.rcFrontFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current RC Front file
+          </a>
+        </div>
+      )}
+      <input
+        data-field="rcFrontFile"
+        type="file"
+        accept=".pdf,.jpg,.jpeg"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] || prev.rcFrontFile }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.rcFrontFile && typeof motorDetails.rcFrontFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
+    </div>
+
+    {/* RC Back Upload - Show for ALL statuses */}
+    <div>
+      <label className="text-sm font-medium text-gray-700">
+        RC Back Upload
+        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
+      </label>
+      {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
+        <div className="mb-1">
+          <a
+            href={motorDetails.rcBackFile}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-indigo-600 underline"
+          >
+            View current RC Back file
+          </a>
+        </div>
+      )}
+      <input
+        data-field="rcBackFile"
+        type="file"
+        accept=".pdf,.jpg,.jpeg"
+        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] || prev.rcBackFile }))}
+        className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
+      />
+      {motorDetails.rcBackFile && typeof motorDetails.rcBackFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
+      {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
+    </div>
+  </div>
+</div>
+
+        {/* Add-On Modal */}
         {renderAddOnModal()}
       </div>
     );
   };
 
-  // Render Electronic Form
+  // ============================================================
+  // RENDER: ELECTRONIC FORM
+  // ============================================================
   const renderElectronicForm = () => {
     const isDeviceOlderThan15Days = () => {
       if (!electronicDetails.dateOfPurchase) return false;
@@ -4170,7 +3924,8 @@ const handleUpdate = async (e) => {
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
         <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-          <FaMobileAlt /> Mobile/Electronic Equipment Details        </h3>
+          <FaMobileAlt /> Mobile/Electronic Equipment Details
+        </h3>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
@@ -4259,7 +4014,12 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
             {typeof electronicDetails.aadhaarFile === "string" && electronicDetails.aadhaarFile && (
               <div className="mb-1">
-                <a href={electronicDetails.aadhaarFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                <a
+                  href={electronicDetails.aadhaarFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
                   View current Aadhaar file
                 </a>
               </div>
@@ -4270,7 +4030,6 @@ const handleUpdate = async (e) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.aadhaarFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -4297,7 +4056,12 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload PAN</label>
             {typeof electronicDetails.panFile === "string" && electronicDetails.panFile && (
               <div className="mb-1">
-                <a href={electronicDetails.panFile} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                <a
+                  href={electronicDetails.panFile}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
                   View current PAN file
                 </a>
               </div>
@@ -4308,7 +4072,6 @@ const handleUpdate = async (e) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.panFile instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div>
@@ -4332,7 +4095,12 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
             {typeof electronicDetails.imeiImage === "string" && electronicDetails.imeiImage && (
               <div className="mb-1">
-                <a href={electronicDetails.imeiImage} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
+                <a
+                  href={electronicDetails.imeiImage}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
                   View current IMEI image
                 </a>
               </div>
@@ -4343,22 +4111,32 @@ const handleUpdate = async (e) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] || prev.imeiImage }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.imeiImage instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
 
           <div className="lg:col-span-3">
             <label className="text-sm font-medium text-gray-700">
               Device Photos (3-4 photos from different angles showing IMEI)
             </label>
-            {(electronicDetails.devicePhotos || []).map((photo, idx) => (
-              typeof photo === "string" && photo ? (
-                <div key={idx} className="mb-1">
-                  <a href={photo} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                    View current device photo {idx + 1}
-                  </a>
-                </div>
-              ) : null
-            ))}
+            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.length > 0 && (
+              <div className="mb-1 flex flex-wrap gap-2">
+                {electronicDetails.devicePhotos.map((photo, idx) => {
+                  if (typeof photo === "string" && photo) {
+                    return (
+                      <a
+                        key={idx}
+                        href={photo}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-indigo-600 underline"
+                      >
+                        View current photo {idx + 1}
+                      </a>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+            )}
             <input
               type="file"
               accept=".jpg,.jpeg"
@@ -4366,10 +4144,8 @@ const handleUpdate = async (e) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, devicePhotos: Array.from(e.target.files) }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.devicePhotos.length > 0 && electronicDetails.devicePhotos.some(p => p instanceof File) && (
-              <p className="text-sm text-green-500 mt-1">
-                {electronicDetails.devicePhotos.filter(p => p instanceof File).length} new photo(s) selected
-              </p>
+            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.some(f => typeof f !== "string") && (
+              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.filter(f => typeof f !== "string").length} new photos selected</p>
             )}
           </div>
 
@@ -4377,8 +4153,13 @@ const handleUpdate = async (e) => {
             <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
             {typeof electronicDetails.purchaseInvoice === "string" && electronicDetails.purchaseInvoice && (
               <div className="mb-1">
-                <a href={electronicDetails.purchaseInvoice} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
-                  View current Purchase Invoice
+                <a
+                  href={electronicDetails.purchaseInvoice}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-indigo-600 underline"
+                >
+                  View current invoice
                 </a>
               </div>
             )}
@@ -4388,7 +4169,6 @@ const handleUpdate = async (e) => {
               onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] || prev.purchaseInvoice }))}
               className="w-full p-2 border border-gray-300 rounded-lg"
             />
-            {electronicDetails.purchaseInvoice instanceof File && <p className="text-xs text-green-500 mt-1">✓ New file selected</p>}
           </div>
         </div>
       </div>
@@ -4396,12 +4176,174 @@ const handleUpdate = async (e) => {
   };
 
   // ============================================================
-  // RENDER WORKFLOW FORM - ADDED (Admin Only)
+  // RENDER: MOTOR PAYOUT for one insurer quote (Admin Only)
+  // ============================================================
+  const renderQuoteMotorPayout = (quote, idx) => {
+    const { hasOD, hasTP } = getMotorPremiumParts(motorDetails.insuranceType);
+    const { errors: qErrors, warnings: qWarnings } = getQuoteMotorValidation(quote, idx);
+    const errFor = (suffix) => qErrors.find(e => e.field === `quote${idx}_${suffix}`)?.message?.replace(/^[^:]+:\s/, "");
+    const net = safeNumber(quote.netPremium);
+    const od = hasOD ? safeNumber(quote.odPremium) : 0;
+    const tp = hasTP ? safeNumber(quote.tpPremium) : 0;
+    const splitTotal = od + tp;
+    const splitMatches = net > 0 && Math.abs(splitTotal - net) <= 1;
+    const inputCls = (suffix) =>
+      `w-full p-1 border rounded text-sm ${errFor(suffix) ? 'border-red-500' : 'border-gray-300'}`;
+
+    return (
+      <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
+        <h6 className="text-xs font-semibold text-amber-700 mb-1">Payout — Motor (Admin Only)</h6>
+        <p className="text-[11px] text-gray-500 mb-2">
+          {motorDetails.insuranceType || "Insurance Type not selected"} · PayOut on {hasOD && hasTP ? "OD + TP separately" : hasOD ? "OD only" : "TP only"}
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          {hasOD && (
+            <div>
+              <label className="text-xs font-medium text-gray-700">OD Premium (Net) <span className="text-red-500">*</span></label>
+              <input
+                data-field={`quote${idx}_OdPremium`}
+                type="number"
+                min="0"
+                className={inputCls("OdPremium")}
+                value={quote.odPremium ?? ''}
+                onChange={(e) => updateInsurerQuote(idx, 'odPremium', e.target.value)}
+              />
+              {errFor("OdPremium") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("OdPremium")}</p>}
+            </div>
+          )}
+          {hasTP && (
+            <div>
+              <label className="text-xs font-medium text-gray-700">TP Premium (Net) <span className="text-red-500">*</span></label>
+              <input
+                data-field={`quote${idx}_TpPremium`}
+                type="number"
+                min="0"
+                className={inputCls("TpPremium")}
+                value={quote.tpPremium ?? ''}
+                onChange={(e) => updateInsurerQuote(idx, 'tpPremium', e.target.value)}
+              />
+              {errFor("TpPremium") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("TpPremium")}</p>}
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-medium text-gray-700">{hasOD && hasTP ? "OD + TP" : "Premium Used"} vs Net Premium</label>
+            <input
+              type="text"
+              readOnly
+              className={`w-full p-1 border rounded bg-gray-100 text-sm font-medium ${
+                splitTotal <= 0 ? 'text-gray-600' : splitMatches ? 'text-green-700 border-green-400' : 'text-red-600 border-red-400'
+              }`}
+              value={`${formatCurrency(splitTotal)} / ${formatCurrency(net)}`}
+            />
+            {splitTotal > 0 && (
+              <p className={`text-[10px] mt-0.5 ${splitMatches ? 'text-green-600' : 'text-red-500'}`}>
+                {splitMatches ? "✓ Matches Net Premium" : `Difference: ₹${(splitTotal - net).toFixed(2)}`}
+              </p>
+            )}
+            {errFor("NetPremium") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("NetPremium")}</p>}
+          </div>
+
+          {hasOD && (
+            <>
+              <div>
+                <label className="text-xs font-medium text-gray-700">OD Payout Slab (%) <span className="text-red-500">*</span></label>
+                <input
+                  data-field={`quote${idx}_OdPayoutPercent`}
+                  type="number"
+                  min="0"
+                  max="100"
+                  className={inputCls("OdPayoutPercent")}
+                  value={quote.odPayoutSlab ?? ''}
+                  onChange={(e) => updateInsurerQuote(idx, 'odPayoutSlab', e.target.value)}
+                />
+                {errFor("OdPayoutPercent") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("OdPayoutPercent")}</p>}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">OD PayOut Amount (auto)</label>
+                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm" value={formatCurrency(quote.odPayoutAmount)} />
+              </div>
+            </>
+          )}
+          {hasTP && (
+            <>
+              <div>
+                <label className="text-xs font-medium text-gray-700">TP Payout Slab (%) <span className="text-red-500">*</span></label>
+                <input
+                  data-field={`quote${idx}_TpPayoutPercent`}
+                  type="number"
+                  min="0"
+                  max="100"
+                  className={inputCls("TpPayoutPercent")}
+                  value={quote.tpPayoutSlab ?? ''}
+                  onChange={(e) => updateInsurerQuote(idx, 'tpPayoutSlab', e.target.value)}
+                />
+                {errFor("TpPayoutPercent") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("TpPayoutPercent")}</p>}
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-700">TP PayOut Amount (auto)</label>
+                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm" value={formatCurrency(quote.tpPayoutAmount)} />
+              </div>
+            </>
+          )}
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
+            <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium" value={formatCurrency(quote.totalPayoutReceivable)} />
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-gray-700">GST Return Slab (%)</label>
+            <input
+              data-field={`quote${idx}_GstReturn`}
+              type="number"
+              className={inputCls("GstReturn")}
+              value={quote.gstReturnSlabOnEMI ?? ''}
+              onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
+            />
+            {errFor("GstReturn") && <p className="text-red-500 text-[10px] mt-0.5">{errFor("GstReturn")}</p>}
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-700">GST Return Amount (auto)</label>
+            <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-emerald-700" value={formatCurrency(quote.gstReturnAmount)} />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-gray-700">TDS Amount @ 2% (auto)</label>
+            <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-red-600" value={formatCurrency(quote.tdsAmount)} />
+            <p className="text-[10px] text-gray-500 mt-0.5">= Total PayOut Receivable × 2%</p>
+          </div>
+
+          {qWarnings.length > 0 && (
+            <div className="lg:col-span-3 bg-yellow-50 border border-yellow-300 rounded p-2 space-y-0.5">
+              {qWarnings.map((w, i) => (
+                <p key={i} className="text-[11px] text-yellow-800">⚠ {w.replace(/^[^:]+:\s/, "")}</p>
+              ))}
+            </div>
+          )}
+
+          <div className="lg:col-span-3">
+            <label className="text-xs font-medium text-gray-700">
+              Arshyan Payout (auto: OD PayOut + TP PayOut + GST Return − TDS 2% − Discount)
+            </label>
+            <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
+              value={formatCurrency(quote.arshyanPayout)} />
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // RENDER WORKFLOW FORM (Admin Only)
   // ============================================================
   const renderWorkflowForm = () => {
     // Lock only when the lead was ALREADY saved as Policy Issued,
     // not the instant the dropdown changes (that hid the policy fields)
     const isPolicyIssued = editLead?.status === "Policy Issued";
+    const showPayout = isPayoutVisible();
+    // Quotes stay locked after issue - unless the lead was issued without any quote,
+    // otherwise the payout (which needs the quote's Net Premium) could never be entered.
+    const savedHadQuotes = (editLead?.workflowDetails?.selectedInsurers?.length || 0) > 0;
+    const quoteLocked = isPolicyIssued && savedHadQuotes;
 
     // #5: Payment Mode EMI restriction by LOB
     const isEMIEligibleLOB = formData.lob && (
@@ -4412,6 +4354,14 @@ const handleUpdate = async (e) => {
       formData.lob === "Terms Insurance"
     );
     const paymentModeOptionsForLOB = isEMIEligibleLOB ? PAYMENT_TERM_OPTIONS : ["One Time"];
+
+    // FIX: keep quotes (and the payout inside them) visible after "Quotation Generated".
+    // Previously this block disappeared at "Policy Issued", so the payout was never reachable.
+    const showQuotesBlock =
+      workflowDetails.status === "Quotation Generated" ||
+      showInsurerQuotes ||
+      (workflowDetails.selectedInsurers?.length || 0) > 0 ||
+      showPayout;
     
     return (
       <div className="border-t-2 border-indigo-200 pt-4 mt-4">
@@ -4436,19 +4386,19 @@ const handleUpdate = async (e) => {
             {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Status is locked when Policy Issued</p>}
           </div>
 
-          {(workflowDetails.status === "Quotation Generated" || showInsurerQuotes) && (
+          {showQuotesBlock && (
             <>
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Select Insurers for Quote</label>
                 {/* #2: Show all insurers instead of slicing to 10, bumped max-h to 64 */}
-                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto ${isPolicyIssued ? 'bg-gray-100' : ''}`}>
+                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto ${quoteLocked ? 'bg-gray-100' : ''}`}>
                   {INSURER_OPTIONS.map(ins => (
                     <label key={ins} className="flex items-center gap-2 text-sm">
                       <input
                         type="checkbox"
                         checked={workflowDetails.selectedInsurers?.includes(ins) || false}
                         onChange={(e) => {
-                          if (isPolicyIssued) return;
+                          if (quoteLocked) return;
                           const current = workflowDetails.selectedInsurers || [];
                           let updated;
                           if (e.target.checked) {
@@ -4458,24 +4408,24 @@ const handleUpdate = async (e) => {
                           }
                           setWorkflowDetails(prev => ({ ...prev, selectedInsurers: updated }));
                         }}
-                        className={`rounded text-indigo-600 ${isPolicyIssued ? 'cursor-not-allowed' : ''}`}
-                        disabled={isPolicyIssued}
+                        className={`rounded text-indigo-600 ${quoteLocked ? 'cursor-not-allowed' : ''}`}
+                        disabled={quoteLocked}
                       />
                       {ins}
                     </label>
                   ))}
                 </div>
-                {isPolicyIssued && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
+                {quoteLocked && <p className="text-xs text-gray-500 mt-1">Insurer selection is locked when Policy Issued</p>}
               </div>
               {workflowDetails.selectedInsurers?.length > 0 && (
                 <div className="lg:col-span-3">
                   <h5 className="text-sm font-medium text-gray-700 mb-2">Insurer-wise Quotes</h5>
                   {workflowDetails.selectedInsurers.map((insurer, idx) => {
                     const quote = workflowDetails.insurerQuotes?.[idx] || {};
-const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quote.paymentMode !== "One Time";
+                    const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quote.paymentMode !== "One Time";
 
                     return (
-                      <div key={idx} className={`border rounded-lg p-3 mb-3 ${isPolicyIssued ? 'bg-gray-50' : 'bg-gray-50'}`}>
+                      <div key={idx} className="border rounded-lg p-3 mb-3 bg-gray-50">
                         <h6 className="font-medium text-indigo-600">{insurer}</h6>
 
                         {/* ---- Quote No. + Upload + View ---- */}
@@ -4484,16 +4434,15 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                             <label className="text-xs font-medium text-gray-700">Quote No. <span className="text-red-500">*</span></label>
                             <input
                               type="text"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               placeholder="Enter quote number"
                               value={quote.quoteNumber || ''}
-                              onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'quoteNumber', e.target.value)}
+                              onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'quoteNumber', e.target.value)}
                             />
                           </div>
                           <div>
                             <label className="text-xs font-medium text-gray-700">Upload Quote</label>
-                            {/* FIX: View option for existing uploaded quote */}
                             {typeof quote.quoteUpload === "string" && quote.quoteUpload && (
                               <div className="mb-1">
                                 <a href={quote.quoteUpload} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 underline">
@@ -4504,11 +4453,11 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                             <input
                               type="file"
                               accept=".pdf,.jpg,.jpeg"
-                              className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                              disabled={isPolicyIssued}
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
                               onChange={(e) => {
                                 const file = e.target.files[0];
-                                if (file && !isPolicyIssued) updateInsurerQuoteFile(idx, 'quoteUpload', file);
+                                if (file && !quoteLocked) updateInsurerQuoteFile(idx, 'quoteUpload', file);
                               }}
                             />
                             {quote.quoteUpload instanceof File && (
@@ -4519,14 +4468,14 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                             <label className="text-xs font-medium text-gray-700">Payment Mode</label>
                             {/* #5: Payment Mode options restricted by LOB */}
                             <select
-  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-  disabled={isPolicyIssued}
-  value={quote.paymentMode || (isEMIEligibleLOB ? '' : 'One Time')}
-  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
->
-  <option value="">Select</option>
-  {paymentModeOptionsForLOB.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-</select>
+                              className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                              disabled={quoteLocked}
+                              value={quote.paymentMode || (isEMIEligibleLOB ? '' : 'One Time')}
+                              onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'paymentMode', e.target.value)}
+                            >
+                              <option value="">Select</option>
+                              {paymentModeOptionsForLOB.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                            </select>
                           </div>
                         </div>
 
@@ -4538,20 +4487,20 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                               <label className="text-xs font-medium text-gray-700">Net Premium</label>
                               <input
                                 type="number"
-                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                disabled={isPolicyIssued}
+                                className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={quoteLocked}
                                 value={quote.netPremium || ''}
-                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'netPremium', e.target.value)}
+                                onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'netPremium', e.target.value)}
                               />
                             </div>
                             <div>
                               <label className="text-xs font-medium text-gray-700">GST %</label>
                               <input
                                 type="number"
-                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                disabled={isPolicyIssued}
+                                className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={quoteLocked}
                                 value={quote.gst ?? 18}
-                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'gst', e.target.value)}
+                                onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'gst', e.target.value)}
                               />
                             </div>
                             <div>
@@ -4563,10 +4512,10 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                               <label className="text-xs font-medium text-gray-700">Final Discount</label>
                               <input
                                 type="number"
-                                className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                disabled={isPolicyIssued}
+                                className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                disabled={quoteLocked}
                                 value={quote.finalDiscount || ''}
-                                onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'finalDiscount', e.target.value)}
+                                onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'finalDiscount', e.target.value)}
                               />
                             </div>
                             <div>
@@ -4577,7 +4526,7 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                           </div>
                         </div>
 
-                        {/* ---- EMI Premium (only if not Yearly) ---- */}
+                        {/* ---- EMI Premium (only if not Yearly / One Time) ---- */}
                         {showEmiFields && (
                           <div className="mt-3 border-t pt-2">
                             <h6 className="text-xs font-semibold text-gray-600 mb-2">
@@ -4588,20 +4537,20 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                                 <label className="text-xs font-medium text-gray-700">EMI Net Premium</label>
                                 <input
                                   type="number"
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiNetPremium || ''}
-                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiNetPremium', e.target.value)}
+                                  onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'emiNetPremium', e.target.value)}
                                 />
                               </div>
                               <div>
                                 <label className="text-xs font-medium text-gray-700">EMI GST %</label>
                                 <input
                                   type="number"
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiGst ?? 18}
-                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiGst', e.target.value)}
+                                  onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'emiGst', e.target.value)}
                                 />
                               </div>
                               <div>
@@ -4614,10 +4563,10 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                               <div>
                                 <label className="text-xs font-medium text-gray-700">EMI Received Count</label>
                                 <select
-                                  className={`w-full p-1 border rounded text-sm ${isPolicyIssued ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
-                                  disabled={isPolicyIssued}
+                                  className={`w-full p-1 border rounded text-sm ${quoteLocked ? 'bg-gray-100 cursor-not-allowed' : 'border-gray-300'}`}
+                                  disabled={quoteLocked}
                                   value={quote.emiReceivedCount || 0}
-                                  onChange={(e) => !isPolicyIssued && updateInsurerQuote(idx, 'emiReceivedCount', e.target.value)}
+                                  onChange={(e) => !quoteLocked && updateInsurerQuote(idx, 'emiReceivedCount', e.target.value)}
                                 >
                                   {Array.from({ length: (quote.totalEmiCount || 0) + 1 }, (_, i) => i).map((n) => (
                                     <option key={n} value={n}>{n}</option>
@@ -4636,78 +4585,98 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                           </div>
                         )}
 
-                        {/* ---- Payout Section (Admin Only, and only once Policy Issued) ---- */}
-{(localStorage.getItem("userRole") === "Admin") && isPolicyIssued && (
-  <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
-    <h6 className="text-xs font-semibold text-amber-700 mb-2">Payout (Admin Only)</h6>
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      <div>
-        <label className="text-xs font-medium text-gray-700">Payout Slab (%)</label>
-        <input
-          type="number"
-          className="w-full p-1 border border-gray-300 rounded text-sm"
-          value={quote.payoutSlab || ''}
-          onChange={(e) => updateInsurerQuote(idx, 'payoutSlab', e.target.value)}
-        />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
-        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
-          value={formatCurrency(quote.totalPayoutReceivable)} />
-      </div>
+                        {/* ---- Payout Section (Admin Only, once Policy Issued) ---- */}
+                        {showPayout && showMotorSection && renderQuoteMotorPayout(quote, idx)}
 
-      {/* Only show PayOut on EMI when the quote's payment mode is actually EMI-based */}
-      {quote.isEMIMode && (
-        <div>
-          <label className="text-xs font-medium text-gray-700">PayOut on EMI (auto)</label>
-          <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
-            value={formatCurrency(quote.payoutOnEMI)} />
-        </div>
-      )}
+                        {showPayout && !showMotorSection && (
+                          <div className="mt-3 border-t pt-2 bg-amber-50 -mx-3 px-3 pb-2 rounded-b-lg">
+                            <h6 className="text-xs font-semibold text-amber-700 mb-2">Payout (Admin Only)</h6>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Payout Slab (%)</label>
+                                <input
+                                  type="number"
+                                  className="w-full p-1 border border-gray-300 rounded text-sm"
+                                  value={quote.payoutSlab || ''}
+                                  onChange={(e) => updateInsurerQuote(idx, 'payoutSlab', e.target.value)}
+                                />
+                              </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">Total PayOut Receivable (auto)</label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                  value={formatCurrency(quote.totalPayoutReceivable)} />
+                              </div>
 
-      <div>
-        <label className="text-xs font-medium text-gray-700">GST Return Slab (%)</label>
-        <input
-          type="number"
-          className="w-full p-1 border border-gray-300 rounded text-sm"
-          value={quote.gstReturnSlabOnEMI || ''}
-          onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
-        />
-      </div>
+                              {/* Only show PayOut on EMI when the quote's payment mode is actually EMI-based */}
+                              {quote.isEMIMode && (
+                                <div>
+                                  <label className="text-xs font-medium text-gray-700">PayOut on EMI (auto)</label>
+                                  <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm"
+                                    value={formatCurrency(quote.payoutOnEMI)} />
+                                </div>
+                              )}
 
-      <div>
-        <label className="text-xs font-medium text-gray-700">GST Return Amount (auto)</label>
-        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-emerald-700"
-          value={formatCurrency(quote.gstReturnAmount)} />
-      </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">GST Return Slab (%)</label>
+                                <input
+                                  type="number"
+                                  className="w-full p-1 border border-gray-300 rounded text-sm"
+                                  value={quote.gstReturnSlabOnEMI || ''}
+                                  onChange={(e) => updateInsurerQuote(idx, 'gstReturnSlabOnEMI', e.target.value)}
+                                />
+                              </div>
 
-      <div>
-        <label className="text-xs font-medium text-gray-700">TDS Amount @ 2% (auto)</label>
-        <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-red-600"
-          value={formatCurrency(quote.tdsAmount)} />
-        <p className="text-[10px] text-gray-500 mt-0.5">
-          {quote.isEMIMode
-            ? "= PayOut on EMI × EMIs Received × 2%"
-            : "= Total PayOut Receivable × 2%"}
-        </p>
-      </div>
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">GST Return Amount (auto)</label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-emerald-700"
+                                  value={formatCurrency(quote.gstReturnAmount)} />
+                              </div>
 
-      <div className="lg:col-span-3">
-        <label className="text-xs font-medium text-gray-700">
-          Arshyan Payout (auto: Insurer Payout Received + GST Return − TDS 2% − Discount)
-        </label>
-        <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
-          value={formatCurrency(quote.arshyanPayout)} />
-      </div>
-    </div>
-  </div>
-)}
+                              <div>
+                                <label className="text-xs font-medium text-gray-700">TDS Amount @ 2% (auto)</label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-gray-100 text-sm font-medium text-red-600"
+                                  value={formatCurrency(quote.tdsAmount)} />
+                                <p className="text-[10px] text-gray-500 mt-0.5">
+                                  {quote.isEMIMode
+                                    ? "= PayOut on EMI × EMIs Received × 2%"
+                                    : "= Total PayOut Receivable × 2%"}
+                                </p>
+                              </div>
+
+                              <div className="lg:col-span-3">
+                                <label className="text-xs font-medium text-gray-700">
+                                  Arshyan Payout (auto: Insurer Payout Received + GST Return − TDS 2% − Discount)
+                                </label>
+                                <input type="text" readOnly className="w-full p-1 border rounded bg-amber-100 text-sm font-semibold"
+                                  value={formatCurrency(quote.arshyanPayout)} />
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     );
                   })}
                 </div>
               )}
             </>
+          )}
+
+          {/* Payout lives inside each insurer quote - explain when it can't be shown */}
+          {isAdminUser() && (!showPayout || !(workflowDetails.selectedInsurers?.length > 0)) && (
+            <div className="lg:col-span-3 bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm text-gray-600 flex items-start gap-2">
+              <FaMoneyBillWave className="mt-0.5 text-amber-600 flex-shrink-0" />
+              <span>
+                <span className="font-medium text-amber-700">Payout{showMotorSection ? " — Motor" : ""} (Admin Only): </span>
+                {!showPayout ? (
+                  <>
+                    opens when Status is <span className="font-medium">Policy Issued</span>. Current status:{" "}
+                    <span className="font-medium">{workflowDetails.status || "Open"}</span>.
+                  </>
+                ) : (
+                  <>add at least one insurer quote above. Payout is entered inside the quote the policy was issued with.</>
+                )}
+              </span>
+            </div>
           )}
 
           <div>
@@ -5128,17 +5097,23 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                 </select>
               </div>
 
-              <div>
-                <label className="text-sm font-medium text-gray-700">Sum Insured</label>
-                <select
-                  value={formData.sumInsured}
-                  onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select</option>
-                  {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
+              {/* Motor uses a manual IDV in the Motor section, so hide the lakh-dropdown here for motor */}
+              {!showMotorSection && (
+                <div>
+                  <label className="text-sm font-medium text-gray-700">Sum Insured</label>
+                  <select
+                    value={formData.sumInsured}
+                    onChange={(e) => setFormData({ ...formData, sumInsured: e.target.value })}
+                    className="w-full p-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select</option>
+                    {formData.sumInsured && !SUM_INSURED_OPTIONS.includes(formData.sumInsured) && (
+                      <option value={formData.sumInsured}>{formData.sumInsured}</option>
+                    )}
+                    {SUM_INSURED_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                  </select>
+                </div>
+              )}
 
               <div className="lg:col-span-3">
                 <label className="text-sm font-medium text-gray-700">Remarks</label>
@@ -5190,7 +5165,7 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
               />
             )}
 
-            {/* Workflow Management Section - ADDED */}
+            {/* Workflow Management Section */}
             {renderWorkflowForm()}
 
             {renderPreviousPolicyPopup()}
@@ -5293,8 +5268,9 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                   <div>Insurance Type: {selectedLead.motorDetails.insuranceType || "-"}</div>
                   <div>NCB: {selectedLead.motorDetails.ncb || "-"}</div>
                   <div>Claim Taken: {selectedLead.motorDetails.claimTaken || "-"}</div>
-                  {selectedLead.motorDetails.manufacturer && <div>Manufacturer: {selectedLead.motorDetails.manufacturer}</div>}
+                  {selectedLead.motorDetails.manufacturer && <div>Manufacturer: {getDisplayManufacturer(selectedLead.motorDetails)}</div>}
                   {selectedLead.motorDetails.model && <div>Model: {selectedLead.motorDetails.model}</div>}
+                  {selectedLead.motorDetails.fuelType && <div>Fuel Type: {selectedLead.motorDetails.fuelType}</div>}
                   {selectedLead.motorDetails.chesisNo && <div>Chesis No.: {selectedLead.motorDetails.chesisNo}</div>}
                   {selectedLead.motorDetails.yearOfManufacturing && <div>Year: {selectedLead.motorDetails.yearOfManufacturing}</div>}
                   {selectedLead.motorDetails.monthOfManufacturing && <div>Month: {selectedLead.motorDetails.monthOfManufacturing}</div>}
@@ -5332,7 +5308,7 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                 </div>
               </div>
             )}
-            {/* Workflow Details in View Modal - ADDED */}
+            {/* Workflow Details in View Modal */}
             {selectedLead.workflowDetails && (
               <div className="sm:col-span-2 border-t pt-2 mt-2">
                 <h4 className="font-semibold text-indigo-600">Workflow Details</h4>
@@ -5346,7 +5322,14 @@ const showEmiFields = quote.paymentMode && quote.paymentMode !== "Yearly" && quo
                       <span className="font-medium">Insurer Quotes:</span>
                       <ul className="list-disc list-inside mt-1">
                         {selectedLead.workflowDetails.insurerQuotes.map((q, i) => (
-                          <li key={i}>{q.insurerName} - ₹{q.premiumAmount || 0}</li>
+                          <li key={i}>
+                            {q.insurerName} - Net ₹{formatCurrency(q.netPremium)} / Gross ₹{formatCurrency(q.grossPremium)}
+                            {q.isMotorPayout && (
+                              <span className="text-xs text-gray-500">
+                                {" "}(OD ₹{formatCurrency(q.odPremium)} @ {q.odPayoutSlab || 0}% · TP ₹{formatCurrency(q.tpPremium)} @ {q.tpPayoutSlab || 0}% · Arshyan ₹{formatCurrency(q.arshyanPayout)})
+                              </span>
+                            )}
+                          </li>
                         ))}
                       </ul>
                     </div>
