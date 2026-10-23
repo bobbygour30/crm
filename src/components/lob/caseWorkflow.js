@@ -9,21 +9,28 @@
 //
 // Everything in this file is plain JavaScript (no React) so it can be tested.
 // ============================================================
-import { isMotorLob, validateMotorPayout, computeMotorPayout, OTHER_MANUFACTURER } from "./motorInsurance";
+import {
+  isMotorLob, validateMotorPayout, computeMotorPayout, OTHER_MANUFACTURER, MOTOR_ISSUANCE_STATUS_OPTIONS,
+  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE,
+} from "./motorInsurance";
 
 // ============================================================
 // CONSTANTS
 // ============================================================
-export const LOB_OPTIONS = [
-  "Health Insurance", "Motor Insurance", "Mobile/Electronic Equipment Insurance",
+// Motor BRD: LOB "Motor Insurance" -> Vehicle Type -> Policy Type (Brand New / SAOD / Comprehensive / TP).
+// The older per-vehicle motor LOBs are no longer offered; leads saved with them still open
+// (their vehicle + policy type are worked out by motorDefaultsFromLob).
+export const LEGACY_MOTOR_LOBS = [
   "Private Car-OD", "Private Car-SOD", "Private Car-Comprehensive", "Private Car-TP",
   "Taxi-Comprehensive", "Taxi-TP", "Commercial Vehicle-Comprehensive", "Commercial Vehicle-TP",
-  "E-Rikshaw-TP", "E-Rikshaw-Comprehensive", "Two-Wheeler-TP", "My Home",
+  "E-Rikshaw-TP", "E-Rikshaw-Comprehensive", "Two-Wheeler-TP", "New Vehicle Insurance", "New Two Wheeler Insurance",
+];
+export const LOB_OPTIONS = [
+  "Health Insurance", "Motor Insurance", "Mobile/Electronic Equipment Insurance", "My Home",
   "Mediclaim Health Insurance", "Bharat Sookshma Udyam Suraksha", "Bharat Laghu Udyam Suraksha",
   "Bharat Grih Raksha", "Burglary", "MARINE-OPEN", "MARINE-SPECIFIC", "MARINE-STOP",
   "PERSONAL ACCIDENT", "Employee Compensation", "Group Health Insurance", "Terms Insurance",
-  "Ulip Plan", "Traditional Plan", "Travel Insurance", "New Vehicle Insurance",
-  "New Two Wheeler Insurance", "Other Insurance",
+  "Ulip Plan", "Traditional Plan", "Travel Insurance", "Other Insurance",
 ];
 export const SOURCE_OPTIONS = ["Employee", "Channel Partner", "Direct Client", "Social Media", "Store", "Other"];
 export const GENDER_OPTIONS = ["Male", "Female", "Other"];
@@ -76,9 +83,25 @@ export const ADD_ON_OPTIONS = [
 
 // Workflow option lists (BRD)
 export const QUOTE_STATUS_OPTIONS = ["Pending", "Accepted", "Rejected"];
-export const PAYMENT_STATUS_OPTIONS = ["Pending", "URL Shared", "Payment Done", "Payment Failed"];
-export const EMANDATE_STATUS_OPTIONS = ["Pending", "Done", "Failed"];
-export const ISSUANCE_STATUS_OPTIONS = ["Policy Issued", "At UW", "Pending for e-Mandate"];
+// Payment: two states only. The policy "Status" is asked only once payment is Done.
+export const PAYMENT_DONE = "Payment Done";
+export const PAYMENT_STATUS_OPTIONS = ["Payment Done", "Payment Pending"];
+// e-Mandate statuses apply to EMI (instalment) policies only
+export const EMANDATE_ISSUANCE_STATUSES = ["e-Mandate Link Shared", "e-Mandate Done", "e-Mandate Pending"];
+export const ISSUANCE_STATUS_OPTIONS = [...EMANDATE_ISSUANCE_STATUSES, "Referred to UW", "Policy Issued", "Rejected"]; // health & others
+export { MOTOR_ISSUANCE_STATUS_OPTIONS };
+/** Status options after Payment Done: motor = inspection statuses; others = e-Mandate (EMI only), UW, Issued, Rejected */
+export const getIssuanceStatusOptions = (sections = {}, instalment = false) => {
+  if (sections.motor) return [...MOTOR_ISSUANCE_STATUS_OPTIONS, "Rejected"];
+  return instalment ? ISSUANCE_STATUS_OPTIONS : ISSUANCE_STATUS_OPTIONS.filter((x) => !EMANDATE_ISSUANCE_STATUSES.includes(x));
+};
+/** Older saved values -> current ones */
+export const LEGACY_ISSUANCE_STATUS = { "At UW": "Referred to UW", "Pending for e-Mandate": "e-Mandate Pending" };
+export const LEGACY_PAYMENT_STATUS = {
+  Pending: "Payment Pending", "URL Shared": "Payment Pending", "Payment Failed": "Payment Pending", "Quote Under Discussion": "Payment Pending",
+  "e-Mandate Status Pending": "Payment Done", "e-Mandate Status Done": "Payment Done", "Policy Issued": "Payment Done",
+};
+export const PAYOUT_BASIS_OPTIONS = ["Net Premium", "OD/TP Split"];
 export const CASHBACK_STATUS_OPTIONS = ["Pending", "Partial Settled", "Settled"];
 export const CASHBACK_PAYEE_OPTIONS = ["Customer", "Employee", "Channel Partner"];
 export const DEFAULT_GST_PAYOUT_PERCENT = 11.5;
@@ -88,7 +111,14 @@ export const DEFAULT_QUOTE_GST_PERCENT = "18";
 // Top-level lead status (derived from the stage) - used by lists, filters, renewal alerts
 export const CASE_STATUS_LIST = [
   "Open", "Quote Requested", "Quotation Generated", "Payment Link Generated", "Payment Done",
-  "At UW", "Pending for e-Mandate", "Policy Issued", "Closed Without Issuance",
+  "e-Mandate Link Shared", "e-Mandate Done", "e-Mandate Pending", "Referred to UW",
+  "Awaited for Inspection", "Inspection Done - Waiting for Policy",
+  "Policy Issued", "Rejected", "Closed Without Issuance",
+];
+// issuance statuses that become the lead status as-is (older values kept so old leads still show)
+const PENDING_ISSUANCE_STATUSES = [
+  ...EMANDATE_ISSUANCE_STATUSES, "Referred to UW", "Awaited for Inspection", "Inspection Done - Waiting for Policy", "Rejected",
+  "At UW", "Pending for e-Mandate",
 ];
 
 // Badge colours for the derived status (lists + status cards)
@@ -101,6 +131,13 @@ export const statusBadgeClass = (status) =>
     "Payment Done": "bg-green-100 text-green-800",
     "At UW": "bg-orange-100 text-orange-800",
     "Pending for e-Mandate": "bg-amber-100 text-amber-800",
+    "Awaited for Inspection": "bg-orange-100 text-orange-800",
+    "e-Mandate Link Shared": "bg-violet-100 text-violet-800",
+    "e-Mandate Done": "bg-lime-100 text-lime-800",
+    "e-Mandate Pending": "bg-amber-100 text-amber-800",
+    "Referred to UW": "bg-orange-100 text-orange-800",
+    Rejected: "bg-red-100 text-red-800",
+    "Inspection Done - Waiting for Policy": "bg-teal-100 text-teal-800",
     "Policy Issued": "bg-emerald-100 text-emerald-800",
     "Closed Without Issuance": "bg-red-100 text-red-800",
   }[status] || "bg-gray-100 text-gray-700");
@@ -122,6 +159,13 @@ export const validateEmail = (e) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 export const validateAadhaar = (a) => /^[0-9]{12}$/.test(a);
 export const validatePAN = (p) => /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(p);
 export const validatePIN = (p) => /^[0-9]{6}$/.test(p);
+// Indian registration: BR01AB1234 / DL1CAB1234 / BR01Q1234, or BH series 22BH1234AA
+export const normalizeRegistration = (v) => String(v || "").toUpperCase().replace(/[\s-]/g, "");
+export const validateRegistration = (v) => {
+  const r = normalizeRegistration(v);
+  return /^[A-Z]{2}[0-9]{1,2}[A-Z]{0,3}[0-9]{1,4}$/.test(r) || /^[0-9]{2}BH[0-9]{4}[A-Z]{1,2}$/.test(r);
+};
+export const validateRtoCode = (v) => /^[A-Z]{2}[0-9]{1,2}[A-Z]?$/.test(String(v || "").toUpperCase());
 
 export const getMaxDate = () => new Date().toISOString().split("T")[0];
 export const getODDueDateRestrictions = () => {
@@ -177,7 +221,8 @@ export const isEmiEligibleLob = (lob) => {
 export const STAGES = [
   { key: "Lead", label: "Lead", access: "all", next: "Request for Quote" },
   { key: "Quote", label: "Quote", access: "all", next: "Request Quote Insurer-wise" },
-  { key: "QuoteWorkflow", label: "Quote Workflow", access: "admin", next: "Proceed with Accepted Quote" },
+  // premiums / files / payout are Admin-only; the quote STATUS (and proceeding) is open to Employee + Admin
+  { key: "QuoteWorkflow", label: "Quote Workflow", access: "all", next: "Proceed with Accepted Quote" },
   { key: "PolicyIssuance", label: "Policy Issuance", access: "all", next: "Request for Payment URL" },
   { key: "Payment", label: "Payment", access: "admin", next: "EMI / Premium Details" },
   { key: "EmiDues", label: "EMI Dues", access: "admin", next: "PayOut & Cashback" },
@@ -293,6 +338,7 @@ export const normalizeQuotes = ({ selectedInsurers = [], insurerQuotes = [], acc
       gstPercent: hasValue(q.gstPercent) ? q.gstPercent : hasValue(q.gst) ? q.gst : DEFAULT_QUOTE_GST_PERCENT,
       payoutPercent: hasValue(q.payoutPercent) ? q.payoutPercent : hasValue(q.payoutSlab) && num(q.payoutSlab) ? q.payoutSlab : "",
       quoteStatus: q.quoteStatus || (legacyAccepted ? "Accepted" : "Pending"),
+      acceptedAddOns: Array.isArray(q.acceptedAddOns) ? q.acceptedAddOns : [],
     };
     if (!byName[name]) byName[name] = mapped;
     else {
@@ -323,6 +369,7 @@ export const newQuote = (insurerName) => ({
   gstPercent: DEFAULT_QUOTE_GST_PERCENT,
   payoutPercent: "",
   quoteStatus: "Pending",
+  acceptedAddOns: [], // Motor BRD: add-ons this insurer accepted
 });
 
 // ============================================================
@@ -416,15 +463,13 @@ export const computeProfit = ({ payout = {}, workflow = {}, paymentTerm, isMotor
 // ============================================================
 // STATUS (derived from stage, kept for list badges / filters / renewal alerts)
 // ============================================================
-export const isPaymentConfirmed = (wf = {}) =>
-  !!(wf.utrNumber || ["Payment Done", "e-Mandate Status Done"].includes(wf.paymentStatus));
+export const isPaymentConfirmed = (wf = {}) => wf.paymentStatus === PAYMENT_DONE;
 // Same rule the backend uses (a shared payment URL also counts) - for saving older cases
-export const isPaymentConfirmedLoose = (wf = {}) => !!(wf.paymentUrl || isPaymentConfirmed(wf));
+export const isPaymentConfirmedLoose = (wf = {}) => isPaymentConfirmed(wf);
 
 export const deriveCaseStatus = (stage, wf = {}) => {
   if (wf.issuanceStatus === "Policy Issued") return "Policy Issued";
-  if (wf.issuanceStatus === "At UW") return "At UW";
-  if (wf.issuanceStatus === "Pending for e-Mandate") return "Pending for e-Mandate";
+  if (PENDING_ISSUANCE_STATUSES.includes(wf.issuanceStatus)) return wf.issuanceStatus;
   const i = stageIndex(stage);
   if (i >= IDX.Payment) {
     if (wf.paymentStatus === "Payment Done") return "Payment Done";
@@ -441,7 +486,7 @@ export const inferStage = (lead = {}) => {
   if (lead.caseStage && STAGE_KEYS.includes(lead.caseStage)) return lead.caseStage;
   const st = lead.workflowDetails?.status || lead.status;
   if (st === "Policy Issued") return "Profit";
-  if (["Payment Done", "Payment Link Generated", "At UW", "Pending for e-Mandate"].includes(st)) return "Payment";
+  if (["Payment Done", "Payment Link Generated", ...PENDING_ISSUANCE_STATUSES].includes(st)) return "Payment";
   if (st === "Quotation Generated") return "QuoteWorkflow";
   if (st === "Quote Requested") return "QuoteWorkflow";
   const hasLobData = !!(lead.healthDetails || lead.motorDetails || lead.electronicDetails || lead.paDetails || lead.travelDetails);
@@ -486,14 +531,15 @@ export const emptyWorkflow = () => ({
   status: "Open",
   selectedInsurers: [], quoteRemarks: "", insurerQuotes: [], acceptedInsurer: "",
   finalNetPremium: "", finalGstPercent: DEFAULT_QUOTE_GST_PERCENT, emiNetPremium: "",
-  paymentUrl: "", paymentStatus: "", eMandateStatus: "", utrNumber: "", paymentSnapshot: null,
-  issuanceStatus: "", notIssuedRemarks: "",
+  paymentUrl: "", paymentStatus: "", utrNumber: "", paymentSnapshot: null,
+  issuanceStatus: "", notIssuedRemarks: "", eMandateUrl: "", uwQuery: "",
   policyNumber: "", policyIssuedOn: "", policyStartDate: "", policyExpiryDate: "", policyCopy: null,
   emiReceivedCount: "", lastEmiPaidOn: "",
   workflowRemarks: "",
 });
 export const emptyCashback = () => ({ payoutTo: "Customer", amountPerPayment: "", status: "Pending", settledAmount: "" });
 export const emptyPayout = () => ({
+  payoutBasis: "Net Premium", // Motor: "Net Premium" (BRD) or "OD/TP Split"
   payoutSlabPercent: "", gstPayoutPercent: String(DEFAULT_GST_PAYOUT_PERCENT), tdsPercent: String(DEFAULT_TDS_PERCENT),
   odPremium: "", tpPremium: "", odPayoutPercent: "", tpPayoutPercent: "",
 });
@@ -546,6 +592,10 @@ const validateLeadStage = (ctx, e) => {
   if (f.email && !validateEmail(f.email)) e("email", "Invalid email format");
   if (f.pinCode && !validatePIN(f.pinCode)) e("pinCode", "Enter valid 6-digit PIN code");
   if (!f.lob) e("lob", "LOB is required");
+  if (ctx.sections?.motor) {
+    if (!ctx.motorDetails?.vehicleType) e("vehicleType", "Select the Vehicle Type");
+    if (!ctx.motorDetails?.policyType) e("motorPolicyType", "Select the Motor Policy Type (Brand New / SAOD / Comprehensive / TP)");
+  }
 };
 
 const validateHealthQuote = (ctx, e) => {
@@ -580,50 +630,78 @@ const validateHealthQuote = (ctx, e) => {
 
 const validateMotorQuote = (ctx, e) => {
   const m = ctx.motorDetails;
-  if (!m.vehicleType) e("vehicleType", "Vehicle type is required");
-  if (!m.previousInsuranceStatus) e("previousInsuranceStatus", "Previous Insurance Status is required");
-  const isNew = m.previousInsuranceStatus === "New";
-  if (!isNew && !m.registrationNumber) e("registrationNumber", "Registration number is required");
-  if (!m.insuranceType) e("insuranceType", "Insurance type is required");
-  if (isNew) {
-    if (!m.manufacturer) e("manufacturer", "Manufacturer is required for New Vehicle");
+  if (!m.vehicleType) e("vehicleType", "Vehicle Type is required");
+  if (!m.policyType) e("motorPolicyType", "Motor Policy Type is required");
+  if (m.policyType === "Brand New") {
+    if (!m.rtoCode) e("rtoCode", "RTO is required (e.g. BR01)");
+    else if (!validateRtoCode(m.rtoCode)) e("rtoCode", "RTO format: 2 letters + number, e.g. BR01 / DL11");
+    if (!m.manufacturer) e("manufacturer", "Make / Manufacturer is required");
     if (m.manufacturer === OTHER_MANUFACTURER && !String(m.otherManufacturer || "").trim()) e("otherManufacturer", "Enter the Manufacturer Name (Other selected)");
-    if (!m.model) e("model", "Model is required for New Vehicle");
-    if (!m.fuelType) e("fuelType", "Fuel Type is required for New Vehicle");
-    if (!m.rtoCode) e("rtoCode", "RTO Code is required for New Vehicle");
-    if (!m.chesisNo) e("chesisNo", "Chesis No. is required for New Vehicle");
-    if (!m.yearOfManufacturing) e("yearOfManufacturing", "Year of Manufacturing is required for New Vehicle");
-    if (!m.monthOfManufacturing) e("monthOfManufacturing", "Month of Manufacturing is required for New Vehicle");
-    if (!m.idvAsPerInvoice) e("idvAsPerInvoice", "IDV (As per Invoice) is required for New Vehicle");
-    if (!m.invoiceCopy) e("invoiceCopy", "Invoice Copy is required for New Vehicle");
-  }
-  if (m.previousInsuranceStatus === "Active") {
-    if (["Comprehensive (OD+TP)", "SAOD (On Damage)"].includes(m.insuranceType)) {
-      if (!m.odDueDate) e("odDueDate", "OD Due Date is required for Active Policy");
-      if (!m.tpDueDate) e("tpDueDate", "TP Due Date is required for Active Policy");
+    if (!String(m.model || "").trim()) e("model", "Model is required");
+    if (!m.fuelType) e("fuelType", "Fuel is required");
+    if (!m.monthOfManufacturing || !m.yearOfManufacturing) e("monthOfManufacturing", "Manufacturer Date (MM/YYYY) is required");
+    if (!m.ownerType) e("ownerType", "Type of Owner is required");
+    if (!(num(m.idvAsPerInvoice) > 0)) e("idvAsPerInvoice", "IDV is required (digits only)");
+  } else if (m.policyType) {
+    if (!m.registrationNumber) e("registrationNumber", "Registration No. is required");
+    else if (!validateRegistration(m.registrationNumber)) e("registrationNumber", "Registration No. format, e.g. BR01BS6139");
+    if (!m.previousInsuranceStatus) e("previousInsuranceStatus", "Previous Insurance Status (Active / Not Active) is required");
+    const active = m.previousInsuranceStatus === PREVIOUS_POLICY_ACTIVE;
+    const notActive = m.previousInsuranceStatus === PREVIOUS_POLICY_NOT_ACTIVE;
+    if (m.policyType === "TP") {
+      if (active) {
+        if (!m.previousInsurerName) e("previousInsurerName", "Insurer Name is required");
+        if (!m.tpDueDate) e("tpDueDate", "Policy Expiry Date TP is required");
+      }
+      if (!(m.selectedAddOns || []).length && m.addOnRequired !== "No") e("tpAddOn", "Choose Owner-Driver PA or Not Required");
+    } else {
+      // SAOD / Comprehensive
+      if (active) {
+        if (!m.previousInsurerName) e("previousInsurerName", "Insurer Name is required");
+        if (!(num(m.idvAsPerPYP) > 0)) e("idvAsPerPYP", "IDV is required");
+        if (!m.odDueDate) e("odDueDate", "Policy Expiry Date OD is required");
+        if (!m.tpDueDate) e("tpDueDate", "Policy Expiry Date TP is required");
+        if (!m.claimTaken) e("claimTaken", "Claim Taken in Active Policy is required");
+        if (m.claimTaken === "No" && !m.ncb) e("ncb", "Select the NCB in current policy");
+      }
+      if (notActive && !(num(m.idvRequired) > 0)) e("idvRequired", "IDV Required for (digits) is required");
     }
-    if (!m.policyNo) e("policyNo", "Policy No. is required for Active Policy");
-    if (!m.previousInsurerName) e("previousInsurerName", "Previous Insurer Name is required for Active Policy");
-    if (!m.idvAsPerPYP) e("idvAsPerPYP", "IDV (As per PYP) is required for Active Policy");
-    if (!m.claimTaken) e("claimTaken", "Claim Taken is required for Active Policy");
-    if (m.claimTaken === "No" && !m.ncb) e("ncb", "NCB selection is required when Claim Taken is No");
-    if (m.insuranceType === "SAOD (On Damage)") {
-      if (!m.saodOdDueDate) e("saodOdDueDate", "OD Due Date is required for SAOD");
-      if (!m.saodTpDueDate) e("saodTpDueDate", "TP Due Date is required for SAOD");
-      if (!m.saodPolicyNo) e("saodPolicyNo", "Previous Policy No. is required for SAOD");
-      if (!m.saodPreviousInsurerName) e("saodPreviousInsurerName", "Previous Insurer Name is required for SAOD");
-      if (!m.saodIdvAsPerPYP) e("saodIdvAsPerPYP", "IDV (As per PYP) is required for SAOD");
+    if (active || notActive) {
+      if (!m.rcFrontFile) e("rcFrontFile", "Upload RC — Front side");
+      if (!m.rcBackFile) e("rcBackFile", "Upload RC — Back side");
     }
-    if (!m.pypFile) e("pypFile", "Upload PYP is required for Active Policy");
   }
-  if (m.insuranceType === "TP (Third Party)" && !m.tpInsuranceDueDate) e("tpInsuranceDueDate", "TP Due Date is required for TP Insurance");
-  if (m.insuranceType && m.insuranceType !== "TP (Third Party)") {
-    if (!m.addOnRequired) e("addOnRequired", "Add-On selection is required");
-    if (m.addOnRequired === "Yes" && !(m.selectedAddOns || []).length) e("selectedAddOns", "Please select at least one Add-On");
+};
+
+const validateMotorIssuance = (ctx, e) => {
+  const m = ctx.motorDetails;
+  const corporate = m.ownerType === "Corporate";
+  if (!String(m.proposerName || "").trim()) e("motorProposerName", "Proposer Name is required");
+  if (!corporate) {
+    if (!m.proposerDOB) e("motorProposerDOB", "Proposer DOB is required");
+    else if (isFutureDate(m.proposerDOB)) e("motorProposerDOB", "Proposer DOB cannot be in the future");
+    if (!m.aadhaarNumber) e("motorAadhaar", "Aadhaar Number is required");
+    else if (!validateAadhaar(m.aadhaarNumber)) e("motorAadhaar", "Aadhaar must be 12 digits");
+    if (!m.aadhaarFile) e("motorAadhaarFile", "Upload Aadhaar (mandatory)");
   }
-  if (m.previousInsuranceStatus && !isNew) {
-    if (!m.rcFrontFile) e("rcFrontFile", "RC Front Upload is required");
-    if (!m.rcBackFile) e("rcBackFile", "RC Back Upload is required");
+  if (!m.panNumber) e("motorPan", "PAN Number is required");
+  else if (!validatePAN(m.panNumber)) e("motorPan", "PAN format ABCDE1234F");
+  if (!m.panFile) e("motorPanFile", "Upload PAN (mandatory)");
+  if (m.policyType === "Brand New") {
+    if (!m.invoiceCopy) e("invoiceCopy", "Upload Invoice (mandatory at Policy Issuance)");
+    if (!String(m.engineNo || "").trim()) e("engineNo", "Engine No. (as per invoice) is required");
+    if (!String(m.chesisNo || "").trim()) e("chesisNo", "Chassis No. (as per invoice) is required");
+  } else if (m.policyType) {
+    if (!m.rcFrontFile) e("rcFrontFile", "Upload RC — Front side (mandatory)");
+    if (!m.rcBackFile) e("rcBackFile", "Upload RC — Back side (mandatory)");
+  }
+  if (!String(m.ownerName || "").trim()) e("ownerName", "Owner Name is required");
+  if (!corporate) {
+    if (m.ownerDOB && isFutureDate(m.ownerDOB)) e("ownerDOB", "Owner DOB cannot be in the future");
+    if (!String(m.nomineeName || "").trim()) e("motorNomineeName", "Nominee Name is required");
+    if (!m.nomineeDOB) e("motorNomineeDOB", "Nominee DOB is required");
+    else if (isFutureDate(m.nomineeDOB)) e("motorNomineeDOB", "Nominee DOB cannot be in the future");
+    if (!m.nomineeRelationship) e("motorNomineeRelationship", "Nominee Relation is required");
   }
 };
 
@@ -667,6 +745,7 @@ const validateQuoteWorkflowStage = (ctx, e) => {
 };
 
 const validateIssuanceStage = (ctx, e) => {
+  if (ctx.sections.motor) validateMotorIssuance(ctx, e);
   if (!ctx.sections.health) return;
   const h = ctx.healthDetails;
   const members = h.members || [];
@@ -687,6 +766,18 @@ const validateIssuanceStage = (ctx, e) => {
     if (!members[0].aadhaarNumber) e("member_0_aadhaar", "Adult 1: Aadhaar Number is required");
     if (!members[0].aadhaarFile) e("member_0_aadhaarFile", "Adult 1: Aadhaar upload is mandatory");
   }
+  // Proposer PAN Number + PAN upload are mandatory
+  if (h.proposerIsMember === "Yes") {
+    const pi = members.findIndex((m) => m.type === "proposer");
+    if (pi !== -1) {
+      if (!members[pi].panNumber) e(`member_${pi}_pan`, "Proposer: PAN Number is required");
+      if (!members[pi].panFile) e(`member_${pi}_panFile`, "Proposer: PAN upload is mandatory");
+    }
+  } else {
+    if (!h.panNumber) e("healthPan", "Proposer: PAN Number is required");
+    else if (!validatePAN(h.panNumber)) e("healthPan", "Proposer: PAN format ABCDE1234F");
+    if (!h.panFile) e("healthPanFile", "Proposer: PAN upload is mandatory");
+  }
   if (h.policyType === "Individual") {
     if (!h.nomineeName) e("nomineeName", "Nominee Name is required");
     if (!h.nomineeDOB) e("nomineeDOB", "Nominee DOB is required");
@@ -705,6 +796,34 @@ const validateIssuanceStage = (ctx, e) => {
   }
 };
 
+/**
+ * Step order rules for the Payment module — used by both "Save" and the next-module button,
+ * so a wrong step can never be saved:
+ *   Payment Status: Payment Done / Payment Pending
+ *   Status (only after Payment Done): e-Mandate Link Shared* / e-Mandate Done* / e-Mandate Pending* (*EMI only),
+ *   Referred to UW, Policy Issued, Rejected   (motor: inspection statuses instead of e-Mandate / UW)
+ */
+const checkPaymentSteps = (ctx, e) => {
+  const w = ctx.workflowDetails;
+  const instalment = isInstalment(ctx.formData.paymentTerm);
+  if (!w.issuanceStatus) return;
+  if (w.paymentStatus !== PAYMENT_DONE) {
+    e("issuanceStatus", `Wrong step: "${w.issuanceStatus}" can only be set after Payment Status is "Payment Done"`);
+    return;
+  }
+  if (!getIssuanceStatusOptions(ctx.sections, instalment).includes(w.issuanceStatus)) {
+    e("issuanceStatus", EMANDATE_ISSUANCE_STATUSES.includes(w.issuanceStatus)
+      ? `Wrong step: "${w.issuanceStatus}" applies to EMI payments only`
+      : `"${w.issuanceStatus}" is not a valid status here — choose again`);
+  }
+  if (w.issuanceStatus === "e-Mandate Link Shared") {
+    if (!String(w.eMandateUrl || "").trim()) e("eMandateUrl", "Enter the e-Mandate URL");
+    else if (!/^https?:\/\/\S+$/i.test(String(w.eMandateUrl).trim())) e("eMandateUrl", "e-Mandate URL must start with http:// or https://");
+  }
+  if (w.issuanceStatus === "Referred to UW" && !String(w.uwQuery || "").trim()) e("uwQuery", "Write the UW query");
+  if (w.issuanceStatus === "Rejected" && !String(w.notIssuedRemarks || "").trim()) e("notIssuedRemarks", "Enter the rejection reason");
+};
+
 const validatePaymentStage = (ctx, e) => {
   const w = ctx.workflowDetails;
   const term = ctx.formData.paymentTerm;
@@ -712,14 +831,14 @@ const validatePaymentStage = (ctx, e) => {
   if (num(w.finalGstPercent) < 0 || num(w.finalGstPercent) > 100) e("finalGstPercent", "GST % must be 0-100");
   if (isInstalment(term) && !(num(w.emiNetPremium) > 0)) e("emiNetPremium", "EMI Net Premium is required (Paying Term is not One Time)");
   if (!w.paymentStatus) e("paymentStatus", "Payment Status is required");
-  if (isInstalment(term) && w.paymentStatus === "Payment Done" && !w.eMandateStatus) e("eMandateStatus", "e-Mandate Status is required");
-  if (!w.issuanceStatus) e("issuanceStatus", "Status is required (Policy Issued / At UW / Pending for e-Mandate)");
-  if (w.issuanceStatus && w.issuanceStatus !== "Policy Issued") {
-    if (!String(w.notIssuedRemarks || "").trim()) e("notIssuedRemarks", "Enter the reason the policy is not issued yet");
-    if (ctx.advancing) e("issuanceStatus", "The policy must be Issued before moving to EMI / PayOut");
+  checkPaymentSteps(ctx, e);
+  if (ctx.advancing) {
+    if (w.paymentStatus !== PAYMENT_DONE) e("paymentStatus", "Payment must be Done before moving on");
+    else if (!w.issuanceStatus) e("issuanceStatus", "Select the Status");
+    else if (w.issuanceStatus === "Rejected") e("issuanceStatus", "This case is Rejected — it cannot move to EMI / PayOut");
+    else if (w.issuanceStatus !== "Policy Issued") e("issuanceStatus", "The policy must be Issued before moving to EMI / PayOut");
   }
-  if (w.issuanceStatus === "Policy Issued") {
-    if (!isPaymentConfirmed(w)) e("paymentStatus", "Set Payment Status to Payment Done (or enter the UTR) before marking Policy Issued");
+  if (w.issuanceStatus === "Policy Issued" && w.paymentStatus === PAYMENT_DONE) {
     if (!w.policyNumber) e("policyNumber", "Policy Number is required");
     if (!w.policyIssuedOn) e("policyIssuedOn", "Policy Issued On is required");
     if (!w.policyStartDate) e("policyStartDate", "Policy Start Date is required");
@@ -752,7 +871,7 @@ const validateProfitStage = (ctx, e) => {
   ["payoutSlabPercent", "gstPayoutPercent", "tdsPercent"].forEach((k) => {
     if (!isBlank(p[k]) && (num(p[k]) < 0 || num(p[k]) > 100)) e(`profit_${k}`, "Percent must be between 0 and 100");
   });
-  if (ctx.sections.motor) {
+  if (ctx.sections.motor && p.payoutBasis === "OD/TP Split") {
     const { errors } = validateMotorPayout(
       {
         insuranceType: ctx.motorDetails.insuranceType,
@@ -811,10 +930,7 @@ export const validateFormats = (ctx) => {
   if (ctx.stageIdx >= IDX.QuoteWorkflow) validateQuoteWorkflowStage({ ...ctx }, (f, m) => {
     if (!/Accepted|accepted quote/.test(m)) e(f, m);
   });
-  if (ctx.stageIdx >= IDX.Payment) {
-    const w = ctx.workflowDetails;
-    if (w.issuanceStatus === "Policy Issued" && !isPaymentConfirmedLoose(w)) e("paymentStatus", "Set Payment Status to Payment Done (or enter the UTR) before marking Policy Issued");
-  }
+  if (ctx.stageIdx >= IDX.Payment) checkPaymentSteps(ctx, e);
   if (ctx.stageIdx >= IDX.Profit) validateProfitStage({ ...ctx, advancing: false }, e);
   return list;
 };
@@ -834,6 +950,8 @@ export const collectDocuments = (lead) => {
   add("RC Back", m.rcBackFile, "Motor");
   add("Chassis No. Photo", m.chesisPhoto, "Motor");
   add("Vehicle Invoice", m.invoiceCopy, "Motor");
+  add("Proposer Aadhaar", m.aadhaarFile, "Motor");
+  add("Proposer PAN", m.panFile, "Motor");
   const h = lead.healthDetails || {};
   add("Proposer Aadhaar", h.aadhaarFile, "Health");
   add("Proposer PAN", h.panFile, "Health");

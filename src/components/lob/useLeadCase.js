@@ -7,7 +7,9 @@
 import { useState, useEffect, useMemo } from "react";
 import { emptyPA, hydratePA, validatePA, appendPA } from "./PersonalAccidentForm";
 import { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "./TravelInsuranceForm";
-import { emptyMotorDetails, isAdminUser, OTHER_MANUFACTURER } from "./motorInsurance";
+import {
+  emptyMotorDetails, isAdminUser, OTHER_MANUFACTURER, motorDefaultsFromLob, insuranceTypeForPolicy,
+} from "./motorInsurance";
 import * as W from "./caseWorkflow";
 
 const str = (v) => (v === null || v === undefined ? "" : v);
@@ -20,18 +22,8 @@ const SOURCE_FIELD_LABEL = {
   Other: "Other Source",
 };
 
-// Old payment-status values -> new BRD values
-const LEGACY_PAYMENT_STATUS = {
-  "Quote Under Discussion": { paymentStatus: "Pending" },
-  "e-Mandate Status Pending": { paymentStatus: "Payment Done", eMandateStatus: "Pending" },
-  "e-Mandate Status Done": { paymentStatus: "Payment Done", eMandateStatus: "Done" },
-  "Policy Issued": { paymentStatus: "Payment Done" },
-};
+// Old payment / status values are mapped with W.LEGACY_PAYMENT_STATUS and W.LEGACY_ISSUANCE_STATUS
 
-/**
- * @param quoteFilePrefix  multipart field prefix for quote files ("quoteFile_" admin leads, "insurerQuoteFile_" employee leads)
- * @param role             "auto" = from the logged-in user, "employee" = always employee view (employee panel)
- */
 export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "auto" } = {}) {
   // ------------------------------------------------------------
   // STATE
@@ -97,11 +89,12 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
         payout: payoutDetails,
         workflow: workflowDetails,
         paymentTerm: formData.paymentTerm,
-        isMotor: sections.motor,
-        insuranceType: motorDetails.insuranceType,
+        // Motor BRD: Slab % x Net Premium; the OD/TP split is an optional basis
+        isMotor: sections.motor && payoutDetails.payoutBasis === "OD/TP Split",
+        insuranceType: motorDetails.insuranceType || insuranceTypeForPolicy(motorDetails.policyType),
         cashbackTotal: cashbackCalc.totalPayout,
       }),
-    [payoutDetails, workflowDetails, formData.paymentTerm, sections.motor, motorDetails.insuranceType, cashbackCalc.totalPayout]
+    [payoutDetails, workflowDetails, formData.paymentTerm, sections.motor, motorDetails.insuranceType, motorDetails.policyType, cashbackCalc.totalPayout]
   );
 
   // ------------------------------------------------------------
@@ -142,6 +135,43 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     const code = m && motorDetails.registrationNumber.length >= 4 ? m[1] : "";
     if (code !== (motorDetails.autoRtoCode || "")) setMotorDetails((prev) => ({ ...prev, autoRtoCode: code }));
   }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
+
+  // Motor premium is paid once (no EMI module)
+  useEffect(() => {
+    if (sections.motor && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
+  }, [sections.motor, formData.paymentTerm]);
+
+  // Motor: policy type drives the cover type and the previous-policy status for a brand-new vehicle
+  useEffect(() => {
+    if (!sections.motor || !motorDetails.policyType) return;
+    setMotorDetails((prev) => {
+      const patch = {};
+      const cover = insuranceTypeForPolicy(prev.policyType);
+      if (cover && prev.insuranceType !== cover) patch.insuranceType = cover;
+      if (prev.policyType === "Brand New" && prev.previousInsuranceStatus !== "New") patch.previousInsuranceStatus = "New";
+      if (prev.policyType !== "Brand New" && prev.previousInsuranceStatus === "New") patch.previousInsuranceStatus = "";
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [sections.motor, motorDetails.policyType]);
+
+  // Motor Policy Issuance: auto-fetch proposer / owner names and the insurer-accepted add-ons
+  useEffect(() => {
+    if (!sections.motor || stageIdx < W.IDX.PolicyIssuance) return;
+    setMotorDetails((prev) => {
+      const patch = {};
+      if (!prev.proposerName && formData.name) patch.proposerName = formData.name;
+      const proposer = patch.proposerName || prev.proposerName;
+      if (!prev.ownerName && proposer) patch.ownerName = proposer;
+      if (!prev.ownerDOB && prev.proposerDOB) patch.ownerDOB = prev.proposerDOB;
+      if (!(prev.finalAddOns || []).length) {
+        const accepted = acceptedQuote?.acceptedAddOns || [];
+        const fallback = (prev.selectedAddOns || []).filter((a) => a !== "Not Required");
+        const pick = accepted.length ? accepted : fallback;
+        if (pick.length) patch.finalAddOns = pick;
+      }
+      return Object.keys(patch).length ? { ...prev, ...patch } : prev;
+    });
+  }, [sections.motor, stageIdx, formData.name, acceptedQuote?.insurerName, motorDetails.proposerDOB]);
 
   // Policy Expiry = Start + Tenure - 1 day
   useEffect(() => {
@@ -375,21 +405,32 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
 
     // ---- Motor ----
     const md = lead.motorDetails;
-    setMotorDetails(
-      md
-        ? {
-            ...emptyMotorDetails(),
-            ...md,
-            otherManufacturer: md.otherManufacturer || "",
-            selectedAddOns: md.selectedAddOns || [],
-            odDueDate: W.formatDateForInput(md.odDueDate),
-            tpDueDate: W.formatDateForInput(md.tpDueDate),
-            saodOdDueDate: W.formatDateForInput(md.saodOdDueDate),
-            saodTpDueDate: W.formatDateForInput(md.saodTpDueDate),
-            tpInsuranceDueDate: W.formatDateForInput(md.tpInsuranceDueDate),
-          }
-        : emptyMotorDetails()
-    );
+    if (md || W.detectSections(lead.lob).motor) {
+      const m = md || {};
+      // older leads: vehicle + policy type from the old LOB / cover fields
+      const legacy = motorDefaultsFromLob(lead.lob, m.insuranceType, m.previousInsuranceStatus);
+      setMotorDetails({
+        ...emptyMotorDetails(),
+        ...m,
+        vehicleType: m.vehicleType || legacy.vehicleType,
+        policyType: m.policyType || legacy.policyType,
+        otherManufacturer: m.otherManufacturer || "",
+        selectedAddOns: m.selectedAddOns || [],
+        existingAddOns: m.existingAddOns || [],
+        finalAddOns: m.finalAddOns || [],
+        idvRequired: str(m.idvRequired),
+        odDueDate: W.formatDateForInput(m.odDueDate || m.saodOdDueDate),
+        tpDueDate: W.formatDateForInput(m.tpDueDate || m.saodTpDueDate || m.tpInsuranceDueDate),
+        saodOdDueDate: W.formatDateForInput(m.saodOdDueDate),
+        saodTpDueDate: W.formatDateForInput(m.saodTpDueDate),
+        tpInsuranceDueDate: W.formatDateForInput(m.tpInsuranceDueDate),
+        proposerDOB: W.formatDateForInput(m.proposerDOB),
+        ownerDOB: W.formatDateForInput(m.ownerDOB),
+        nomineeDOB: W.formatDateForInput(m.nomineeDOB),
+      });
+    } else {
+      setMotorDetails(emptyMotorDetails());
+    }
 
     // ---- Electronic ----
     const ed = lead.electronicDetails;
@@ -410,9 +451,16 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       acceptedInsurer: wf.acceptedInsurer || lead.payoutDetails?.acceptedInsurer || lead.previousInsurerName || "",
     });
     const accepted = norm.insurerQuotes.find((q) => q.quoteStatus === "Accepted") || null;
-    const legacyPay = LEGACY_PAYMENT_STATUS[wf.paymentStatus] || {};
     const legacyIssued = lead.status === "Policy Issued" || wf.status === "Policy Issued";
-    const issuanceStatus = wf.issuanceStatus || (legacyIssued ? "Policy Issued" : "");
+    // statuses saved before the Payment Done / Pending flow
+    let paymentStatus = W.LEGACY_PAYMENT_STATUS[wf.paymentStatus] || wf.paymentStatus || "";
+    let issuanceStatus = W.LEGACY_ISSUANCE_STATUS[wf.issuanceStatus] || wf.issuanceStatus || (legacyIssued ? "Policy Issued" : "");
+    if (!issuanceStatus && paymentStatus === W.PAYMENT_DONE && W.isInstalment(lead.paymentTerm)) {
+      const oldMandate = wf.eMandateStatus || (wf.paymentStatus === "e-Mandate Status Done" ? "Done" : wf.paymentStatus === "e-Mandate Status Pending" ? "Pending" : "");
+      if (oldMandate === "Done") issuanceStatus = "e-Mandate Done";
+      else if (oldMandate) issuanceStatus = "e-Mandate Pending";
+    }
+    if (issuanceStatus && paymentStatus !== W.PAYMENT_DONE && (legacyIssued || wf.utrNumber)) paymentStatus = W.PAYMENT_DONE;
     setWorkflowDetails({
       ...W.emptyWorkflow(),
       selectedInsurers: norm.selectedInsurers,
@@ -423,8 +471,9 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       finalGstPercent: str(wf.finalGstPercent ?? accepted?.gstPercent ?? W.DEFAULT_QUOTE_GST_PERCENT),
       emiNetPremium: str(wf.emiNetPremium ?? accepted?.emiNetPremium ?? ""),
       paymentUrl: str(wf.paymentUrl),
-      paymentStatus: legacyPay.paymentStatus || str(wf.paymentStatus),
-      eMandateStatus: str(wf.eMandateStatus || legacyPay.eMandateStatus || ""),
+      paymentStatus,
+      eMandateUrl: str(wf.eMandateUrl),
+      uwQuery: str(wf.uwQuery),
       utrNumber: str(wf.utrNumber),
       paymentSnapshot: wf.paymentSnapshot || null,
       issuanceStatus,
@@ -454,6 +503,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     const pd = lead.payoutDetails || {};
     setPayoutDetails({
       ...W.emptyPayout(),
+      payoutBasis: pd.payoutBasis || (pd.isMotor && (pd.odPremium || pd.tpPremium) ? "OD/TP Split" : "Net Premium"),
       payoutSlabPercent: str(pd.payoutSlabPercent ?? accepted?.payoutPercent ?? ""),
       gstPayoutPercent: str(pd.gstPayoutPercent ?? pd.gstReturnSlabPercent ?? W.DEFAULT_GST_PAYOUT_PERCENT),
       tdsPercent: str(pd.tdsPercent ?? W.DEFAULT_TDS_PERCENT),
@@ -546,7 +596,12 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       nextDueDate: emiSchedule.nextDue,
       emiRenewalAlert: emiSchedule.renewalAlert,
     };
-    if (!instalment) { wf.emiNetPremium = ""; wf.emiReceivedCount = ""; wf.eMandateStatus = ""; }
+    if (!instalment) { wf.emiNetPremium = ""; wf.emiReceivedCount = ""; }
+    delete wf.eMandateStatus; // merged into Status (e-Mandate Link Shared / Done / Pending)
+    // Status exists only after Payment Done; its extra fields only for their status
+    if (wf.paymentStatus !== W.PAYMENT_DONE) wf.issuanceStatus = "";
+    if (wf.issuanceStatus !== "e-Mandate Link Shared") wf.eMandateUrl = "";
+    if (wf.issuanceStatus !== "Referred to UW") wf.uwQuery = "";
     if (wf.paymentSnapshot instanceof File) delete wf.paymentSnapshot;
     if (wf.policyCopy instanceof File) delete wf.policyCopy;
     wf.status = W.deriveCaseStatus(stage, wf);
@@ -596,6 +651,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       fd.append("healthDetails", JSON.stringify(h));
 
       if (healthDetails.renewalDetails?.uploadPolicy instanceof File) fd.append("renewalPolicyFile", healthDetails.renewalDetails.uploadPolicy);
+      // proposer who is not an insured member: PAN lives at health level
+      if (!proposer && healthDetails.panFile instanceof File) fd.append("healthPanFile", healthDetails.panFile);
       (healthDetails.portabilityDetails || []).forEach((p, i) => { if (p.uploadPYP instanceof File) fd.append(`portabilityPYP_${i}`, p.uploadPYP); });
       (healthDetails.members || []).forEach((m, i) => {
         if (m.aadhaarFile instanceof File) fd.append(`memberAadhaar_${i}`, m.aadhaarFile);
@@ -606,16 +663,20 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     }
 
     // ---- Motor ----
-    if (lobVisible && sections.motor) {
+    // vehicle + policy type are chosen in the Lead module, so they are saved from the start
+    if (sections.motor && (lobVisible || motorDetails.vehicleType || motorDetails.policyType)) {
       const m = { ...motorDetails };
-      ["pypFile", "rcFrontFile", "rcBackFile", "chesisPhoto", "invoiceCopy"].forEach((f) => {
+      [["pypFile", "pypFile"], ["rcFrontFile", "rcFrontFile"], ["rcBackFile", "rcBackFile"], ["chesisPhoto", "chesisPhoto"],
+        ["invoiceCopy", "invoiceCopy"], ["aadhaarFile", "motorAadhaarFile"], ["panFile", "motorPanFile"]].forEach(([f, key]) => {
         if (m[f] instanceof File) {
-          fd.append(f, m[f]);
+          fd.append(key, m[f]);
           delete m[f];
         }
       });
       if (m.manufacturer !== OTHER_MANUFACTURER) m.otherManufacturer = "";
-      if (m.vehicleType || m.registrationNumber) fd.append("motorDetails", JSON.stringify(m));
+      if (m.registrationNumber) m.registrationNumber = W.normalizeRegistration(m.registrationNumber);
+      if (m.rtoCode) m.rtoCode = String(m.rtoCode).toUpperCase();
+      if (m.vehicleType || m.registrationNumber || m.policyType) fd.append("motorDetails", JSON.stringify(m));
     }
 
     // ---- Electronic ----

@@ -10,21 +10,11 @@ import LeadCaseForm from "../lob/LeadCaseForm";
 import useLeadCase from "../lob/useLeadCase";
 import { getDisplayManufacturer } from "../lob/motorInsurance";
 import {
-  validateMobile, getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST,
+  validateMobile, getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST, statusBadgeClass,
 } from "../lob/caseWorkflow";
 
-export const statusClass = (status) =>
-  ({
-    Open: "bg-yellow-100 text-yellow-800",
-    "Quote Requested": "bg-sky-100 text-sky-800",
-    "Quotation Generated": "bg-blue-100 text-blue-800",
-    "Payment Link Generated": "bg-purple-100 text-purple-800",
-    "Payment Done": "bg-green-100 text-green-800",
-    "At UW": "bg-orange-100 text-orange-800",
-    "Pending for e-Mandate": "bg-amber-100 text-amber-800",
-    "Policy Issued": "bg-emerald-100 text-emerald-800",
-    "Closed Without Issuance": "bg-red-100 text-red-800",
-  }[status] || "bg-gray-100 text-gray-700");
+// one colour map for all lead pages (includes the motor inspection statuses)
+export const statusClass = statusBadgeClass;
 
 const toSafeLead = (lead) => ({
   ...lead,
@@ -187,6 +177,8 @@ function LeadTable() {
         "Policy Expiry Date": l.policyExpiryDate ? new Date(l.policyExpiryDate).toLocaleDateString() : "",
         "EMIs Received": l.workflowDetails?.emiReceivedCount || "", "Next EMI Due": l.workflowDetails?.nextDueDate ? new Date(l.workflowDetails.nextDueDate).toLocaleDateString() : "",
         "Cashback Total": l.cashbackDetails?.totalPayout ?? "", "Arshyan Profit": l.payoutDetails?.arshyanProfit ?? "",
+        "Motor Policy Type": l.motorDetails?.policyType || "", "Vehicle Type": l.motorDetails?.vehicleType || "",
+        "Registration / RTO": l.motorDetails?.registrationNumber || l.motorDetails?.rtoCode || "",
         "Vehicle Manufacturer": getDisplayManufacturer(l.motorDetails), "Vehicle Model": l.motorDetails?.model || "",
         Remarks: l.remarks || "", "Created At": l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "",
       };
@@ -462,7 +454,7 @@ function LeadTable() {
             {item("LOB", l.lob)}
             {item("Policy Tenure / Paying Term", [l.policyTenure, l.paymentTerm].filter(Boolean).join(" / "))}
             {item("Sum Insured", l.sumInsured)}
-            {l.motorDetails && item("Vehicle", [l.motorDetails.vehicleType, getDisplayManufacturer(l.motorDetails), l.motorDetails.model, l.motorDetails.registrationNumber].filter(Boolean).join(" · "))}
+            {l.motorDetails && item("Vehicle", [l.motorDetails.policyType, l.motorDetails.vehicleType, getDisplayManufacturer(l.motorDetails), l.motorDetails.model, l.motorDetails.registrationNumber || l.motorDetails.rtoCode].filter(Boolean).join(" · "))}
             {l.healthDetails && item("Health", [l.healthDetails.policyType, l.healthDetails.proposerName, `${l.healthDetails.members?.length || 0} member(s)`].filter(Boolean).join(" · "))}
             {item("Insurers Requested", (wf.selectedInsurers || []).join(", "))}
             {item("Accepted Quote", accepted ? `${accepted.insurerName} — ₹${fmt(accepted.netPremium)} net` : "")}

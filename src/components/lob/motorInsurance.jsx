@@ -197,73 +197,120 @@ export const getDisplayManufacturer = (motor) => {
 };
 
 // ============================================================
-// LOB DETECTION (same rules the components already used)
+// LOB DETECTION
 // ============================================================
-export const isMotorLob = (lob) => {
-  if (!lob) return false;
-  return (
-    lob.toLowerCase().includes("motor") ||
-    lob.includes("Car") ||
-    lob.includes("Two-Wheeler") ||
-    lob.includes("Taxi") ||
-    lob.includes("Commercial Vehicle") ||
-    lob.includes("E-Rikshaw") ||
-    lob.includes("School Bus") ||
-    lob.includes("Truck") ||
-    lob.includes("Tractor") ||
-    lob.includes("Auto Rickshaw") ||
-    lob === "Private Car-OD" ||
-    lob === "Private Car-SOD" ||
-    lob === "Private Car-Comprehensive" ||
-    lob === "Private Car-TP" ||
-    lob === "Taxi-Comprehensive" ||
-    lob === "Taxi-TP" ||
-    lob === "Commercial Vehicle-Comprehensive" ||
-    lob === "Commercial Vehicle-TP" ||
-    lob === "E-Rikshaw-TP" ||
-    lob === "E-Rikshaw-Comprehensive" ||
-    lob === "Two-Wheeler-TP"
-  );
+const MOTOR_LOB_WORDS = ["Car", "Two-Wheeler", "Two Wheeler", "Taxi", "Commercial Vehicle", "E-Rikshaw", "School Bus", "Truck", "Tractor", "Auto Rickshaw", "Vehicle"];
+export const isMotorLob = (lob) => !!lob && (lob.toLowerCase().includes("motor") || MOTOR_LOB_WORDS.some((w) => lob.includes(w)));
+
+// ============================================================
+// MOTOR BRD: Policy types (one sheet each) + option lists
+// ============================================================
+export const MOTOR_POLICY_TYPES = ["Brand New", "SAOD", "Comprehensive", "TP"];
+export const MOTOR_POLICY_TYPE_LABELS = {
+  "Brand New": "Brand New Vehicle",
+  SAOD: "SAOD (Own Damage only)",
+  Comprehensive: "Comprehensive / Package",
+  TP: "TP (Third Party only)",
+};
+export const MOTOR_FUEL_OPTIONS = ["Petrol", "CNG", "Diesel", "Electric", "Hybrid-Electric"];
+export const OWNER_TYPE_OPTIONS = ["Individual", "Corporate"];
+export const TP_ADDON_OPTIONS = ["Owner-Driver PA", "Not Required"];
+// Payment "Status" for motor (BRD) — replaces At UW / e-Mandate used for health
+export const MOTOR_ISSUANCE_STATUS_OPTIONS = ["Policy Issued", "Awaited for Inspection", "Inspection Done - Waiting for Policy"];
+// Shown to users as "Not Active"; stored as "Expired" so older records stay valid
+export const PREVIOUS_POLICY_ACTIVE = "Active";
+export const PREVIOUS_POLICY_NOT_ACTIVE = "Expired";
+
+/** Insurance cover implied by the policy type (used by the optional OD/TP payout split) */
+export const insuranceTypeForPolicy = (policyType) =>
+  ({ SAOD: "SAOD (On Damage)", Comprehensive: "Comprehensive (OD+TP)", TP: "TP (Third Party)" }[policyType] || "");
+
+/** Old LOB values ("Private Car-TP", "New Two Wheeler Insurance" ...) -> vehicle + policy type */
+export const motorDefaultsFromLob = (lob = "", insuranceType = "", previousInsuranceStatus = "") => {
+  const l = lob.toLowerCase();
+  let vehicleType = "";
+  if (l.includes("two-wheeler") || l.includes("two wheeler")) vehicleType = "Two Wheeler";
+  else if (l.includes("private car")) vehicleType = "Private Car";
+  else if (l.includes("taxi")) vehicleType = "Taxi";
+  else if (l.includes("commercial vehicle")) vehicleType = "Commercial Vehicle";
+  else if (l.includes("e-rikshaw")) vehicleType = "e-Rickshaw";
+  let policyType = "";
+  if (l.startsWith("new ") || previousInsuranceStatus === "New") policyType = "Brand New";
+  else if (l.endsWith("-tp") || insuranceType === "TP (Third Party)") policyType = "TP";
+  else if (l.endsWith("-od") || l.endsWith("-sod") || insuranceType === "SAOD (On Damage)") policyType = "SAOD";
+  else if (l.endsWith("-comprehensive") || insuranceType === "Comprehensive (OD+TP)" || (insuranceType || "").startsWith("Bundle")) policyType = "Comprehensive";
+  return { vehicleType, policyType };
+};
+
+/** "Policy Type · Vehicle" label for lists */
+export const getMotorSummary = (motor) => {
+  if (!motor) return "";
+  return [motor.policyType, motor.vehicleType].filter(Boolean).join(" · ");
 };
 
 // ============================================================
 // EMPTY MOTOR STATE
 // ============================================================
 export const emptyMotorDetails = () => ({
+  // Lead
   vehicleType: "",
-  previousInsuranceStatus: "",
+  policyType: "",
+  // Quote — Brand New
+  rtoCode: "",
   manufacturer: "",
   otherManufacturer: "",
   model: "",
   fuelType: "",
-  rtoCode: "",
-  chesisNo: "",
+  variant: "",
   yearOfManufacturing: "",
   monthOfManufacturing: "",
+  ownerType: "",
   idvAsPerInvoice: "",
-  insuranceType: "",
+  invoiceCopy: null,
+  // Quote — SAOD / Comprehensive / TP
+  registrationNumber: "",
+  autoRtoCode: "",
+  previousInsuranceStatus: "",
+  previousInsurerName: "",
+  policyNo: "",
+  idvAsPerPYP: "",
+  idvRequired: "",
+  existingAddOns: [],
   odDueDate: "",
   tpDueDate: "",
-  policyNo: "",
-  previousInsurerName: "",
-  idvAsPerPYP: "",
+  rcFrontFile: null,
+  rcBackFile: null,
+  pypFile: null,
+  claimTaken: "",
+  ncb: "",
+  // Add-ons requested (all types)
+  addOnRequired: "",
+  selectedAddOns: [],
+  insuranceType: "",
+  // Policy Issuance
+  finalAddOns: [],
+  proposerName: "",
+  proposerDOB: "",
+  aadhaarNumber: "",
+  aadhaarFile: null,
+  panNumber: "",
+  panFile: null,
+  engineNo: "",
+  chesisNo: "",
+  chesisPhoto: null,
+  ownerName: "",
+  ownerDOB: "",
+  nomineeName: "",
+  nomineeDOB: "",
+  nomineeRelationship: "",
+  issuanceRemarks: "",
+  // legacy fields kept so older records load untouched
   saodOdDueDate: "",
   saodTpDueDate: "",
   saodPolicyNo: "",
   saodPreviousInsurerName: "",
   saodIdvAsPerPYP: "",
   tpInsuranceDueDate: "",
-  registrationNumber: "",
-  autoRtoCode: "",
-  claimTaken: "",
-  ncb: "",
-  addOnRequired: "",
-  selectedAddOns: [],
-  pypFile: null,
-  rcFrontFile: null,
-  rcBackFile: null,
-  chesisPhoto: null,
-  invoiceCopy: null,
 });
 
 // ============================================================

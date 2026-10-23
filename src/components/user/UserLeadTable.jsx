@@ -12,7 +12,7 @@
 import { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
-  FaEye, FaEdit, FaTimes, FaTrash, FaDownload, FaSearch, FaUpload, FaFilter, FaFileExcel, FaBell,
+  FaEye, FaEdit, FaTimes, FaTrash, FaLock, FaDownload, FaSearch, FaUpload, FaFilter, FaFileExcel, FaBell,
   FaClock, FaExclamationTriangle, FaUserPlus, FaCheckCircle,
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
@@ -24,24 +24,32 @@ import {
   CASE_STATUS_LIST, IDX, stageIndex, statusBadgeClass,
 } from "../../components/lob/caseWorkflow";
 
-// Employees may delete a lead only before quotes are requested (the server enforces the same rule)
-const canEmployeeDelete = (lead) => stageIndex(inferStage(lead)) <= IDX.Quote;
+// Employees may delete a lead only before it is submitted (the server enforces the same rule)
+const canEmployeeDelete = (lead) => inferStage(lead) === "Lead";
 
 // Employees see their own names for steps Admin handles (internal steps like "Cashback" / "Arshyan Profit" stay hidden)
 const employeeStageLabel = (lead) => {
   const key = inferStage(lead);
   if (lead.status === "Policy Issued" && stageIndex(key) >= IDX.Payment) return "Policy Issued";
-  if (key === "QuoteWorkflow") return "Quotes (Admin)";
+  if (key === "QuoteWorkflow") return "Quotes";
   if (stageIndex(key) >= IDX.Payment) return "Payment & Issuance (Admin)";
   return getStage(key).label;
 };
 
 // Who has the next action on this case
 const nextActor = (lead) => {
-  const stage = getStage(inferStage(lead));
+  const key = inferStage(lead);
   if (lead.status === "Policy Issued") return { label: "Issued", cls: "text-emerald-700" };
-  return stage.access === "admin" ? { label: "With Admin", cls: "text-gray-500" } : { label: "Your action", cls: "text-indigo-700 font-medium" };
+  if (lead.status === "Rejected") return { label: "Rejected", cls: "text-red-600" };
+  // Quotes: the employee reviews / accepts once Admin has added premiums
+  if (key === "QuoteWorkflow") {
+    const ready = (lead.workflowDetails?.insurerQuotes || []).some((q) => q.netPremium);
+    return ready ? { label: "Your action", cls: "text-indigo-700 font-medium" } : { label: "With Admin", cls: "text-gray-500" };
+  }
+  return getStage(key).access === "admin" ? { label: "With Admin", cls: "text-gray-500" } : { label: "Your action", cls: "text-indigo-700 font-medium" };
 };
+// after the employee's final submission the case is view-only for them
+const canEmployeeEdit = (lead) => nextActor(lead).label === "Your action" && stageIndex(inferStage(lead)) < IDX.Payment;
 
 function UserLeadTable() {
   const c = useLeadCase({ quoteFilePrefix: "insurerQuoteFile_", role: "employee" });
@@ -198,6 +206,8 @@ function UserLeadTable() {
         "Policy Number": l.policyNumber || wf.policyNumber || "",
         "Policy Start Date": l.policyStartDate ? new Date(l.policyStartDate).toLocaleDateString() : "",
         "Policy Expiry Date": l.policyExpiryDate ? new Date(l.policyExpiryDate).toLocaleDateString() : "",
+        "Motor Policy Type": l.motorDetails?.policyType || "", "Vehicle Type": l.motorDetails?.vehicleType || "",
+        "Registration / RTO": l.motorDetails?.registrationNumber || l.motorDetails?.rtoCode || "",
         "Vehicle Manufacturer": getDisplayManufacturer(l.motorDetails), "Vehicle Model": l.motorDetails?.model || "",
         Remarks: l.remarks || "", "Created At": l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "",
       };
@@ -435,7 +445,7 @@ function UserLeadTable() {
             {item("LOB", l.lob)}
             {item("Policy Tenure / Paying Term", [l.policyTenure, l.paymentTerm].filter(Boolean).join(" / "))}
             {item("Sum Insured", l.sumInsured)}
-            {l.motorDetails && item("Vehicle", [l.motorDetails.vehicleType, getDisplayManufacturer(l.motorDetails), l.motorDetails.model, l.motorDetails.registrationNumber].filter(Boolean).join(" · "))}
+            {l.motorDetails && item("Vehicle", [l.motorDetails.policyType, l.motorDetails.vehicleType, getDisplayManufacturer(l.motorDetails), l.motorDetails.model, l.motorDetails.registrationNumber || l.motorDetails.rtoCode].filter(Boolean).join(" · "))}
             {l.healthDetails && item("Health", [l.healthDetails.policyType, l.healthDetails.proposerName, `${l.healthDetails.members?.length || 0} member(s)`].filter(Boolean).join(" · "))}
             {item("Insurers Requested", (wf.selectedInsurers || []).join(", "))}
             {item("Accepted Quote", accepted ? `${accepted.insurerName} — ₹${fmt(computeQuote(accepted).grossPremium)} gross` : "")}
@@ -453,7 +463,9 @@ function UserLeadTable() {
             ) : <p className="text-sm text-gray-500">No documents uploaded yet.</p>}
           </div>
           <div className="flex justify-end mt-6 pt-4 border-t gap-3">
-            <button onClick={() => { const x = selectedLead; setSelectedLead(null); openEdit(x); }} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"><FaEdit /> Open Case</button>
+            <button onClick={() => { const x = selectedLead; setSelectedLead(null); openEdit(x); }} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2">
+              {canEmployeeEdit(selectedLead) ? <><FaEdit /> Open Case</> : <><FaEye /> View Case</>}
+            </button>
             <button onClick={() => setSelectedLead(null)} className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Close</button>
           </div>
         </motion.div>
@@ -561,7 +573,11 @@ function UserLeadTable() {
                     <td className="p-3">
                       <div className="flex gap-2 items-center">
                         <button onClick={() => setSelectedLead(lead)} className="text-indigo-600 hover:text-indigo-800" title="View"><FaEye className="h-5 w-5" /></button>
-                        <button onClick={() => openEdit(lead)} className="text-blue-600 hover:text-blue-800" title="Open case"><FaEdit className="h-5 w-5" /></button>
+                        {canEmployeeEdit(lead) ? (
+                          <button onClick={() => openEdit(lead)} className="text-blue-600 hover:text-blue-800" title="Open case"><FaEdit className="h-5 w-5" /></button>
+                        ) : (
+                          <button onClick={() => openEdit(lead)} className="text-gray-500 hover:text-gray-700" title="View case"><FaLock className="h-4 w-4" /></button>
+                        )}
                         {canEmployeeDelete(lead) && (
                           <button onClick={() => handleDelete(lead)} className="text-red-600 hover:text-red-800" title="Delete"><FaTrash className="h-4 w-4" /></button>
                         )}
@@ -588,7 +604,9 @@ function UserLeadTable() {
                 <div><strong>Next:</strong> <span className={actor.cls}>{actor.label}</span></div>
                 <div className="pt-2 flex gap-3">
                   <button onClick={() => setSelectedLead(lead)} className="text-indigo-600"><FaEye className="h-5 w-5" /></button>
-                  <button onClick={() => openEdit(lead)} className="text-blue-600"><FaEdit className="h-5 w-5" /></button>
+                  <button onClick={() => openEdit(lead)} className={canEmployeeEdit(lead) ? "text-blue-600" : "text-gray-500"} title={canEmployeeEdit(lead) ? "Open case" : "View case"}>
+                    {canEmployeeEdit(lead) ? <FaEdit className="h-5 w-5" /> : <FaLock className="h-4 w-4" />}
+                  </button>
                   {canEmployeeDelete(lead) && <button onClick={() => handleDelete(lead)} className="text-red-600"><FaTrash className="h-4 w-4" /></button>}
                 </div>
               </div>

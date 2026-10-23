@@ -19,22 +19,25 @@ import { motion } from "framer-motion";
 import {
   FaTimes, FaCheck, FaCar, FaEdit, FaShieldAlt, FaMobileAlt, FaExclamationCircle, FaExclamationTriangle,
   FaSpinner, FaSave, FaLock, FaMicrophone, FaStop, FaArrowRight, FaHeartbeat, FaFileAlt, FaMoneyBillWave,
-  FaClock, FaUsers, FaLink, FaBell, FaHandHoldingUsd, FaChartLine, FaFolderOpen, FaClipboardList,
+  FaClock, FaUsers, FaLink, FaBell, FaHandHoldingUsd, FaChartLine, FaFolderOpen, FaClipboardList, FaLockOpen,
 } from "react-icons/fa";
 import PersonalAccidentForm from "./PersonalAccidentForm";
 import TravelInsuranceForm from "./TravelInsuranceForm";
 import {
   OTHER_MANUFACTURER, getManufacturerOptions, isManufacturerValidForType, getMotorPremiumParts,
+  MOTOR_POLICY_TYPES, MOTOR_POLICY_TYPE_LABELS, MOTOR_FUEL_OPTIONS, OWNER_TYPE_OPTIONS,
+  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE,
 } from "./motorInsurance";
 import {
   LOB_OPTIONS, SOURCE_OPTIONS, GENDER_OPTIONS, POLICY_TYPE_OPTIONS, QUALIFICATION_OPTIONS, OCCUPATION_OPTIONS,
   RELATIONSHIP_OPTIONS, YES_NO_OPTIONS, NCB_OPTIONS, VEHICLE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS,
   PREVIOUS_INSURANCE_STATUS_OPTIONS, INSURANCE_TYPE_OPTIONS, DEVICE_TYPE_OPTIONS, INSURER_OPTIONS,
   POLICY_TENURE_OPTIONS, PAYMENT_TERM_OPTIONS, SUM_INSURED_OPTIONS, RIDER_OPTIONS, PREVIOUS_POLICY_CASE_OPTIONS,
-  EXPERIENCE_YEARS_OPTIONS, ADD_ON_OPTIONS, QUOTE_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS, EMANDATE_STATUS_OPTIONS,
+  EXPERIENCE_YEARS_OPTIONS, ADD_ON_OPTIONS, QUOTE_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS,
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
-  deriveCaseStatus, statusBadgeClass,
+  deriveCaseStatus, statusBadgeClass, getIssuanceStatusOptions, PAYOUT_BASIS_OPTIONS, normalizeRegistration,
+  PAYMENT_DONE,
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -68,13 +71,18 @@ const ViewLink = ({ url, label = "View current file" }) =>
 
 const NewFileTag = ({ file }) => (file instanceof File ? <p className="text-xs text-green-600 mt-1">✓ {file.name} selected</p> : null);
 
-const Section = ({ n, title, icon: Icon, adminOnly, tone = "indigo", status, children }) => {
+/**
+ * A module of the case. Once it has been submitted (the case moved past it) it is
+ * read-only for everyone; only Admin sees an "Edit" button to unlock it again.
+ */
+const Section = ({ n, title, icon: Icon, adminOnly, tone = "indigo", status, children, lock }) => {
   const tones = {
     indigo: "border-indigo-200 text-indigo-700",
     emerald: "border-emerald-200 text-emerald-700",
     amber: "border-amber-200 text-amber-700",
     gray: "border-gray-200 text-gray-700",
   };
+  const locked = !!lock?.locked;
   return (
     <section className={cx("border-t-2 pt-4 mt-6", tones[tone].split(" ")[0])} data-section={title}>
       <div className="flex flex-wrap items-center gap-2 mb-4">
@@ -84,8 +92,25 @@ const Section = ({ n, title, icon: Icon, adminOnly, tone = "indigo", status, chi
         </h3>
         {adminOnly && <span className="text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">Admin</span>}
         {status && <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700">{status}</span>}
+        {lock?.submitted && (
+          <span className={cx("text-[11px] px-2 py-0.5 rounded-full inline-flex items-center gap-1", locked ? "bg-gray-100 text-gray-600" : "bg-amber-50 text-amber-700")}>
+            {locked ? <><FaLock className="h-2.5 w-2.5" /> Submitted</> : <><FaLockOpen className="h-2.5 w-2.5" /> Editing (Admin)</>}
+          </span>
+        )}
+        {lock?.submitted && lock.canEdit && (
+          <button
+            type="button" onClick={locked ? lock.onEdit : lock.onLock}
+            className={cx("ml-auto text-xs px-3 py-1 rounded-md border flex items-center gap-1",
+              locked ? "border-indigo-300 text-indigo-700 hover:bg-indigo-50" : "border-gray-300 text-gray-600 hover:bg-gray-50")}
+          >
+            {locked ? <><FaEdit /> Edit</> : <><FaLock /> Done editing</>}
+          </button>
+        )}
       </div>
-      {children}
+      {/* a disabled fieldset makes every input inside read-only; links stay clickable */}
+      <fieldset disabled={locked} className={cx("min-w-0 w-full border-0 p-0 m-0", locked && "opacity-90")}>
+        {children}
+      </fieldset>
     </section>
   );
 };
@@ -123,6 +148,35 @@ const StageStepper = ({ stages, current, labels = {} }) => {
     </ol>
   );
 };
+
+// Multi-choice add-on picker (Motor BRD: "Multiple choice enabled")
+const AddOnPicker = ({ options, value = [], onChange, disabled, dataField, error }) => (
+  <div
+    data-field={dataField}
+    className={cx("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border rounded-lg p-2 max-h-56 overflow-y-auto", error ? "border-red-500" : "border-gray-300", disabled && "bg-gray-50")}
+  >
+    {options.map((o) => (
+      <label key={o} className="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox" className="rounded text-indigo-600" disabled={disabled} checked={value.includes(o)}
+          onChange={(e) => onChange(e.target.checked ? [...value, o] : value.filter((x) => x !== o))}
+        />
+        {o}
+      </label>
+    ))}
+  </div>
+);
+
+const FileField = ({ label, required, error, dataField, value, onFile, accept = ".pdf,.jpg,.jpeg,.png", hint, className }) => (
+  <Field label={label} required={required} error={error} hint={hint} className={className}>
+    <ViewLink url={value} />
+    <input data-field={dataField} type="file" accept={accept} onChange={(e) => e.target.files[0] && onFile(e.target.files[0])} className={inputCls(error)} />
+    <NewFileTag file={value} />
+  </Field>
+);
+
+const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+const uniq = (arr) => [...new Set(arr.filter(Boolean))];
 
 // BRD: "Discussion done yet - manual type and voice notes should be enabled"
 const VoiceNoteButton = ({ onText }) => {
@@ -186,7 +240,7 @@ export default function LeadCaseForm({
     caseStage, savedLead, quoteFiles, setQuoteFiles, validationErrors, validationPopup, setValidationPopup,
     showAddOnModal, setShowAddOnModal, isFetchingPin, pinFetchError,
     sections, stageIdx, isAdmin, instalment, acceptedQuote, sourceDependentField, visibleStages, nextStage,
-    quotesLocked, paymentLocked, finalAmounts, emiAmounts, emiSchedule, cashbackCalc, profitCalc,
+    finalAmounts, emiAmounts, emiSchedule, cashbackCalc, profitCalc,
     toggleInsurer, updateQuote, updateMember, updateMemberRider, updatePortability, scrollToError,
   } = c;
   const err = validationErrors;
@@ -197,83 +251,20 @@ export default function LeadCaseForm({
   const currentStageDef = getStage(caseStage);
   const canAdvance = !!nextStage && canEdit(caseStage);
 
-  const renderAddOnModal = () => {
-    if (!showAddOnModal) return null;
-
-    return (
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4 overflow-y-auto"
-        onClick={() => setShowAddOnModal(false)}
-      >
-        <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl p-6 max-w-2xl max-h-[90vh] overflow-y-auto w-full"
-          onClick={(e) => e.stopPropagation()}
-        >
-          <div className="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 pb-4 border-b">
-            <h2 className="text-xl font-bold flex items-center gap-2">
-              <FaShieldAlt className="text-indigo-600" /> Select Add-Ons
-            </h2>
-            <button onClick={() => setShowAddOnModal(false)} className="text-gray-500 hover:text-gray-700">
-              <FaTimes className="h-5 w-5" />
-            </button>
-          </div>
-
-          <div className="space-y-3">
-            <p className="text-sm text-gray-600 mb-4">Select the add-ons you want to include in the policy:</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {ADD_ON_OPTIONS.map((addOn) => (
-                <label key={addOn} className="flex items-start gap-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={motorDetails.selectedAddOns?.includes(addOn) || false}
-                    onChange={(e) => {
-                      const current = motorDetails.selectedAddOns || [];
-                      let updated;
-                      if (e.target.checked) {
-                        updated = [...current, addOn];
-                      } else {
-                        updated = current.filter(item => item !== addOn);
-                      }
-                      setMotorDetails(prev => ({ ...prev, selectedAddOns: updated }));
-                    }}
-                    className="mt-1 h-4 w-4 text-indigo-600 rounded border-gray-300 focus:ring-indigo-500"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-gray-700">{addOn}</span>
-                    <p className="text-xs text-gray-500">Additional coverage for your policy</p>
-                  </div>
-                </label>
-              ))}
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-4 mt-6 pt-4 border-t">
-            <button
-              type="button"
-              onClick={() => setShowAddOnModal(false)}
-              className="px-6 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setShowAddOnModal(false);
-              }}
-              className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"
-            >
-              <FaCheck /> Confirm Add-Ons
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    );
-  };
-
+  // ---- Submitted modules are locked; Admin can unlock one with "Edit" ----
+  const [unlocked, setUnlocked] = useState({});
+  useEffect(() => setUnlocked({}), [savedLead?._id, caseStage]);
+  const isSubmitted = (key) => mode !== "create" && stageIdx > IDX[key];
+  const sectionLocked = (key) => isSubmitted(key) && !(isAdmin && !hideAdminModules && unlocked[key]);
+  const lockFor = (key) => ({
+    submitted: isSubmitted(key),
+    locked: sectionLocked(key),
+    canEdit: isAdmin && !hideAdminModules,
+    onEdit: () => setUnlocked((u) => ({ ...u, [key]: true })),
+    onLock: () => setUnlocked((u) => ({ ...u, [key]: false })),
+  });
+  // after the employee's final submission (Request for Payment URL) the whole case is Admin-only
+  const employeeReadOnly = employeeView && stageIdx >= IDX.Payment;
 
   const renderValidationPopup = () => {
     if (!validationPopup.show) return null;
@@ -288,7 +279,7 @@ export default function LeadCaseForm({
         <motion.div
           initial={{ scale: 0.9, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
+          role="alertdialog" aria-modal="true" aria-label="Submission stopped" className="bg-white rounded-2xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-start gap-3 mb-4">
@@ -296,8 +287,8 @@ export default function LeadCaseForm({
               <FaExclamationCircle className="text-red-600 h-6 w-6" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-gray-800">Validation Errors</h3>
-              <p className="text-sm text-gray-500">Please fix the following issues:</p>
+              <h3 className="text-lg font-bold text-gray-800">Submission stopped</h3>
+              <p className="text-sm text-gray-500">A wrong or missing step was found — nothing was saved. Fix these to continue:</p>
             </div>
           </div>
           
@@ -333,786 +324,6 @@ export default function LeadCaseForm({
     );
   };
 
-
-  // ============================================================
-  // RENDER: MOTOR FORM - UPDATED with manufacturer lists + Other
-  // ============================================================
-  const renderMotorForm = () => {
-    const maxDate = getMaxDate();
-    const odRestrictions = getODDueDateRestrictions();
-    
-    const currentYear = new Date().getFullYear();
-    const yearOptions = [];
-    for (let i = 0; i <= 20; i++) {
-      yearOptions.push(currentYear - i);
-    }
-    
-    const monthOptions = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-
-    const isBundlePackage = motorDetails.insuranceType?.startsWith("Bundle Package");
-    const isComprehensiveOrSAOD = 
-      motorDetails.insuranceType === "Comprehensive (OD+TP)" || 
-      motorDetails.insuranceType === "SAOD (On Damage)";
-    const isTP = motorDetails.insuranceType === "TP (Third Party)";
-    const showActiveFields = motorDetails.previousInsuranceStatus === "Active";
-    const showNewVehicleFields = motorDetails.previousInsuranceStatus === "New";
-    const showSAODFields = motorDetails.insuranceType === "SAOD (On Damage)";
-    const showTPFields = motorDetails.insuranceType === "TP (Third Party)";
-
-    // Manufacturer dropdown depends on Vehicle Type
-    const manufacturerInfo = getManufacturerOptions(motorDetails.vehicleType, motorDetails.manufacturer);
-    const isOtherManufacturer = motorDetails.manufacturer === OTHER_MANUFACTURER;
-
-    return (
-      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-          <FaCar /> Motor Insurance Details
-        </h3>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {/* Vehicle Type */}
-          <div>
-            <label className="text-sm font-medium text-gray-700">Vehicle Type <span className="text-red-500">*</span></label>
-            <select
-              data-field="vehicleType"
-              value={motorDetails.vehicleType}
-              onChange={(e) => {
-                const vehicleType = e.target.value;
-                setMotorDetails(prev => {
-                  // Clear the manufacturer if it doesn't belong to the new vehicle type's list
-                  const keep = isManufacturerValidForType(vehicleType, prev.manufacturer);
-                  return {
-                    ...prev,
-                    vehicleType,
-                    manufacturer: keep ? prev.manufacturer : "",
-                    otherManufacturer: keep ? prev.otherManufacturer : "",
-                  };
-                });
-              }}
-              className={`w-full p-2 border rounded-lg ${validationErrors.vehicleType ? 'border-red-500' : 'border-gray-300'}`}
-            >
-              <option value="">Select Vehicle Type</option>
-              {VEHICLE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            {validationErrors.vehicleType && <p className="text-red-500 text-xs mt-1">{validationErrors.vehicleType}</p>}
-          </div>
-
-          {/* Previous Insurance Status */}
-          <div>
-            <label className="text-sm font-medium text-gray-700">Previous Insurance Status <span className="text-red-500">*</span></label>
-            <select
-              data-field="previousInsuranceStatus"
-              value={motorDetails.previousInsuranceStatus}
-              onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsuranceStatus: e.target.value }))}
-              className={`w-full p-2 border rounded-lg ${validationErrors.previousInsuranceStatus ? 'border-red-500' : 'border-gray-300'}`}
-            >
-              <option value="">Select Status</option>
-              {PREVIOUS_INSURANCE_STATUS_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            {validationErrors.previousInsuranceStatus && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsuranceStatus}</p>}
-          </div>
-
-          {/* Registration Number - Only for non-New vehicles */}
-          {!showNewVehicleFields && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">Registration No. <span className="text-red-500">*</span></label>
-              <input
-                data-field="registrationNumber"
-                type="text"
-                value={motorDetails.registrationNumber}
-                onChange={(e) => setMotorDetails(prev => ({ ...prev, registrationNumber: e.target.value.toUpperCase() }))}
-                className={`w-full p-2 border rounded-lg uppercase ${validationErrors.registration ? 'border-red-500' : 'border-gray-300'}`}
-                placeholder="e.g., BR01AB1234"
-              />
-              {validationErrors.registration && <p className="text-red-500 text-xs mt-1">{validationErrors.registration}</p>}
-            </div>
-          )}
-
-          {/* Auto-fetched RTO Code - Only for non-New vehicles */}
-          {!showNewVehicleFields && motorDetails.autoRtoCode && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">RTO Code (Auto-fetched)</label>
-              <input
-                type="text"
-                value={motorDetails.autoRtoCode}
-                readOnly
-                className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 uppercase"
-              />
-            </div>
-          )}
-
-          {/* Insurance Type */}
-          <div className={showNewVehicleFields ? "lg:col-span-3" : ""}>
-            <label className="text-sm font-medium text-gray-700">Insurance Type <span className="text-red-500">*</span></label>
-            <select
-              data-field="insuranceType"
-              value={motorDetails.insuranceType}
-              onChange={(e) => {
-                const selectedType = e.target.value;
-                setMotorDetails(prev => ({ 
-                  ...prev, 
-                  insuranceType: selectedType,
-                  odDueDate: "",
-                  tpDueDate: "",
-                  saodOdDueDate: "",
-                  saodTpDueDate: "",
-                  saodPolicyNo: "",
-                  saodPreviousInsurerName: "",
-                  saodIdvAsPerPYP: "",
-                }));
-              }}
-              className={`w-full p-2 border rounded-lg ${validationErrors.insuranceType ? 'border-red-500' : 'border-gray-300'}`}
-            >
-              <option value="">Select Insurance Type</option>
-              {INSURANCE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-            </select>
-            {validationErrors.insuranceType && <p className="text-red-500 text-xs mt-1">{validationErrors.insuranceType}</p>}
-            
-            {isBundlePackage && (
-              <p className="text-xs text-blue-600 mt-1">
-                Bundle Package selected - {motorDetails.insuranceType}
-              </p>
-            )}
-          </div>
-          {/* Sum Insured - Manual entry for Motor Insurance */}
-<div>
-  <label className="text-sm font-medium text-gray-700">Sum Insured (IDV) — Manual Entry</label>
-  <input
-    type="text"
-    value={formData.sumInsured}
-    onChange={(e) => setFormData(prev => ({ ...prev, sumInsured: e.target.value }))}
-    className="w-full p-2 border border-gray-300 rounded-lg"
-    placeholder="Enter Sum Insured manually (e.g., 5,50,000)"
-  />
-</div>
-        </div>
-
-        {/* New Vehicle Details Section */}
-        {showNewVehicleFields && (
-          <div className="mt-4 border-t border-blue-200 pt-4">
-            <h4 className="text-md font-semibold text-blue-600 mb-3 flex items-center gap-2">
-              <FaCar /> New Vehicle Details
-            </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Manufacturer <span className="text-red-500">*</span></label>
-                <select
-                  data-field="manufacturer"
-                  value={motorDetails.manufacturer}
-                  disabled={!motorDetails.vehicleType}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setMotorDetails(prev => ({
-                      ...prev,
-                      manufacturer: value,
-                      otherManufacturer: value === OTHER_MANUFACTURER ? prev.otherManufacturer : "",
-                    }));
-                  }}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.manufacturer ? 'border-red-500' : 'border-gray-300'} ${!motorDetails.vehicleType ? 'bg-gray-100 cursor-not-allowed' : ''}`}
-                >
-                  <option value="">{motorDetails.vehicleType ? "Select Manufacturer" : "Select Vehicle Type first"}</option>
-                  {manufacturerInfo.legacyValue && (
-                    <option value={manufacturerInfo.legacyValue}>{manufacturerInfo.legacyValue} (saved earlier)</option>
-                  )}
-                  {manufacturerInfo.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-                {motorDetails.vehicleType && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    {manufacturerInfo.count} manufacturers for {motorDetails.vehicleType}. Not listed? Choose "Other".
-                  </p>
-                )}
-                {validationErrors.manufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.manufacturer}</p>}
-              </div>
-
-              {/* Manual manufacturer name when "Other" is selected */}
-              {isOtherManufacturer && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Manufacturer Name (Manual) <span className="text-red-500">*</span></label>
-                  <input
-                    data-field="otherManufacturer"
-                    type="text"
-                    value={motorDetails.otherManufacturer || ""}
-                    onChange={(e) => setMotorDetails(prev => ({ ...prev, otherManufacturer: e.target.value }))}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.otherManufacturer ? 'border-red-500' : 'border-gray-300'}`}
-                    placeholder="Enter manufacturer / company name"
-                  />
-                  {validationErrors.otherManufacturer && <p className="text-red-500 text-xs mt-1">{validationErrors.otherManufacturer}</p>}
-                </div>
-              )}
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">
-                  {isOtherManufacturer ? "Model Name (Manual)" : "Model"} <span className="text-red-500">*</span>
-                </label>
-                <input
-                  data-field="model"
-                  type="text"
-                  value={motorDetails.model}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, model: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.model ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder={isOtherManufacturer ? "Enter model name manually" : "Enter model name"}
-                />
-                {validationErrors.model && <p className="text-red-500 text-xs mt-1">{validationErrors.model}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Fuel Type <span className="text-red-500">*</span></label>
-                <select
-                  data-field="fuelType"
-                  value={motorDetails.fuelType}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, fuelType: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.fuelType ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select Fuel Type</option>
-                  {FUEL_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-                {validationErrors.fuelType && <p className="text-red-500 text-xs mt-1">{validationErrors.fuelType}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">RTO Code <span className="text-red-500">*</span></label>
-                <input
-                  data-field="rtoCode"
-                  type="text"
-                  value={motorDetails.rtoCode}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, rtoCode: e.target.value.toUpperCase() }))}
-                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.rtoCode ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="e.g., BR01"
-                />
-                {validationErrors.rtoCode && <p className="text-red-500 text-xs mt-1">{validationErrors.rtoCode}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Chesis No. <span className="text-red-500">*</span></label>
-                <input
-                  data-field="chesisNo"
-                  type="text"
-                  value={motorDetails.chesisNo}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisNo: e.target.value.toUpperCase() }))}
-                  className={`w-full p-2 border rounded-lg uppercase ${validationErrors.chesisNo ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter chassis number"
-                />
-                {validationErrors.chesisNo && <p className="text-red-500 text-xs mt-1">{validationErrors.chesisNo}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Year of Manufacturing <span className="text-red-500">*</span></label>
-                <select
-                  data-field="yearOfManufacturing"
-                  value={motorDetails.yearOfManufacturing}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, yearOfManufacturing: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.yearOfManufacturing ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select Year</option>
-                  {yearOptions.map(year => <option key={year} value={year}>{year}</option>)}
-                </select>
-                {validationErrors.yearOfManufacturing && <p className="text-red-500 text-xs mt-1">{validationErrors.yearOfManufacturing}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Month of Manufacturing <span className="text-red-500">*</span></label>
-                <select
-                  data-field="monthOfManufacturing"
-                  value={motorDetails.monthOfManufacturing}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, monthOfManufacturing: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.monthOfManufacturing ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select Month</option>
-                  {monthOptions.map(month => <option key={month} value={month}>{month}</option>)}
-                </select>
-                {validationErrors.monthOfManufacturing && <p className="text-red-500 text-xs mt-1">{validationErrors.monthOfManufacturing}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">IDV (As per Invoice) <span className="text-red-500">*</span></label>
-                <input
-                  data-field="idvAsPerInvoice"
-                  type="number"
-                  value={motorDetails.idvAsPerInvoice}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, idvAsPerInvoice: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.idvAsPerInvoice ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter IDV amount"
-                />
-                {validationErrors.idvAsPerInvoice && <p className="text-red-500 text-xs mt-1">{validationErrors.idvAsPerInvoice}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Invoice Copy <span className="text-red-500">*</span></label>
-                {typeof motorDetails.invoiceCopy === "string" && motorDetails.invoiceCopy && (
-                  <div className="mb-1">
-                    <a
-                      href={motorDetails.invoiceCopy}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 underline"
-                    >
-                      View current Invoice file
-                    </a>
-                  </div>
-                )}
-                <input
-                  data-field="invoiceCopy"
-                  type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, invoiceCopy: e.target.files[0] || prev.invoiceCopy }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.invoiceCopy ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {motorDetails.invoiceCopy && typeof motorDetails.invoiceCopy !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-                {validationErrors.invoiceCopy && <p className="text-red-500 text-xs mt-1">{validationErrors.invoiceCopy}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Upload Chesis No. Photo (Not Mandatory)</label>
-                {typeof motorDetails.chesisPhoto === "string" && motorDetails.chesisPhoto && (
-                  <div className="mb-1">
-                    <a
-                      href={motorDetails.chesisPhoto}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 underline"
-                    >
-                      View current Chesis photo
-                    </a>
-                  </div>
-                )}
-                <input
-                  type="file"
-                  accept=".jpg,.jpeg,.png"
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, chesisPhoto: e.target.files[0] || prev.chesisPhoto }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                />
-                {motorDetails.chesisPhoto && typeof motorDetails.chesisPhoto !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Active Policy Fields */}
-        {showActiveFields && (
-          <div className="mt-4 border-t border-green-200 pt-4">
-            <h4 className="text-md font-semibold text-green-600 mb-3 flex items-center gap-2">
-              <FaShieldAlt /> Active Policy Details
-            </h4>
-            
-            {isComprehensiveOrSAOD && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">OD Due Date <span className="text-red-500">*</span></label>
-                  <input
-                    data-field="odDueDate"
-                    type="date"
-                    min={odRestrictions.min}
-                    max={odRestrictions.max}
-                    value={motorDetails.odDueDate}
-                    onChange={(e) => {
-                      const selected = new Date(e.target.value);
-                      const minDate = new Date(odRestrictions.min);
-                      const maxDate = new Date(odRestrictions.max);
-                      if (selected >= minDate && selected <= maxDate) {
-                        setMotorDetails(prev => ({ ...prev, odDueDate: e.target.value }));
-                      } else {
-                        alert("OD Due Date must be within 90 days before or 60 days after today");
-                      }
-                    }}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.odDueDate ? 'border-red-500' : 'border-gray-300'}`}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">Range: 90 days before to 60 days after today</p>
-                  {validationErrors.odDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.odDueDate}</p>}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
-                  <input
-                    data-field="tpDueDate"
-                    type="date"
-                    value={motorDetails.tpDueDate}
-                    onChange={(e) => setMotorDetails(prev => ({ ...prev, tpDueDate: e.target.value }))}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.tpDueDate ? 'border-red-500' : 'border-gray-300'}`}
-                  />
-                  {validationErrors.tpDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpDueDate}</p>}
-                </div>
-              </div>
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Policy No. <span className="text-red-500">*</span></label>
-                <input
-                  data-field="policyNo"
-                  type="text"
-                  value={motorDetails.policyNo}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, policyNo: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.policyNo ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter policy number"
-                />
-                {validationErrors.policyNo && <p className="text-red-500 text-xs mt-1">{validationErrors.policyNo}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Previous Insurer Name <span className="text-red-500">*</span></label>
-                <select
-                  data-field="previousInsurerName"
-                  value={motorDetails.previousInsurerName}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, previousInsurerName: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.previousInsurerName ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select Insurer</option>
-                  {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-                {validationErrors.previousInsurerName && <p className="text-red-500 text-xs mt-1">{validationErrors.previousInsurerName}</p>}
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">IDV (As per PYP) <span className="text-red-500">*</span></label>
-                <input
-                  data-field="idvAsPerPYP"
-                  type="number"
-                  value={motorDetails.idvAsPerPYP}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, idvAsPerPYP: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.idvAsPerPYP ? 'border-red-500' : 'border-gray-300'}`}
-                  placeholder="Enter IDV amount"
-                />
-                {validationErrors.idvAsPerPYP && <p className="text-red-500 text-xs mt-1">{validationErrors.idvAsPerPYP}</p>}
-              </div>
-            </div>
-
-            <div className="mt-4 border-t border-gray-200 pt-4">
-              <h5 className="text-sm font-semibold text-gray-700 mb-3">Claim & NCB Details</h5>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Claim Taken? <span className="text-red-500">*</span></label>
-                  <select
-                    data-field="claimTaken"
-                    value={motorDetails.claimTaken}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setMotorDetails(prev => ({ 
-                        ...prev, 
-                        claimTaken: value,
-                        ncb: value === "Yes" ? "0%" : prev.ncb
-                      }));
-                    }}
-                    className={`w-full p-2 border rounded-lg ${validationErrors.claimTaken ? 'border-red-500' : 'border-gray-300'}`}
-                  >
-                    <option value="">Select</option>
-                    {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                  </select>
-                  {validationErrors.claimTaken && <p className="text-red-500 text-xs mt-1">{validationErrors.claimTaken}</p>}
-                </div>
-
-                <div>
-                  <label className="text-sm font-medium text-gray-700">NCB</label>
-                  {motorDetails.claimTaken === "Yes" ? (
-                    <div>
-                      <input
-                        type="text"
-                        value="0%"
-                        readOnly
-                        className="w-full p-2 border border-gray-300 rounded-lg bg-gray-100 text-red-600 font-semibold"
-                      />
-                      <p className="text-xs text-red-500 mt-1">Auto-set to 0% as Claim Taken is Yes</p>
-                    </div>
-                  ) : (
-                    <select
-                      data-field="ncb"
-                      value={motorDetails.ncb}
-                      onChange={(e) => setMotorDetails(prev => ({ ...prev, ncb: e.target.value }))}
-                      className={`w-full p-2 border rounded-lg ${validationErrors.ncb ? 'border-red-500' : 'border-gray-300'}`}
-                      disabled={motorDetails.claimTaken === ""}
-                    >
-                      <option value="">{motorDetails.claimTaken === "" ? "Select Claim Taken first" : "Select NCB"}</option>
-                      {NCB_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                    </select>
-                  )}
-                  {validationErrors.ncb && <p className="text-red-500 text-xs mt-1">{validationErrors.ncb}</p>}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* SAOD Specific Fields */}
-        {showSAODFields && showActiveFields && (
-          <div className="mt-4 border-t border-purple-200 pt-4">
-            <h5 className="text-sm font-semibold text-purple-600 mb-3">SAOD (On Damage) Details</h5>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">OD Due Date <span className="text-red-500">*</span></label>
-                <input
-                  data-field="saodOdDueDate"
-                  type="date"
-                  min={odRestrictions.min}
-                  max={odRestrictions.max}
-                  value={motorDetails.saodOdDueDate}
-                  onChange={(e) => {
-                    const selected = new Date(e.target.value);
-                    const minDate = new Date(odRestrictions.min);
-                    const maxDate = new Date(odRestrictions.max);
-                    if (selected >= minDate && selected <= maxDate) {
-                      setMotorDetails(prev => ({ ...prev, saodOdDueDate: e.target.value }));
-                    } else {
-                      alert("OD Due Date must be within 90 days before or 60 days after today");
-                    }
-                  }}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                />
-                <p className="text-xs text-gray-500 mt-1">Range: 90 days before to 60 days after today</p>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
-                <input
-                  data-field="saodTpDueDate"
-                  type="date"
-                  value={motorDetails.saodTpDueDate}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodTpDueDate: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Previous Policy No. <span className="text-red-500">*</span></label>
-                <input
-                  data-field="saodPolicyNo"
-                  type="text"
-                  value={motorDetails.saodPolicyNo}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodPolicyNo: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                />
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">Previous Insurer Name <span className="text-red-500">*</span></label>
-                <select
-                  data-field="saodPreviousInsurerName"
-                  value={motorDetails.saodPreviousInsurerName}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodPreviousInsurerName: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="">Select Insurer</option>
-                  {INSURER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="text-sm font-medium text-gray-700">IDV (As per PYP) <span className="text-red-500">*</span></label>
-                <input
-                  data-field="saodIdvAsPerPYP"
-                  type="number"
-                  value={motorDetails.saodIdvAsPerPYP}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, saodIdvAsPerPYP: e.target.value }))}
-                  className="w-full p-2 border border-gray-300 rounded-lg"
-                  placeholder="Enter IDV amount"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* TP Insurance Fields */}
-        {showTPFields && (
-          <div className="mt-4 border-t border-orange-200 pt-4">
-            <h5 className="text-sm font-semibold text-orange-600 mb-3">TP (Third Party) Details</h5>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">TP Due Date <span className="text-red-500">*</span></label>
-                <input
-                  data-field="tpInsuranceDueDate"
-                  type="date"
-                  value={motorDetails.tpInsuranceDueDate}
-                  onChange={(e) => setMotorDetails(prev => ({ ...prev, tpInsuranceDueDate: e.target.value }))}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.tpInsuranceDueDate ? 'border-red-500' : 'border-gray-300'}`}
-                />
-                {validationErrors.tpInsuranceDueDate && <p className="text-red-500 text-xs mt-1">{validationErrors.tpInsuranceDueDate}</p>}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add-On Section - For all types except TP */}
-        {!isTP && (
-          <div className="mt-4 border-t border-pink-200 pt-4">
-            <h5 className="text-sm font-semibold text-pink-600 mb-3 flex items-center gap-2">
-              <FaShieldAlt /> Add-On
-            </h5>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium text-gray-700">Add-On Required? <span className="text-red-500">*</span></label>
-                <select
-                  data-field="addOnRequired"
-                  value={motorDetails.addOnRequired}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setMotorDetails(prev => ({ 
-                      ...prev, 
-                      addOnRequired: value,
-                      selectedAddOns: value === "No" ? [] : prev.selectedAddOns
-                    }));
-                    if (value === "Yes") {
-                      setShowAddOnModal(true);
-                    }
-                  }}
-                  className={`w-full p-2 border rounded-lg ${validationErrors.addOnRequired ? 'border-red-500' : 'border-gray-300'}`}
-                >
-                  <option value="">Select</option>
-                  {YES_NO_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                </select>
-                {validationErrors.addOnRequired && <p className="text-red-500 text-xs mt-1">{validationErrors.addOnRequired}</p>}
-              </div>
-
-              {motorDetails.addOnRequired === "Yes" && (
-                <div>
-                  <label className="text-sm font-medium text-gray-700">Selected Add-Ons</label>
-                  <div className="w-full p-2 border border-gray-300 rounded-lg bg-gray-50 min-h-[40px]">
-                    {motorDetails.selectedAddOns && motorDetails.selectedAddOns.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {motorDetails.selectedAddOns.map((addOn, idx) => (
-                          <span key={idx} className="bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full text-xs">
-                            {addOn}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">No add-ons selected</span>
-                    )}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddOnModal(true)}
-                    className="mt-1 text-sm text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                  >
-                    <FaEdit className="h-3 w-3" /> Manage Add-Ons
-                  </button>
-                  {validationErrors.selectedAddOns && <p className="text-red-500 text-xs mt-1">{validationErrors.selectedAddOns}</p>}
-                </div>
-              )}
-              
-              {motorDetails.addOnRequired === "No" && (
-                <div className="flex items-center text-gray-500 text-sm">
-                  <FaCheck className="text-green-500 mr-2" /> No add-ons selected
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* TP Insurance - Add-On automatically set to No */}
-        {isTP && (
-          <div className="mt-4 border-t border-orange-200 pt-4">
-            <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-              <div className="flex items-center gap-2 text-orange-700">
-                <FaShieldAlt />
-                <span className="font-medium">Add-On:</span>
-                <span className="font-bold">No</span>
-                <span className="text-sm text-orange-600">(Auto-set for TP Insurance)</span>
-              </div>
-              <input type="hidden" value="No" />
-            </div>
-          </div>
-        )}
-
-       {/* Uploads Section - Updated for all statuses */}
-<div className="mt-4 border-t border-gray-200 pt-4">
-  <h5 className="text-sm font-semibold text-gray-700 mb-3">Upload Documents</h5>
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-    
-    {/* PYP Upload - Show for ALL statuses (Active, Expired, New) */}
-    <div>
-      <label className="text-sm font-medium text-gray-700">
-        Upload PYP 
-        {motorDetails.previousInsuranceStatus === "Active" && <span className="text-red-500">*</span>}
-      </label>
-      {typeof motorDetails.pypFile === "string" && motorDetails.pypFile && (
-        <div className="mb-1">
-          <a
-            href={motorDetails.pypFile}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-indigo-600 underline"
-          >
-            View current PYP file
-          </a>
-        </div>
-      )}
-      <input
-        data-field="pypFile"
-        type="file"
-        accept=".pdf"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, pypFile: e.target.files[0] || prev.pypFile }))}
-        className={`w-full p-2 border rounded-lg ${validationErrors.pypFile ? 'border-red-500' : 'border-gray-300'}`}
-      />
-      {motorDetails.pypFile && typeof motorDetails.pypFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-      {validationErrors.pypFile && <p className="text-red-500 text-xs mt-1">{validationErrors.pypFile}</p>}
-    </div>
-
-    {/* RC Front Upload - Show for ALL statuses */}
-    <div>
-      <label className="text-sm font-medium text-gray-700">
-        RC Front Upload
-        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
-      </label>
-      {typeof motorDetails.rcFrontFile === "string" && motorDetails.rcFrontFile && (
-        <div className="mb-1">
-          <a
-            href={motorDetails.rcFrontFile}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-indigo-600 underline"
-          >
-            View current RC Front file
-          </a>
-        </div>
-      )}
-      <input
-        data-field="rcFrontFile"
-        type="file"
-        accept=".pdf,.jpg,.jpeg"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcFrontFile: e.target.files[0] || prev.rcFrontFile }))}
-        className={`w-full p-2 border rounded-lg ${validationErrors.rcFrontFile ? 'border-red-500' : 'border-gray-300'}`}
-      />
-      {motorDetails.rcFrontFile && typeof motorDetails.rcFrontFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-      {validationErrors.rcFrontFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcFrontFile}</p>}
-    </div>
-
-    {/* RC Back Upload - Show for ALL statuses */}
-    <div>
-      <label className="text-sm font-medium text-gray-700">
-        RC Back Upload
-        {motorDetails.previousInsuranceStatus !== "New" && <span className="text-red-500">*</span>}
-      </label>
-      {typeof motorDetails.rcBackFile === "string" && motorDetails.rcBackFile && (
-        <div className="mb-1">
-          <a
-            href={motorDetails.rcBackFile}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-xs text-indigo-600 underline"
-          >
-            View current RC Back file
-          </a>
-        </div>
-      )}
-      <input
-        data-field="rcBackFile"
-        type="file"
-        accept=".pdf,.jpg,.jpeg"
-        onChange={(e) => setMotorDetails(prev => ({ ...prev, rcBackFile: e.target.files[0] || prev.rcBackFile }))}
-        className={`w-full p-2 border rounded-lg ${validationErrors.rcBackFile ? 'border-red-500' : 'border-gray-300'}`}
-      />
-      {motorDetails.rcBackFile && typeof motorDetails.rcBackFile !== "string" && <p className="text-xs text-green-500 mt-1">✓ File selected</p>}
-      {validationErrors.rcBackFile && <p className="text-red-500 text-xs mt-1">{validationErrors.rcBackFile}</p>}
-    </div>
-  </div>
-</div>
-
-        {/* Add-On Modal */}
-        {renderAddOnModal()}
-      </div>
-    );
-  };
 
   // ============================================================
   // RENDER: ELECTRONIC FORM
@@ -1467,9 +678,35 @@ export default function LeadCaseForm({
       <Field label="LOB" required error={err.lob} hint={stageIdx > IDX.Lead ? "Changing the LOB changes which Quote details are asked" : undefined}>
         <select name="lob" value={formData.lob} onChange={(e) => setFormData((p) => ({ ...p, lob: e.target.value }))} className={inputCls(err.lob)}>
           <option value="">-- Select LOB --</option>
+          {formData.lob && !LOB_OPTIONS.includes(formData.lob) && <option value={formData.lob}>{formData.lob} (old)</option>}
           {LOB_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
       </Field>
+      {sections.motor && (
+        <>
+          <Field label="Vehicle Type" required error={err.vehicleType}>
+            <select
+              data-field="vehicleType" value={motorDetails.vehicleType} className={inputCls(err.vehicleType)}
+              onChange={(e) => {
+                const v = e.target.value;
+                setMotorDetails((p) => (isManufacturerValidForType(v, p.manufacturer) ? { ...p, vehicleType: v } : { ...p, vehicleType: v, manufacturer: "", otherManufacturer: "" }));
+              }}
+            >
+              <option value="">Select Vehicle Type</option>
+              {VEHICLE_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          <Field
+            label="Policy Type" required error={err.motorPolicyType}
+            hint={motorDetails.policyType === "SAOD" ? "Own Damage only — the vehicle must already have an active TP policy" : undefined}
+          >
+            <select data-field="motorPolicyType" value={motorDetails.policyType} onChange={(e) => setMotorDetails((p) => ({ ...p, policyType: e.target.value }))} className={inputCls(err.motorPolicyType)}>
+              <option value="">Select Policy Type</option>
+              {MOTOR_POLICY_TYPES.map((o) => <option key={o} value={o}>{MOTOR_POLICY_TYPE_LABELS[o]}</option>)}
+            </select>
+          </Field>
+        </>
+      )}
       <div className="sm:col-span-2 lg:col-span-3">
         <div className="flex items-center justify-between">
           <label className="text-sm font-medium text-gray-700">Discussion Done Yet (Remarks)</label>
@@ -1629,19 +866,25 @@ export default function LeadCaseForm({
     const termOptions = isEmiEligibleLob(formData.lob) ? PAYMENT_TERM_OPTIONS : ["One Time"];
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-        <Field label="Policy Tenure">
+        <Field label="Policy Tenure" hint={sections.motor ? "Used for the policy expiry date (default 1 year)" : undefined}>
           <select data-field="policyTenure" value={formData.policyTenure} onChange={(e) => setFormData((p) => ({ ...p, policyTenure: e.target.value }))} className={inputCls()}>
             <option value="">Select</option>
             {POLICY_TENURE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
-        <Field label="Paying Term">
-          <select data-field="paymentTerm" value={formData.paymentTerm} onChange={(e) => setFormData((p) => ({ ...p, paymentTerm: e.target.value }))} className={inputCls()}>
-            <option value="">Select</option>
-            {formData.paymentTerm && !termOptions.includes(formData.paymentTerm) && <option value={formData.paymentTerm}>{formData.paymentTerm}</option>}
-            {termOptions.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </Field>
+        {sections.motor ? (
+          <Field label="Paying Term" hint="Motor premium is paid once">
+            <input type="text" readOnly value="One Time" className={autoCls} />
+          </Field>
+        ) : (
+          <Field label="Paying Term">
+            <select data-field="paymentTerm" value={formData.paymentTerm} onChange={(e) => setFormData((p) => ({ ...p, paymentTerm: e.target.value }))} className={inputCls()}>
+              <option value="">Select</option>
+              {formData.paymentTerm && !termOptions.includes(formData.paymentTerm) && <option value={formData.paymentTerm}>{formData.paymentTerm}</option>}
+              {termOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+        )}
         {!sections.motor && (
           <Field label="Sum Insured">
             <select value={formData.sumInsured} onChange={(e) => setFormData((p) => ({ ...p, sumInsured: e.target.value }))} className={inputCls()}>
@@ -1655,15 +898,318 @@ export default function LeadCaseForm({
     );
   };
 
+  // ============================================================
+  // 2. QUOTE — Motor (Motor BRD: one layout per policy type)
+  // ============================================================
+  const setM = (patch) => setMotorDetails((p) => ({ ...p, ...patch }));
+  const motorAddOnOptions = () =>
+    motorDetails.policyType === "TP" ? ["Owner-Driver PA"] : ADD_ON_OPTIONS;
+
+  const renderRcUploads = (required) => (
+    <>
+      <FileField label="Upload RC — Front" required={required} error={err.rcFrontFile} dataField="rcFrontFile" value={motorDetails.rcFrontFile} onFile={(f) => setM({ rcFrontFile: f })} />
+      <FileField label="Upload RC — Back" required={required} error={err.rcBackFile} dataField="rcBackFile" value={motorDetails.rcBackFile} onFile={(f) => setM({ rcBackFile: f })} />
+    </>
+  );
+
+  const renderMotorQuote = () => {
+    const m = motorDetails;
+    if (!m.vehicleType || !m.policyType) {
+      return <div className="mb-6"><ReadOnlyNote>Select the Vehicle Type and Policy Type in the Lead module first.</ReadOnlyNote></div>;
+    }
+    const heading = (
+      <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2">
+        <FaCar /> Motor Quote — {MOTOR_POLICY_TYPE_LABELS[m.policyType]} · {m.vehicleType}
+      </h4>
+    );
+
+    // ---------------- Brand New ----------------
+    if (m.policyType === "Brand New") {
+      const { options: makes, legacyValue } = getManufacturerOptions(m.vehicleType, m.manufacturer);
+      const year = new Date().getFullYear();
+      const years = [year, year - 1, year - 2];
+      if (m.yearOfManufacturing && !years.includes(Number(m.yearOfManufacturing))) years.push(Number(m.yearOfManufacturing));
+      return (
+        <div className="mb-6">
+          {heading}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Field label="RTO" required error={err.rtoCode} hint="e.g. BR01 / DL11">
+              <input data-field="rtoCode" type="text" maxLength="5" value={m.rtoCode} onChange={(e) => setM({ rtoCode: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} className={cx(inputCls(err.rtoCode), "uppercase")} />
+            </Field>
+            <Field label="Make / Manufacturer" required error={err.manufacturer} hint={`${makes.length - 1} makes for ${m.vehicleType}. Not listed? Choose Other.`}>
+              <select data-field="manufacturer" value={m.manufacturer} onChange={(e) => setM({ manufacturer: e.target.value, otherManufacturer: e.target.value === OTHER_MANUFACTURER ? m.otherManufacturer : "" })} className={inputCls(err.manufacturer)}>
+                <option value="">Select Make</option>
+                {legacyValue && <option value={legacyValue}>{legacyValue} (saved earlier)</option>}
+                {makes.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            {m.manufacturer === OTHER_MANUFACTURER && (
+              <Field label="Manufacturer Name" required error={err.otherManufacturer}>
+                <input data-field="otherManufacturer" type="text" value={m.otherManufacturer} onChange={(e) => setM({ otherManufacturer: e.target.value })} className={inputCls(err.otherManufacturer)} />
+              </Field>
+            )}
+            <div>
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-gray-700">Model <span className="text-red-500">*</span></label>
+                <VoiceNoteButton onText={(t) => setMotorDetails((p) => ({ ...p, model: p.model ? `${p.model} ${t}` : t }))} />
+              </div>
+              <input data-field="model" type="text" value={m.model} onChange={(e) => setM({ model: e.target.value })} className={inputCls(err.model)} placeholder="Type or dictate the model" />
+              {err.model && <p className="text-red-500 text-xs mt-1">{err.model}</p>}
+            </div>
+            <Field label="Fuel" required error={err.fuelType}>
+              <select data-field="fuelType" value={m.fuelType} onChange={(e) => setM({ fuelType: e.target.value })} className={inputCls(err.fuelType)}>
+                <option value="">Select Fuel</option>
+                {m.fuelType && !MOTOR_FUEL_OPTIONS.includes(m.fuelType) && <option value={m.fuelType}>{m.fuelType}</option>}
+                {MOTOR_FUEL_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="Variant" hint="As written on the invoice / quotation">
+              <input data-field="variant" type="text" value={m.variant} onChange={(e) => setM({ variant: e.target.value })} className={inputCls()} />
+            </Field>
+            <Field label="Manufacturer Date (MM/YYYY)" required error={err.monthOfManufacturing}>
+              <div className="flex gap-2">
+                <select data-field="monthOfManufacturing" value={m.monthOfManufacturing} onChange={(e) => setM({ monthOfManufacturing: e.target.value })} className={inputCls(err.monthOfManufacturing)}>
+                  <option value="">Month</option>
+                  {MONTHS.map((o, i) => <option key={o} value={o}>{String(i + 1).padStart(2, "0")} — {o}</option>)}
+                </select>
+                <select aria-label="Year of manufacturing" value={m.yearOfManufacturing} onChange={(e) => setM({ yearOfManufacturing: e.target.value })} className={inputCls(err.monthOfManufacturing && !m.yearOfManufacturing)}>
+                  <option value="">Year</option>
+                  {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                </select>
+              </div>
+            </Field>
+            <Field label="Type of Owner" required error={err.ownerType}>
+              <select data-field="ownerType" value={m.ownerType} onChange={(e) => setM({ ownerType: e.target.value })} className={inputCls(err.ownerType)}>
+                <option value="">Select</option>
+                {OWNER_TYPE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+            <Field label="IDV (₹)" required error={err.idvAsPerInvoice}>
+              <input data-field="idvAsPerInvoice" type="text" inputMode="numeric" value={m.idvAsPerInvoice} onChange={(e) => setM({ idvAsPerInvoice: e.target.value.replace(/\D/g, "") })} className={inputCls(err.idvAsPerInvoice)} />
+            </Field>
+            <FileField label="Upload Invoice (Not Mandatory)" dataField="invoiceCopy" value={m.invoiceCopy} onFile={(f) => setM({ invoiceCopy: f })} hint="Becomes mandatory at Policy Issuance" />
+            <Field label="Add-ons" className="sm:col-span-2 lg:col-span-3">
+              <AddOnPicker options={ADD_ON_OPTIONS} value={m.selectedAddOns || []} onChange={(v) => setM({ selectedAddOns: v, addOnRequired: v.length ? "Yes" : "No" })} />
+            </Field>
+          </div>
+        </div>
+      );
+    }
+
+    // ---------------- SAOD / Comprehensive / TP ----------------
+    const active = m.previousInsuranceStatus === PREVIOUS_POLICY_ACTIVE;
+    const notActive = m.previousInsuranceStatus === PREVIOUS_POLICY_NOT_ACTIVE;
+    const isTP = m.policyType === "TP";
+    const tpAddOn = (m.selectedAddOns || []).includes("Owner-Driver PA") ? "Owner-Driver PA" : m.addOnRequired === "No" ? "Not Required" : "";
+    return (
+      <div className="mb-6">
+        {heading}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Registration No." required error={err.registrationNumber} hint={m.autoRtoCode ? `RTO: ${m.autoRtoCode}` : "e.g. BR01BS6139"}>
+            <input
+              data-field="registrationNumber" type="text" maxLength="13" value={m.registrationNumber} className={cx(inputCls(err.registrationNumber), "uppercase")}
+              onChange={(e) => setM({ registrationNumber: normalizeRegistration(e.target.value) })}
+            />
+          </Field>
+          <Field label="Previous Insurance Status" required error={err.previousInsuranceStatus}>
+            <select data-field="previousInsuranceStatus" value={m.previousInsuranceStatus} onChange={(e) => setM({ previousInsuranceStatus: e.target.value })} className={inputCls(err.previousInsuranceStatus)}>
+              <option value="">Select</option>
+              <option value={PREVIOUS_POLICY_ACTIVE}>Active</option>
+              <option value={PREVIOUS_POLICY_NOT_ACTIVE}>Not Active</option>
+            </select>
+          </Field>
+
+          {active && (
+            <>
+              <Field label="Insurer Name" required error={err.previousInsurerName}>
+                <select data-field="previousInsurerName" value={m.previousInsurerName} onChange={(e) => setM({ previousInsurerName: e.target.value })} className={inputCls(err.previousInsurerName)}>
+                  <option value="">Select Insurer</option>
+                  {m.previousInsurerName && !INSURER_OPTIONS.includes(m.previousInsurerName) && <option value={m.previousInsurerName}>{m.previousInsurerName}</option>}
+                  {INSURER_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </Field>
+              {!isTP && (
+                <Field label="IDV (₹)" required error={err.idvAsPerPYP}>
+                  <input data-field="idvAsPerPYP" type="text" inputMode="numeric" value={m.idvAsPerPYP} onChange={(e) => setM({ idvAsPerPYP: e.target.value.replace(/\D/g, "") })} className={inputCls(err.idvAsPerPYP)} />
+                </Field>
+              )}
+              <Field label="Policy Expiry Date OD" required={!isTP} error={err.odDueDate}>
+                <input data-field="odDueDate" type="date" value={m.odDueDate} onChange={(e) => setM({ odDueDate: e.target.value })} className={inputCls(err.odDueDate)} />
+              </Field>
+              <Field label="Policy Expiry Date TP" required error={err.tpDueDate}>
+                <input data-field="tpDueDate" type="date" value={m.tpDueDate} onChange={(e) => setM({ tpDueDate: e.target.value })} className={inputCls(err.tpDueDate)} />
+              </Field>
+            </>
+          )}
+
+          {notActive && !isTP && (
+            <Field label="IDV Required for (₹)" required error={err.idvRequired}>
+              <input data-field="idvRequired" type="text" inputMode="numeric" value={m.idvRequired} onChange={(e) => setM({ idvRequired: e.target.value.replace(/\D/g, "") })} className={inputCls(err.idvRequired)} />
+            </Field>
+          )}
+
+          {(active || notActive) && renderRcUploads(true)}
+          {active && !isTP && (
+            <FileField label="Upload PYP for NCB Discount (Not Mandatory)" dataField="pypFile" value={m.pypFile} onFile={(f) => setM({ pypFile: f })} accept=".pdf,.jpg,.jpeg,.png" />
+          )}
+
+          {active && !isTP && (
+            <>
+              <Field label="Claim Taken in Active Policy" required error={err.claimTaken}>
+                <select data-field="claimTaken" value={m.claimTaken} onChange={(e) => setM({ claimTaken: e.target.value, ncb: e.target.value === "Yes" ? "0%" : m.ncb === "0%" ? "" : m.ncb })} className={inputCls(err.claimTaken)}>
+                  <option value="">Select</option>
+                  {YES_NO_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </Field>
+              {m.claimTaken === "No" && (
+                <Field label="NCB in Current Policy" required error={err.ncb}>
+                  <select data-field="ncb" value={m.ncb} onChange={(e) => setM({ ncb: e.target.value })} className={inputCls(err.ncb)}>
+                    <option value="">Select NCB</option>
+                    {NCB_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </Field>
+              )}
+              {m.claimTaken === "Yes" && (
+                <Field label="NCB in Current Policy" hint="Claim taken → NCB resets to 0%"><input type="text" readOnly value="0%" className={autoCls} /></Field>
+              )}
+              <Field label="Add-ons in the Active Policy" className="sm:col-span-2 lg:col-span-3">
+                <AddOnPicker options={ADD_ON_OPTIONS} value={m.existingAddOns || []} onChange={(v) => setM({ existingAddOns: v })} />
+              </Field>
+            </>
+          )}
+
+          {isTP ? (
+            <Field label="Add-on" required error={err.tpAddOn}>
+              <select
+                data-field="tpAddOn" value={tpAddOn} className={inputCls(err.tpAddOn)}
+                onChange={(e) => setM(e.target.value === "Owner-Driver PA" ? { selectedAddOns: ["Owner-Driver PA"], addOnRequired: "Yes" } : { selectedAddOns: [], addOnRequired: e.target.value ? "No" : "" })}
+              >
+                <option value="">Select</option>
+                <option value="Owner-Driver PA">Owner-Driver PA</option>
+                <option value="Not Required">Not Required</option>
+              </select>
+            </Field>
+          ) : (active || notActive) && (
+            <Field label={active ? "Add-ons Required" : "Add-ons"} className="sm:col-span-2 lg:col-span-3">
+              <AddOnPicker options={ADD_ON_OPTIONS} value={m.selectedAddOns || []} onChange={(v) => setM({ selectedAddOns: v, addOnRequired: v.length ? "Yes" : "No" })} />
+            </Field>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // ============================================================
+  // 4. POLICY ISSUANCE — Motor
+  // ============================================================
+  const renderMotorIssuance = () => {
+    const m = motorDetails;
+    const corporate = m.ownerType === "Corporate";
+    const maxDate = getMaxDate();
+    const addOnOptions = m.policyType === "TP" ? ["Owner-Driver PA"] : uniq([...(acceptedQuote?.acceptedAddOns || []), ...ADD_ON_OPTIONS]);
+    return (
+      <div className="space-y-5">
+        <div>
+          <h4 className="text-md font-semibold text-indigo-600 mb-1">Add-ons in the Policy</h4>
+          <p className="text-xs text-gray-500 mb-2">
+            {acceptedQuote?.acceptedAddOns?.length ? `Taken from what ${acceptedQuote.insurerName} accepted — adjust if needed.` : "Select the add-ons the insurer accepted."}
+          </p>
+          <AddOnPicker options={addOnOptions} value={m.finalAddOns || []} onChange={(v) => setM({ finalAddOns: v })} dataField="finalAddOns" />
+        </div>
+
+        <div>
+          <h4 className="text-md font-semibold text-indigo-600 mb-3">Proposer Details{corporate ? " (Corporate owner)" : ""}</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Field label="Proposer Name" required error={err.motorProposerName} hint="Taken from the lead — you can change it">
+              <input data-field="motorProposerName" type="text" value={m.proposerName} onChange={(e) => setM({ proposerName: toUpperCase(e.target.value) })} className={cx(inputCls(err.motorProposerName), "uppercase")} />
+            </Field>
+            {!corporate && (
+              <Field label="Proposer DOB" required error={err.motorProposerDOB}>
+                <input data-field="motorProposerDOB" type="date" max={maxDate} value={m.proposerDOB} onChange={(e) => setM({ proposerDOB: e.target.value })} className={inputCls(err.motorProposerDOB)} />
+              </Field>
+            )}
+            {!corporate && (
+              <>
+                <Field label="Aadhaar Number" required error={err.motorAadhaar}>
+                  <input data-field="motorAadhaar" type="text" inputMode="numeric" maxLength="12" value={m.aadhaarNumber} onChange={(e) => setM({ aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} className={inputCls(err.motorAadhaar)} />
+                </Field>
+                <FileField label="Upload Aadhaar (Mandatory)" required error={err.motorAadhaarFile} dataField="motorAadhaarFile" value={m.aadhaarFile} onFile={(f) => setM({ aadhaarFile: f })} />
+              </>
+            )}
+            <Field label="PAN Number" required error={err.motorPan}>
+              <input data-field="motorPan" type="text" maxLength="10" value={m.panNumber} onChange={(e) => setM({ panNumber: e.target.value.toUpperCase().slice(0, 10) })} className={cx(inputCls(err.motorPan), "uppercase")} placeholder="ABCDE1234F" />
+            </Field>
+            <FileField label="Upload PAN (Mandatory)" required error={err.motorPanFile} dataField="motorPanFile" value={m.panFile} onFile={(f) => setM({ panFile: f })} />
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-md font-semibold text-indigo-600 mb-3">Vehicle Documents</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {m.policyType === "Brand New" ? (
+              <>
+                <FileField label="Upload Invoice (Mandatory)" required error={err.invoiceCopy} dataField="invoiceCopy" value={m.invoiceCopy} onFile={(f) => setM({ invoiceCopy: f })} hint="Auto-fetched from the Quote if uploaded there" />
+                <Field label="Engine No. (as per invoice)" required error={err.engineNo}>
+                  <input data-field="engineNo" type="text" value={m.engineNo} onChange={(e) => setM({ engineNo: e.target.value.toUpperCase() })} className={cx(inputCls(err.engineNo), "uppercase")} />
+                </Field>
+                <Field label="Chassis No. (as per invoice)" required error={err.chesisNo}>
+                  <input data-field="chesisNo" type="text" value={m.chesisNo} onChange={(e) => setM({ chesisNo: e.target.value.toUpperCase() })} className={cx(inputCls(err.chesisNo), "uppercase")} />
+                </Field>
+              </>
+            ) : (
+              <>
+                {renderRcUploads(true)}
+                {m.policyType !== "TP" && (
+                  <FileField label="Upload PYP for NCB Discount (Not Mandatory)" dataField="pypFile" value={m.pypFile} onFile={(f) => setM({ pypFile: f })} hint="Auto-fetched from the Quote" />
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h4 className="text-md font-semibold text-indigo-600 mb-3">Owner & Nominee</h4>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Field label={corporate ? "Owner (Company) Name" : "Owner Name"} required error={err.ownerName} hint="As per RC / invoice">
+              <input data-field="ownerName" type="text" value={m.ownerName} onChange={(e) => setM({ ownerName: toUpperCase(e.target.value) })} className={cx(inputCls(err.ownerName), "uppercase")} />
+            </Field>
+            {!corporate && (
+              <>
+                <Field label="Owner DOB" error={err.ownerDOB}>
+                  <input data-field="ownerDOB" type="date" max={maxDate} value={m.ownerDOB} onChange={(e) => setM({ ownerDOB: e.target.value })} className={inputCls(err.ownerDOB)} />
+                </Field>
+                <Field label="Nominee Name" required error={err.motorNomineeName}>
+                  <input data-field="motorNomineeName" type="text" value={m.nomineeName} onChange={(e) => setM({ nomineeName: toUpperCase(e.target.value) })} className={cx(inputCls(err.motorNomineeName), "uppercase")} />
+                </Field>
+                <Field label="DOB of Nominee" required error={err.motorNomineeDOB}>
+                  <input data-field="motorNomineeDOB" type="date" max={maxDate} value={m.nomineeDOB} onChange={(e) => setM({ nomineeDOB: e.target.value })} className={inputCls(err.motorNomineeDOB)} />
+                </Field>
+                <Field label="Relation" required error={err.motorNomineeRelationship}>
+                  <select data-field="motorNomineeRelationship" value={m.nomineeRelationship} onChange={(e) => setM({ nomineeRelationship: e.target.value })} className={inputCls(err.motorNomineeRelationship)}>
+                    <option value="">Select</option>
+                    {RELATIONSHIP_OPTIONS.filter((r) => r !== "Self").map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </Field>
+              </>
+            )}
+            <Field label="Remarks (If Any)" className="sm:col-span-2 lg:col-span-3">
+              <textarea rows="2" value={m.issuanceRemarks} onChange={(e) => setM({ issuanceRemarks: e.target.value })} className={inputCls()} />
+            </Field>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // QUOTE — insurers to request quotes from (multiple choice) + remarks
   const renderQuoteRequest = () => {
     const sel = workflowDetails.selectedInsurers || [];
     const unknown = sel.filter((n) => !isKnownInsurer(n));
+    const quotesLocked = sectionLocked("Quote");
     return (
       <div className="mt-2">
         <h4 className="text-md font-semibold text-indigo-600 mb-1">Quote Required From (Insurer List) <span className="text-red-500">*</span></h4>
         <p className="text-xs text-gray-500 mb-2">Select every insurer to request a quote from. {sel.length} selected.</p>
-        {quotesLocked && <div className="mb-2"><ReadOnlyNote>Insurer selection is locked because Payment has started.</ReadOnlyNote></div>}
         {unknown.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2 items-center">
             <span className="text-xs text-amber-700">Not in the current insurer list:</span>
@@ -1705,40 +1251,21 @@ export default function LeadCaseForm({
   const renderQuoteWorkflow = () => {
     const sel = workflowDetails.selectedInsurers || [];
     const quotes = workflowDetails.insurerQuotes || [];
-    const findQ = (ins) => quotes.find((q) => q.insurerName === ins) || { insurerName: ins, gstPercent: "18", quoteStatus: "Pending" };
+    const findQ = (ins) => quotes.find((q) => q.insurerName === ins) || { insurerName: ins, gstPercent: "18", quoteStatus: "Pending", acceptedAddOns: [] };
+    const requestedAddOns = sections.motor ? (motorDetails.selectedAddOns || []).filter((a) => a !== "Not Required") : [];
     if (!sel.length) return <ReadOnlyNote>No insurers were selected in the Quote module.</ReadOnlyNote>;
 
-    if (!isAdmin) {
-      return (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm border">
-            <thead className="bg-gray-50 text-left"><tr><th className="p-2">Insurer</th><th className="p-2">Net</th><th className="p-2">GST</th><th className="p-2">Gross</th><th className="p-2">Status</th></tr></thead>
-            <tbody>
-              {sel.map((ins) => {
-                const q = findQ(ins); const calc = computeQuote(q);
-                return (
-                  <tr key={ins} className="border-t">
-                    <td className="p-2">{ins}</td><td className="p-2">{q.netPremium ? fmt(q.netPremium) : "—"}</td>
-                    <td className="p-2">{q.netPremium ? fmt(calc.gstValue) : "—"}</td><td className="p-2">{q.netPremium ? fmt(calc.grossPremium) : "—"}</td>
-                    <td className="p-2"><span className={cx("px-2 py-0.5 rounded-full text-xs", statusBadge(q.quoteStatus))}>{q.quoteStatus || "Pending"}</span></td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <p className="text-xs text-gray-500 mt-2">Quotes are filled by Admin.</p>
-        </div>
-      );
-    }
+    const dataLocked = !isAdmin; // premiums, files, payout, accepted add-ons: Admin only
+    const anyPremium = sel.some((ins) => findQ(ins).netPremium);
 
     return (
       <div data-field="quoteStatus">
-        {quotesLocked && <div className="mb-3"><ReadOnlyNote>Quotes are locked because Payment has started.</ReadOnlyNote></div>}
+        {!isAdmin && !anyPremium && <div className="mb-3"><ReadOnlyNote>Admin is adding the insurer quotes. You can accept or reject a quote once its premium is in.</ReadOnlyNote></div>}
         {err.quoteStatus && <p className="text-red-500 text-sm mb-2">{err.quoteStatus}</p>}
         {sel.map((ins) => {
           const q = findQ(ins);
           const calc = computeQuote(q);
-          const L = quotesLocked;
+          const L = dataLocked;
           const k = (f) => `quote_${ins}_${f}`;
           return (
             <div key={ins} data-quote-card={ins} className={cx("border rounded-lg p-3 mb-3", q.quoteStatus === "Accepted" ? "border-emerald-300 bg-emerald-50/40" : "bg-gray-50")}>
@@ -1758,20 +1285,34 @@ export default function LeadCaseForm({
                 </Field>
                 <Field label="GST Value (auto)"><input type="text" readOnly value={fmt(calc.gstValue)} className={autoCls} /></Field>
                 <Field label="Gross Premium (auto)"><input type="text" readOnly value={fmt(calc.grossPremium)} className={cx(autoCls, "font-medium")} /></Field>
-                <Field label="Upload Quote">
-                  <ViewLink url={q.quoteUpload} label="View current quote" />
-                  <input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={L} onChange={(e) => e.target.files[0] && setQuoteFiles((p) => ({ ...p, [ins]: e.target.files[0] }))} className={inputCls(false, L)} />
+                <Field label={isAdmin ? "Upload Quote" : "Quote Document"}>
+                  <ViewLink url={q.quoteUpload} label="View quote" />
+                  {isAdmin ? (
+                    <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => e.target.files[0] && setQuoteFiles((p) => ({ ...p, [ins]: e.target.files[0] }))} className={inputCls()} />
+                  ) : !q.quoteUpload && <p className="text-sm text-gray-400">Not uploaded yet</p>}
                   <NewFileTag file={quoteFiles[ins]} />
                 </Field>
-                <Field label="Pay Out (%)" error={err[k("payout")]} hint="Insurer payout slab offered on this quote">
-                  <input data-field={k("payout")} type="number" min="0" max="100" disabled={L} value={q.payoutPercent ?? ""} onChange={(e) => updateQuote(ins, "payoutPercent", e.target.value)} className={inputCls(err[k("payout")], L)} />
-                </Field>
-                <Field label="Quote Status">
-                  <select disabled={L} value={q.quoteStatus || "Pending"} onChange={(e) => updateQuote(ins, "quoteStatus", e.target.value)} className={inputCls(false, L)}>
+                {!employeeView && (
+                  <Field label="Pay Out (%)" error={err[k("payout")]} hint="Insurer payout slab offered on this quote">
+                    <input data-field={k("payout")} type="number" min="0" max="100" value={q.payoutPercent ?? ""} onChange={(e) => updateQuote(ins, "payoutPercent", e.target.value)} className={inputCls(err[k("payout")])} />
+                  </Field>
+                )}
+                <Field label="Quote Status" hint={isAdmin ? undefined : "Accept / Reject / Pending — Employee & Admin"}>
+                  <select data-field={k("status")} value={q.quoteStatus || "Pending"} onChange={(e) => updateQuote(ins, "quoteStatus", e.target.value)} className={inputCls()}>
                     {QUOTE_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                   </select>
                 </Field>
               </div>
+              {sections.motor && (
+                <div className="mt-3">
+                  <label className="text-sm font-medium text-gray-700">Add-ons accepted by this insurer</label>
+                  {requestedAddOns.length > 0 && <p className="text-xs text-gray-500 mb-1">Requested: {requestedAddOns.join(", ")}</p>}
+                  <AddOnPicker
+                    options={uniq([...requestedAddOns, ...motorAddOnOptions()])} value={q.acceptedAddOns || []} disabled={L}
+                    onChange={(v) => updateQuote(ins, "acceptedAddOns", v)}
+                  />
+                </div>
+              )}
             </div>
           );
         })}
@@ -1795,6 +1336,7 @@ export default function LeadCaseForm({
       ["Gross Premium", fmt(calc.grossPremium)],
       ...(employeeView ? [] : [["Pay Out", acceptedQuote.payoutPercent !== undefined && acceptedQuote.payoutPercent !== "" ? `${acceptedQuote.payoutPercent}%` : "—"]]),
       ["Quote Status", acceptedQuote.quoteStatus],
+      ...(sections.motor ? [["Add-ons accepted", (acceptedQuote.acceptedAddOns || []).join(", ") || "None"]] : []),
     ];
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-emerald-50/50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm">
@@ -1857,12 +1399,12 @@ export default function LeadCaseForm({
           </Field>
           {first && (
             <>
-              <Field label="PAN Number" error={err[k("pan")]}>
+              <Field label="PAN Number" required={m.type === "proposer"} error={err[k("pan")]}>
                 <input data-field={k("pan")} type="text" maxLength="10" value={m.panNumber || ""} onChange={(e) => updateMember(i, "panNumber", e.target.value.toUpperCase().slice(0, 10))} className={cx(inputCls(err[k("pan")]), "uppercase")} placeholder="ABCDE1234F" />
               </Field>
-              <Field label="Upload PAN">
+              <Field label={m.type === "proposer" ? "Upload PAN Card (Mandatory)" : "Upload PAN Card"} required={m.type === "proposer"} error={err[k("panFile")]}>
                 <ViewLink url={m.panFile} />
-                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => e.target.files[0] && updateMember(i, "panFile", e.target.files[0])} className={inputCls()} />
+                <input data-field={k("panFile")} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => e.target.files[0] && updateMember(i, "panFile", e.target.files[0])} className={inputCls(err[k("panFile")])} />
                 <NewFileTag file={m.panFile} />
               </Field>
             </>
@@ -1912,6 +1454,31 @@ export default function LeadCaseForm({
             <textarea value={m.medicalRemarks || ""} rows="2" onChange={(e) => updateMember(i, "medicalRemarks", e.target.value)} className={inputCls()} />
           </Field>
         </div>
+        {first && healthDetails.policyType === "Individual" && renderNominee()}
+      </div>
+    );
+  };
+
+  // Nominee is part of the Proposer / Adult 1 details
+  const renderNominee = () => {
+    const h = healthDetails;
+    return (
+      <div className="mt-4 pt-3 border-t border-gray-200">
+        <h6 className="text-sm font-semibold text-gray-700 mb-2">Nominee</h6>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Field label="Nominee Name" required error={err.nomineeName}>
+            <input data-field="nomineeName" type="text" value={h.nomineeName || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeName: toUpperCase(e.target.value) }))} className={cx(inputCls(err.nomineeName), "uppercase")} />
+          </Field>
+          <Field label="Nominee DOB" required error={err.nomineeDOB}>
+            <input data-field="nomineeDOB" type="date" max={getMaxDate()} value={h.nomineeDOB || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeDOB: e.target.value }))} className={inputCls(err.nomineeDOB)} />
+          </Field>
+          <Field label="Nominee Relationship" required error={err.nomineeRelationship}>
+            <select data-field="nomineeRelationship" value={h.nomineeRelationship || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeRelationship: e.target.value }))} className={inputCls(err.nomineeRelationship)}>
+              <option value="">Select</option>
+              {RELATIONSHIP_OPTIONS.filter((r) => r !== "Self").map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+        </div>
       </div>
     );
   };
@@ -1922,20 +1489,15 @@ export default function LeadCaseForm({
     const maxDate = getMaxDate();
     return (
       <div>
-        {h.policyType === "Individual" && (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
-            <Field label="Nominee Name" required error={err.nomineeName}>
-              <input data-field="nomineeName" type="text" value={h.nomineeName || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeName: toUpperCase(e.target.value) }))} className={cx(inputCls(err.nomineeName), "uppercase")} />
-            </Field>
-            <Field label="Nominee DOB" required error={err.nomineeDOB}>
-              <input data-field="nomineeDOB" type="date" max={maxDate} value={h.nomineeDOB || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeDOB: e.target.value }))} className={inputCls(err.nomineeDOB)} />
-            </Field>
-            <Field label="Nominee Relationship" required error={err.nomineeRelationship}>
-              <select data-field="nomineeRelationship" value={h.nomineeRelationship || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, nomineeRelationship: e.target.value }))} className={inputCls(err.nomineeRelationship)}>
-                <option value="">Select</option>
-                {RELATIONSHIP_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </Field>
+        {h.proposerIsMember !== "Yes" && (
+          <div className="border rounded-lg p-4 mb-4 bg-indigo-50/40">
+            <h5 className="font-medium text-gray-700 mb-3">Proposer — {h.proposerName || formData.name} (not insured)</h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <Field label="Proposer PAN Number" required error={err.healthPan}>
+                <input data-field="healthPan" type="text" maxLength="10" value={h.panNumber || ""} onChange={(e) => setHealthDetails((p) => ({ ...p, panNumber: e.target.value.toUpperCase().slice(0, 10) }))} className={cx(inputCls(err.healthPan), "uppercase")} placeholder="ABCDE1234F" />
+              </Field>
+              <FileField label="Upload PAN Card (Mandatory)" required error={err.healthPanFile} dataField="healthPanFile" value={h.panFile} onFile={(f) => setHealthDetails((p) => ({ ...p, panFile: f }))} />
+            </div>
           </div>
         )}
 
@@ -2006,22 +1568,24 @@ export default function LeadCaseForm({
     if (!isAdmin) {
       return (
         <ReadOnlyNote>
-          Payment is handled by Admin. Payment Status: <b>{w.paymentStatus || "Pending"}</b>
+          Payment is handled by Admin. Payment Status: <b>{w.paymentStatus || "Payment Pending"}</b>
           {w.issuanceStatus ? <> · Status: <b>{w.issuanceStatus}</b></> : null}
           {w.policyNumber ? <> · Policy No: <b>{w.policyNumber}</b></> : null}
         </ReadOnlyNote>
       );
     }
-    const L = paymentLocked;
-    const pypDue = sections.motor ? motorDetails.odDueDate || motorDetails.tpDueDate : "";
+    const paid = w.paymentStatus === PAYMENT_DONE;
+    const statusOptions = getIssuanceStatusOptions(sections, instalment);
+    const pypDue = sections.motor && motorDetails.previousInsuranceStatus === PREVIOUS_POLICY_ACTIVE
+      ? (motorDetails.policyType === "TP" ? motorDetails.tpDueDate : motorDetails.odDueDate) || ""
+      : "";
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {L && <div className="sm:col-span-2 lg:col-span-3"><ReadOnlyNote>Saved as Policy Issued — payment and policy details are locked.</ReadOnlyNote></div>}
         <Field label="Final Net Premium" required error={err.finalNetPremium} hint={acceptedQuote ? `Accepted quote: ${fmt(acceptedQuote.netPremium)}` : undefined}>
-          <input data-field="finalNetPremium" type="number" min="0" disabled={L} value={w.finalNetPremium} onChange={(e) => setWf({ finalNetPremium: e.target.value })} className={inputCls(err.finalNetPremium, L)} />
+          <input data-field="finalNetPremium" type="number" min="0" value={w.finalNetPremium} onChange={(e) => setWf({ finalNetPremium: e.target.value })} className={inputCls(err.finalNetPremium)} />
         </Field>
         <Field label="GST %" error={err.finalGstPercent}>
-          <input data-field="finalGstPercent" type="number" min="0" max="100" disabled={L} value={w.finalGstPercent} onChange={(e) => setWf({ finalGstPercent: e.target.value })} className={inputCls(err.finalGstPercent, L)} />
+          <input data-field="finalGstPercent" type="number" min="0" max="100" value={w.finalGstPercent} onChange={(e) => setWf({ finalGstPercent: e.target.value })} className={inputCls(err.finalGstPercent)} />
         </Field>
         <Field label="GST Value (auto)"><input type="text" readOnly value={fmt(finalAmounts.gstValue)} className={autoCls} /></Field>
         <Field label="Gross Premium (auto)"><input type="text" readOnly value={fmt(finalAmounts.gross)} className={cx(autoCls, "font-medium")} /></Field>
@@ -2029,7 +1593,7 @@ export default function LeadCaseForm({
         {instalment && (
           <>
             <Field label={`EMI Net Premium (${formData.paymentTerm})`} required error={err.emiNetPremium}>
-              <input data-field="emiNetPremium" type="number" min="0" disabled={L} value={w.emiNetPremium} onChange={(e) => setWf({ emiNetPremium: e.target.value })} className={inputCls(err.emiNetPremium, L)} />
+              <input data-field="emiNetPremium" type="number" min="0" value={w.emiNetPremium} onChange={(e) => setWf({ emiNetPremium: e.target.value })} className={inputCls(err.emiNetPremium)} />
             </Field>
             <Field label="EMI GST Value (auto)"><input type="text" readOnly value={fmt(emiAmounts.gstValue)} className={autoCls} /></Field>
             <Field label="EMI Premium — Gross (auto)" hint={`${emiSchedule.total} EMIs over ${formData.policyTenure || "1 Year"}`}>
@@ -2040,77 +1604,92 @@ export default function LeadCaseForm({
 
         <Field label="Payment URL" className="sm:col-span-2">
           <div className="flex gap-2">
-            <input type="url" disabled={L} value={w.paymentUrl} onChange={(e) => setWf({ paymentUrl: e.target.value })} className={inputCls(false, L)} placeholder="https://..." />
+            <input type="url" value={w.paymentUrl} onChange={(e) => setWf({ paymentUrl: e.target.value })} className={inputCls()} placeholder="https://..." />
             {w.paymentUrl && (
               <a href={w.paymentUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm"><FaLink /> Open</a>
             )}
           </div>
         </Field>
         <Field label="Payment Status" required error={err.paymentStatus}>
-          <select data-field="paymentStatus" disabled={L} value={w.paymentStatus} onChange={(e) => setWf({ paymentStatus: e.target.value })} className={inputCls(err.paymentStatus, L)}>
+          <select
+            data-field="paymentStatus" value={w.paymentStatus} className={inputCls(err.paymentStatus)}
+            // moving back to Pending clears the Status — it only exists after Payment Done
+            onChange={(e) => setWf(e.target.value === PAYMENT_DONE ? { paymentStatus: e.target.value } : { paymentStatus: e.target.value, issuanceStatus: "", eMandateUrl: "", uwQuery: "" })}
+          >
             <option value="">Select</option>
             {PAYMENT_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
-        {w.paymentStatus === "Payment Done" && (
+
+        {!paid && (
+          <p className="sm:col-span-2 lg:col-span-3 text-xs text-gray-500 flex items-center gap-1">
+            <FaLock className="h-3 w-3" /> The policy Status opens once Payment Status is “Payment Done”.
+          </p>
+        )}
+
+        {paid && (
           <>
             <Field label="UTR Number">
-              <input type="text" disabled={L} value={w.utrNumber} onChange={(e) => setWf({ utrNumber: e.target.value })} className={inputCls(false, L)} />
+              <input type="text" value={w.utrNumber} onChange={(e) => setWf({ utrNumber: e.target.value })} className={inputCls()} />
             </Field>
-            <Field label="Payment Snapshot">
-              <ViewLink url={w.paymentSnapshot} label="View current snapshot" />
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={L} onChange={(e) => e.target.files[0] && setWf({ paymentSnapshot: e.target.files[0] })} className={inputCls(false, L)} />
-              <NewFileTag file={w.paymentSnapshot} />
+            <FileField label="Payment Snapshot" dataField="paymentSnapshot" value={w.paymentSnapshot} onFile={(f) => setWf({ paymentSnapshot: f })} />
+            <Field label="Status" required error={err.issuanceStatus} hint={instalment && !sections.motor ? "e-Mandate statuses are for EMI payments" : undefined}>
+              <select data-field="issuanceStatus" value={w.issuanceStatus} onChange={(e) => setWf({ issuanceStatus: e.target.value })} className={inputCls(err.issuanceStatus)}>
+                <option value="">Select</option>
+                {w.issuanceStatus && !statusOptions.includes(w.issuanceStatus) && <option value={w.issuanceStatus}>{w.issuanceStatus} (not valid here)</option>}
+                {statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
             </Field>
-            {instalment && (
-              <Field label="e-Mandate Status" required error={err.eMandateStatus}>
-                <select data-field="eMandateStatus" disabled={L} value={w.eMandateStatus} onChange={(e) => setWf({ eMandateStatus: e.target.value })} className={inputCls(err.eMandateStatus, L)}>
-                  <option value="">Select</option>
-                  {EMANDATE_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-                </select>
+
+            {w.issuanceStatus === "e-Mandate Link Shared" && (
+              <Field label="e-Mandate URL" required error={err.eMandateUrl} className="sm:col-span-2">
+                <input data-field="eMandateUrl" type="url" value={w.eMandateUrl} onChange={(e) => setWf({ eMandateUrl: e.target.value })} className={inputCls(err.eMandateUrl)} placeholder="https://..." />
               </Field>
             )}
-          </>
-        )}
-        <Field label="Status" required error={err.issuanceStatus}>
-          <select data-field="issuanceStatus" disabled={L} value={w.issuanceStatus} onChange={(e) => setWf({ issuanceStatus: e.target.value })} className={inputCls(err.issuanceStatus, L)}>
-            <option value="">Select</option>
-            {ISSUANCE_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </Field>
-        {w.issuanceStatus && w.issuanceStatus !== "Policy Issued" && (
-          <Field label="Reason Policy Not Issued (Remarks)" required error={err.notIssuedRemarks} className="sm:col-span-2">
-            <textarea data-field="notIssuedRemarks" rows="2" value={w.notIssuedRemarks} onChange={(e) => setWf({ notIssuedRemarks: e.target.value })} className={inputCls(err.notIssuedRemarks)} />
-          </Field>
-        )}
-        {w.issuanceStatus === "Policy Issued" && (
-          <>
-            <Field label="Policy Number" required error={err.policyNumber}>
-              <input data-field="policyNumber" type="text" disabled={L} value={w.policyNumber} onChange={(e) => setWf({ policyNumber: e.target.value })} className={inputCls(err.policyNumber, L)} />
-            </Field>
-            <Field label="Policy Issued On" required error={err.policyIssuedOn}>
-              <input data-field="policyIssuedOn" type="date" disabled={L} value={w.policyIssuedOn} onChange={(e) => setWf({ policyIssuedOn: e.target.value })} className={inputCls(err.policyIssuedOn, L)} />
-            </Field>
-            <Field label="Policy Start Date" required error={err.policyStartDate} hint={pypDue ? `Not before previous policy due date (${pypDue})` : undefined}>
-              <input
-                data-field="policyStartDate" type="date" disabled={L} min={pypDue || undefined} value={w.policyStartDate} className={inputCls(err.policyStartDate, L)}
-                onChange={(e) => {
-                  if (pypDue && new Date(e.target.value) < new Date(pypDue)) {
-                    alert("Policy Start Date cannot be earlier than the Previous Policy (PYP) Due Date");
-                    return;
-                  }
-                  setWf({ policyStartDate: e.target.value });
-                }}
-              />
-            </Field>
-            <Field label="Policy Expiry Date (auto)" hint="Start Date + Policy Tenure">
-              <input type="date" readOnly value={w.policyExpiryDate} className={autoCls} />
-            </Field>
-            <Field label="Upload Policy Copy">
-              <ViewLink url={w.policyCopy} label="View current policy copy" />
-              <input type="file" accept=".pdf" disabled={L} onChange={(e) => e.target.files[0] && setWf({ policyCopy: e.target.files[0] })} className={inputCls(false, L)} />
-              <NewFileTag file={w.policyCopy} />
-            </Field>
+
+            {w.issuanceStatus === "Referred to UW" && (
+              <div className="sm:col-span-2 lg:col-span-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-sm font-medium text-gray-700">UW Query <span className="text-red-500">*</span></label>
+                  <VoiceNoteButton onText={(t) => setWorkflowDetails((p) => ({ ...p, uwQuery: p.uwQuery ? `${p.uwQuery} ${t}` : t }))} />
+                </div>
+                <textarea data-field="uwQuery" rows="3" value={w.uwQuery} onChange={(e) => setWf({ uwQuery: e.target.value })} className={inputCls(err.uwQuery)} placeholder="Type or dictate the underwriter's query" />
+                {err.uwQuery && <p className="text-red-500 text-xs mt-1">{err.uwQuery}</p>}
+              </div>
+            )}
+
+            {(w.issuanceStatus === "Rejected" || ["Awaited for Inspection", "Inspection Done - Waiting for Policy"].includes(w.issuanceStatus)) && (
+              <Field label={w.issuanceStatus === "Rejected" ? "Rejection Reason" : "Remarks"} required={w.issuanceStatus === "Rejected"} error={err.notIssuedRemarks} className="sm:col-span-2 lg:col-span-3">
+                <textarea data-field="notIssuedRemarks" rows="2" value={w.notIssuedRemarks} onChange={(e) => setWf({ notIssuedRemarks: e.target.value })} className={inputCls(err.notIssuedRemarks)} />
+              </Field>
+            )}
+
+            {w.issuanceStatus === "Policy Issued" && (
+              <>
+                <Field label="Policy Number" required error={err.policyNumber}>
+                  <input data-field="policyNumber" type="text" value={w.policyNumber} onChange={(e) => setWf({ policyNumber: e.target.value })} className={inputCls(err.policyNumber)} />
+                </Field>
+                <Field label="Policy Issued On" required error={err.policyIssuedOn}>
+                  <input data-field="policyIssuedOn" type="date" value={w.policyIssuedOn} onChange={(e) => setWf({ policyIssuedOn: e.target.value })} className={inputCls(err.policyIssuedOn)} />
+                </Field>
+                <Field label="Policy Start Date" required error={err.policyStartDate} hint={pypDue ? `Not before previous policy expiry (${pypDue})` : undefined}>
+                  <input
+                    data-field="policyStartDate" type="date" min={pypDue || undefined} value={w.policyStartDate} className={inputCls(err.policyStartDate)}
+                    onChange={(e) => {
+                      if (pypDue && new Date(e.target.value) < new Date(pypDue)) {
+                        alert("Policy Start Date cannot be earlier than the previous policy expiry date");
+                        return;
+                      }
+                      setWf({ policyStartDate: e.target.value });
+                    }}
+                  />
+                </Field>
+                <Field label="Policy Expiry Date (auto)" hint="Start Date + Policy Tenure">
+                  <input type="date" readOnly value={w.policyExpiryDate} className={autoCls} />
+                </Field>
+                <FileField label="Upload Policy Copy" dataField="policyCopy" value={w.policyCopy} onFile={(f) => setWf({ policyCopy: f })} accept=".pdf" />
+              </>
+            )}
           </>
         )}
       </div>
@@ -2228,7 +1807,19 @@ export default function LeadCaseForm({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {sections.motor ? (
+          {sections.motor && (
+            <Field label="PayOut Basis" className="sm:col-span-2 lg:col-span-3" hint="BRD: Slab % on the Net Premium. Use the OD/TP split only if this insurer pays separate OD and TP slabs.">
+              <div className="flex flex-wrap gap-4 pt-1">
+                {PAYOUT_BASIS_OPTIONS.map((o) => (
+                  <label key={o} className="flex items-center gap-2 text-sm">
+                    <input type="radio" name="payoutBasis" value={o} checked={(p.payoutBasis || "Net Premium") === o} onChange={() => setP({ payoutBasis: o })} />
+                    {o === "Net Premium" ? "Slab % on Net Premium" : "Separate OD / TP slabs"}
+                  </label>
+                ))}
+              </div>
+            </Field>
+          )}
+          {sections.motor && p.payoutBasis === "OD/TP Split" ? (
             <>
               {hasOD && (
                 <>
@@ -2349,9 +1940,12 @@ export default function LeadCaseForm({
     const sel = w.selectedInsurers || [];
     const acceptedCalc = acceptedQuote ? computeQuote(acceptedQuote) : null;
     let headline;
-    if (stageIdx === IDX.QuoteWorkflow) headline = `Admin is collecting quotes from ${sel.length} insurer${sel.length === 1 ? "" : "s"}. You can still adjust the insurer list until a quote is accepted.`;
+    if (stageIdx === IDX.QuoteWorkflow) headline = (w.insurerQuotes || []).some((q) => q.netPremium)
+      ? "Quotes are in — review them below, mark one Accepted and use “Proceed with Accepted Quote”."
+      : `Admin is collecting quotes from ${sel.length} insurer${sel.length === 1 ? "" : "s"}.`;
     else if (stageIdx === IDX.PolicyIssuance) headline = "A quote has been accepted — fill the proposer & member details below, then use “Request for Payment URL”.";
     else if (w.issuanceStatus === "Policy Issued") headline = "Policy issued.";
+    else if (w.issuanceStatus === "Referred to UW") headline = `Referred to UW${w.uwQuery ? ` — query: ${w.uwQuery}` : ""}.`;
     else if (w.issuanceStatus) headline = `Policy status: ${w.issuanceStatus}${w.notIssuedRemarks ? ` — ${w.notIssuedRemarks}` : ""}.`;
     else headline = "Admin is processing the payment and policy issuance.";
     const row = (label, value) =>
@@ -2382,6 +1976,14 @@ export default function LeadCaseForm({
               <button type="button" onClick={() => navigator.clipboard?.writeText(w.paymentUrl)} className="text-xs px-2 py-1 border rounded-md hover:bg-white">Copy</button>
             </div>
           )}
+          {w.issuanceStatus === "e-Mandate Link Shared" && w.eMandateUrl && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">e-Mandate link for the customer:</span>
+              <a href={w.eMandateUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline break-all">{w.eMandateUrl}</a>
+              <button type="button" onClick={() => navigator.clipboard?.writeText(w.eMandateUrl)} className="text-xs px-2 py-1 border rounded-md hover:bg-white">Copy</button>
+            </div>
+          )}
+          {employeeReadOnly && <p className="text-xs text-gray-500 flex items-center gap-1"><FaLock className="h-3 w-3" /> Submitted — only Admin can edit this case now.</p>}
           {typeof w.policyCopy === "string" && w.policyCopy && <ViewLink url={w.policyCopy} label="Download policy copy" />}
         </div>
       </Section>
@@ -2398,7 +2000,7 @@ export default function LeadCaseForm({
       <StageStepper
         stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "Cashback", "Profit"].includes(x.key)) : visibleStages}
         current={caseStage}
-        labels={hideAdminModules ? { QuoteWorkflow: "Quotes (Admin)", Payment: "Payment & Issuance (Admin)" } : {}}
+        labels={hideAdminModules ? { QuoteWorkflow: "Quotes", Payment: "Payment & Issuance (Admin)" } : {}}
       />
       {hideAdminModules && currentStageDef.access === "admin" ? (
         <p className="text-xs text-gray-500 mb-2">
@@ -2413,16 +2015,16 @@ export default function LeadCaseForm({
         </p>
       )}
 
-      <Section n={num_("Lead")} title="Lead" icon={FaClipboardList} status={stageIdx > IDX.Lead ? "Done" : undefined}>
+      <Section n={num_("Lead")} title="Lead" icon={FaClipboardList} lock={lockFor("Lead")}>
         {renderLeadSection()}
       </Section>
 
       {reached("Quote") && (
-        <Section n={num_("Quote")} title="Quote" icon={FaFileAlt} status={stageIdx > IDX.Quote ? "Requested" : undefined}>
+        <Section n={num_("Quote")} title="Quote" icon={FaFileAlt} status={stageIdx > IDX.Quote ? "Requested" : undefined} lock={lockFor("Quote")}>
           {!formData.lob && <ReadOnlyNote>Select the LOB in the Lead module first.</ReadOnlyNote>}
           {sections.health && renderHealthQuote()}
           {!sections.health && formData.lob && renderPolicyTerms()}
-          {sections.motor && renderMotorForm()}
+          {sections.motor && renderMotorQuote()}
           {sections.electronic && renderElectronicForm()}
           {sections.pa && <PersonalAccidentForm details={paDetails} setDetails={setPaDetails} errors={err} insurerOptions={INSURER_OPTIONS} />}
           {sections.travel && <TravelInsuranceForm details={travelDetails} setDetails={setTravelDetails} errors={err} lead={formData} />}
@@ -2432,33 +2034,33 @@ export default function LeadCaseForm({
 
       {hideAdminModules && reached("QuoteWorkflow") && renderEmployeeStatus()}
 
-      {!hideAdminModules && reached("QuoteWorkflow") && (
-        <Section n={num_("QuoteWorkflow")} title="Quote Workflow" icon={FaClipboardList} adminOnly status={acceptedQuote ? `Accepted: ${acceptedQuote.insurerName}` : undefined}>
+      {reached("QuoteWorkflow") && (
+        <Section n={num_("QuoteWorkflow")} title={hideAdminModules ? "Quotes" : "Quote Workflow"} icon={FaClipboardList} status={acceptedQuote ? `Accepted: ${acceptedQuote.insurerName}` : undefined} lock={lockFor("QuoteWorkflow")}>
           {renderQuoteWorkflow()}
         </Section>
       )}
 
       {reached("PolicyIssuance") && (
-        <Section n={num_("PolicyIssuance")} title="Policy Issuance" icon={FaUsers}>
+        <Section n={num_("PolicyIssuance")} title="Policy Issuance" icon={FaUsers} lock={lockFor("PolicyIssuance")}>
           {renderAcceptedQuoteSummary()}
-          {sections.health ? renderHealthIssuance() : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
+          {sections.health ? renderHealthIssuance() : sections.motor ? renderMotorIssuance() : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
         </Section>
       )}
 
       {!hideAdminModules && reached("Payment") && (
-        <Section n={num_("Payment")} title="Payment for the Policy" icon={FaMoneyBillWave} adminOnly tone="emerald" status={workflowDetails.issuanceStatus || undefined}>
+        <Section n={num_("Payment")} title="Payment for the Policy" icon={FaMoneyBillWave} adminOnly tone="emerald" status={workflowDetails.issuanceStatus || undefined} lock={lockFor("Payment")}>
           {renderPayment()}
         </Section>
       )}
 
       {!hideAdminModules && reached("EmiDues") && instalment && (
-        <Section n={num_("EmiDues")} title="EMI Dues" icon={FaClock} adminOnly tone="emerald">
+        <Section n={num_("EmiDues")} title="EMI Dues" icon={FaClock} adminOnly tone="emerald" lock={lockFor("EmiDues")}>
           {renderEmiDues()}
         </Section>
       )}
 
       {!hideAdminModules && reached("Cashback") && (
-        <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly tone="amber">
+        <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly tone="amber" lock={lockFor("Cashback")}>
           {renderCashback()}
         </Section>
       )}
@@ -2478,9 +2080,13 @@ export default function LeadCaseForm({
           <p className="mr-auto text-sm text-gray-500 flex items-center gap-2"><FaClock /> Waiting for Admin: {currentStageDef.label}</p>
         )}
         <button type="button" onClick={onCancel} className="px-5 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300">Cancel</button>
-        <button type="button" onClick={onSave} disabled={isSubmitting} className="px-5 py-2 bg-white border border-indigo-600 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50 flex items-center gap-2">
-          <FaSave /> {mode === "create" ? (caseStage === "Lead" ? "Save Lead" : "Save Draft") : "Save"}
-        </button>
+        {employeeReadOnly ? (
+          <p className="mr-auto text-sm text-gray-500 flex items-center gap-2"><FaLock /> Submitted — only Admin can edit this case.</p>
+        ) : (
+          <button type="button" onClick={onSave} disabled={isSubmitting} className="px-5 py-2 bg-white border border-indigo-600 text-indigo-700 rounded-lg hover:bg-indigo-50 disabled:opacity-50 flex items-center gap-2">
+            <FaSave /> {mode === "create" ? (caseStage === "Lead" ? "Save Lead" : "Save Draft") : "Save"}
+          </button>
+        )}
         {canAdvance && (
           <button type="button" onClick={onAdvance} disabled={isSubmitting} className="px-5 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2">
             {isSubmitting ? "Saving..." : <>{currentStageDef.next} <FaArrowRight /></>}
