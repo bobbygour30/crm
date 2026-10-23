@@ -28,7 +28,11 @@ const LEGACY_PAYMENT_STATUS = {
   "Policy Issued": { paymentStatus: "Payment Done" },
 };
 
-export default function useLeadCase({ quoteFilePrefix = "quoteFile_" } = {}) {
+/**
+ * @param quoteFilePrefix  multipart field prefix for quote files ("quoteFile_" admin leads, "insurerQuoteFile_" employee leads)
+ * @param role             "auto" = from the logged-in user, "employee" = always employee view (employee panel)
+ */
+export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "auto" } = {}) {
   // ------------------------------------------------------------
   // STATE
   // ------------------------------------------------------------
@@ -56,7 +60,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_" } = {}) {
   // ------------------------------------------------------------
   const sections = useMemo(() => W.detectSections(formData.lob), [formData.lob]);
   const stageIdx = W.stageIndex(caseStage);
-  const isAdmin = isAdminUser();
+  const isAdmin = role === "employee" ? false : isAdminUser();
   const instalment = W.isInstalment(formData.paymentTerm);
   const acceptedQuote = W.getAcceptedQuote(workflowDetails);
   const sourceDependentField = SOURCE_FIELD_LABEL[formData.source] || "";
@@ -64,7 +68,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_" } = {}) {
   const nextStage = W.getNextStage(caseStage, formData.paymentTerm);
 
   // Quotes can't change once Payment has started; payment/policy fields lock once saved as Policy Issued
-  const quotesLocked = stageIdx > W.IDX.PolicyIssuance;
+  // Employees can change the insurer list only until Admin starts working on quotes' results
+  const quotesLocked = stageIdx > W.IDX.PolicyIssuance || (!isAdmin && stageIdx > W.IDX.QuoteWorkflow);
   const paymentLocked = savedIssued;
 
   const finalAmounts = W.computeAmount(workflowDetails.finalNetPremium, workflowDetails.finalGstPercent);

@@ -34,6 +34,7 @@ import {
   EXPERIENCE_YEARS_OPTIONS, ADD_ON_OPTIONS, QUOTE_STATUS_OPTIONS, PAYMENT_STATUS_OPTIONS, EMANDATE_STATUS_OPTIONS,
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
+  deriveCaseStatus, statusBadgeClass,
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -95,7 +96,7 @@ const ReadOnlyNote = ({ children }) => (
   </div>
 );
 
-const StageStepper = ({ stages, current }) => {
+const StageStepper = ({ stages, current, labels = {} }) => {
   const ci = stageIndex(current);
   return (
     <ol className="flex flex-wrap gap-2 mb-2" aria-label="Case progress">
@@ -115,7 +116,7 @@ const StageStepper = ({ stages, current }) => {
             aria-current={active ? "step" : undefined}
           >
             {done ? <FaCheck className="h-2.5 w-2.5" /> : <span className="font-semibold">{i + 1}</span>}
-            {s.label}
+            {labels[s.key] || s.label}
           </li>
         );
       })}
@@ -170,6 +171,7 @@ const VoiceNoteButton = ({ onText }) => {
 export default function LeadCaseForm({
   c,
   mode = "edit",            // "create" | "edit"
+  audience = "auto",        // "auto" | "employee" (employee panel: admin modules are not rendered at all)
   employees = [],
   channelPartners = [],
   isSubmitting = false,
@@ -189,6 +191,8 @@ export default function LeadCaseForm({
   } = c;
   const err = validationErrors;
   const reached = (key) => stageIdx >= IDX[key];
+  const employeeView = audience === "employee" || !isAdmin;
+  const hideAdminModules = audience === "employee";
   const canEdit = (key) => getStage(key).access === "all" || isAdmin;
   const currentStageDef = getStage(caseStage);
   const canAdvance = !!nextStage && canEdit(caseStage);
@@ -1574,7 +1578,7 @@ export default function LeadCaseForm({
               {POLICY_TENURE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
           </Field>
-          <Field label="Paying Term" required error={err.paymentTerm} hint={instalment ? "EMI Dues will be tracked after the policy is issued" : undefined}>
+          <Field label="Paying Term" required error={err.paymentTerm} hint={instalment ? (employeeView ? "Premium will be collected in instalments" : "EMI Dues will be tracked after the policy is issued") : undefined}>
             <select data-field="paymentTerm" value={formData.paymentTerm} onChange={(e) => setFormData((p) => ({ ...p, paymentTerm: e.target.value }))} className={inputCls(err.paymentTerm)}>
               <option value="">Select</option>
               {PAYMENT_TERM_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
@@ -1789,7 +1793,7 @@ export default function LeadCaseForm({
       ["GST %", `${num(acceptedQuote.gstPercent)}%`],
       ["GST Value", fmt(calc.gstValue)],
       ["Gross Premium", fmt(calc.grossPremium)],
-      ["Pay Out", acceptedQuote.payoutPercent !== undefined && acceptedQuote.payoutPercent !== "" ? `${acceptedQuote.payoutPercent}%` : "—"],
+      ...(employeeView ? [] : [["Pay Out", acceptedQuote.payoutPercent !== undefined && acceptedQuote.payoutPercent !== "" ? `${acceptedQuote.payoutPercent}%` : "—"]]),
       ["Quote Status", acceptedQuote.quoteStatus],
     ];
     return (
@@ -2337,17 +2341,77 @@ export default function LeadCaseForm({
   };
 
   // ============================================================
+  // EMPLOYEE: case status card (replaces the Admin modules)
+  // ============================================================
+  const renderEmployeeStatus = () => {
+    const w = workflowDetails;
+    const status = deriveCaseStatus(caseStage, w);
+    const sel = w.selectedInsurers || [];
+    const acceptedCalc = acceptedQuote ? computeQuote(acceptedQuote) : null;
+    let headline;
+    if (stageIdx === IDX.QuoteWorkflow) headline = `Admin is collecting quotes from ${sel.length} insurer${sel.length === 1 ? "" : "s"}. You can still adjust the insurer list until a quote is accepted.`;
+    else if (stageIdx === IDX.PolicyIssuance) headline = "A quote has been accepted — fill the proposer & member details below, then use “Request for Payment URL”.";
+    else if (w.issuanceStatus === "Policy Issued") headline = "Policy issued.";
+    else if (w.issuanceStatus) headline = `Policy status: ${w.issuanceStatus}${w.notIssuedRemarks ? ` — ${w.notIssuedRemarks}` : ""}.`;
+    else headline = "Admin is processing the payment and policy issuance.";
+    const row = (label, value) =>
+      value || value === 0 ? (
+        <div><p className="text-xs text-gray-500">{label}</p><p className="font-medium text-gray-800 break-words">{value}</p></div>
+      ) : null;
+    return (
+      <Section title="Case Status" icon={FaClock} tone="gray">
+        <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className={cx("px-2.5 py-0.5 rounded-full text-xs font-medium", statusBadgeClass(status))}>{status}</span>
+            <p className="text-sm text-gray-700">{headline}</p>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
+            {row("Insurers requested", sel.length ? sel.join(", ") : null)}
+            {row("Accepted insurer", acceptedQuote?.insurerName)}
+            {acceptedCalc && row("Gross premium (quote)", `₹ ${fmt(acceptedCalc.grossPremium)}`)}
+            {stageIdx >= IDX.Payment && row("Payment status", w.paymentStatus || "Pending")}
+            {w.issuanceStatus === "Policy Issued" && row("Policy number", w.policyNumber)}
+            {w.issuanceStatus === "Policy Issued" && row("Policy period", [w.policyStartDate, w.policyExpiryDate].filter(Boolean).join(" → "))}
+            {instalment && w.issuanceStatus === "Policy Issued" && row("EMIs received", `${emiSchedule.received} / ${emiSchedule.total}`)}
+            {instalment && w.issuanceStatus === "Policy Issued" && row(emiSchedule.renewalAlert ? "Renewal" : "Next EMI due", emiSchedule.renewalAlert ? "All EMIs received — renewal due" : emiSchedule.nextDue)}
+          </div>
+          {w.paymentUrl && stageIdx >= IDX.Payment && w.paymentStatus !== "Payment Done" && (
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-gray-600">Payment link for the customer:</span>
+              <a href={w.paymentUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline break-all">{w.paymentUrl}</a>
+              <button type="button" onClick={() => navigator.clipboard?.writeText(w.paymentUrl)} className="text-xs px-2 py-1 border rounded-md hover:bg-white">Copy</button>
+            </div>
+          )}
+          {typeof w.policyCopy === "string" && w.policyCopy && <ViewLink url={w.policyCopy} label="Download policy copy" />}
+        </div>
+      </Section>
+    );
+  };
+
+  // ============================================================
   // LAYOUT
   // ============================================================
   const num_ = (key) => visibleStages.findIndex((s) => s.key === key) + 1;
 
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate>
-      <StageStepper stages={visibleStages} current={caseStage} />
-      <p className="text-xs text-gray-500 mb-2">
-        Current module: <span className="font-medium text-gray-700">{currentStageDef.label}</span>
-        {nextStage ? <> — complete it and use <span className="font-medium">“{currentStageDef.next}”</span> to open the next module.</> : " — final module."}
-      </p>
+      <StageStepper
+        stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "Cashback", "Profit"].includes(x.key)) : visibleStages}
+        current={caseStage}
+        labels={hideAdminModules ? { QuoteWorkflow: "Quotes (Admin)", Payment: "Payment & Issuance (Admin)" } : {}}
+      />
+      {hideAdminModules && currentStageDef.access === "admin" ? (
+        <p className="text-xs text-gray-500 mb-2">
+          Current step: <span className="font-medium text-gray-700">
+            {workflowDetails.issuanceStatus === "Policy Issued" ? "Policy issued" : caseStage === "QuoteWorkflow" ? "Quotes — with Admin" : "Payment & Issuance — with Admin"}
+          </span>. Your details stay editable below.
+        </p>
+      ) : (
+        <p className="text-xs text-gray-500 mb-2">
+          Current module: <span className="font-medium text-gray-700">{currentStageDef.label}</span>
+          {nextStage ? <> — complete it and use <span className="font-medium">“{currentStageDef.next}”</span> to open the next module.</> : " — final module."}
+        </p>
+      )}
 
       <Section n={num_("Lead")} title="Lead" icon={FaClipboardList} status={stageIdx > IDX.Lead ? "Done" : undefined}>
         {renderLeadSection()}
@@ -2366,7 +2430,9 @@ export default function LeadCaseForm({
         </Section>
       )}
 
-      {reached("QuoteWorkflow") && (
+      {hideAdminModules && reached("QuoteWorkflow") && renderEmployeeStatus()}
+
+      {!hideAdminModules && reached("QuoteWorkflow") && (
         <Section n={num_("QuoteWorkflow")} title="Quote Workflow" icon={FaClipboardList} adminOnly status={acceptedQuote ? `Accepted: ${acceptedQuote.insurerName}` : undefined}>
           {renderQuoteWorkflow()}
         </Section>
@@ -2379,25 +2445,25 @@ export default function LeadCaseForm({
         </Section>
       )}
 
-      {reached("Payment") && (
+      {!hideAdminModules && reached("Payment") && (
         <Section n={num_("Payment")} title="Payment for the Policy" icon={FaMoneyBillWave} adminOnly tone="emerald" status={workflowDetails.issuanceStatus || undefined}>
           {renderPayment()}
         </Section>
       )}
 
-      {reached("EmiDues") && instalment && (
+      {!hideAdminModules && reached("EmiDues") && instalment && (
         <Section n={num_("EmiDues")} title="EMI Dues" icon={FaClock} adminOnly tone="emerald">
           {renderEmiDues()}
         </Section>
       )}
 
-      {reached("Cashback") && (
+      {!hideAdminModules && reached("Cashback") && (
         <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly tone="amber">
           {renderCashback()}
         </Section>
       )}
 
-      {reached("Profit") && isAdmin && (
+      {!hideAdminModules && reached("Profit") && isAdmin && (
         <Section n={num_("Profit")} title="Arshyan Profit" icon={FaChartLine} adminOnly tone="emerald">
           {renderProfit()}
         </Section>

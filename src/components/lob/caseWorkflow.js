@@ -91,6 +91,20 @@ export const CASE_STATUS_LIST = [
   "At UW", "Pending for e-Mandate", "Policy Issued", "Closed Without Issuance",
 ];
 
+// Badge colours for the derived status (lists + status cards)
+export const statusBadgeClass = (status) =>
+  ({
+    Open: "bg-yellow-100 text-yellow-800",
+    "Quote Requested": "bg-sky-100 text-sky-800",
+    "Quotation Generated": "bg-blue-100 text-blue-800",
+    "Payment Link Generated": "bg-purple-100 text-purple-800",
+    "Payment Done": "bg-green-100 text-green-800",
+    "At UW": "bg-orange-100 text-orange-800",
+    "Pending for e-Mandate": "bg-amber-100 text-amber-800",
+    "Policy Issued": "bg-emerald-100 text-emerald-800",
+    "Closed Without Issuance": "bg-red-100 text-red-800",
+  }[status] || "bg-gray-100 text-gray-700");
+
 // ============================================================
 // SMALL HELPERS
 // ============================================================
