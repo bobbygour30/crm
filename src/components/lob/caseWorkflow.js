@@ -13,6 +13,10 @@ import {
   isMotorLob, validateMotorPayout, computeMotorPayout, OTHER_MANUFACTURER, MOTOR_ISSUANCE_STATUS_OPTIONS,
   PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE,
 } from "./motorInsurance";
+import {
+  MOBILE_LOB, MOBILE_INSURERS, getChartPremium, checkPurchaseDate, usesImei, computeMobileProfit, MOBILE_MIN_PHOTOS,
+  composeMakeModel, productForInsurer,
+} from "./mobileInsurance";
 
 // ============================================================
 // CONSTANTS
@@ -20,13 +24,14 @@ import {
 // Motor BRD: LOB "Motor Insurance" -> Vehicle Type -> Policy Type (Brand New / SAOD / Comprehensive / TP).
 // The older per-vehicle motor LOBs are no longer offered; leads saved with them still open
 // (their vehicle + policy type are worked out by motorDefaultsFromLob).
+export const LEGACY_MOBILE_LOBS = ["Mobile/Electronic Equipment Insurance"];
 export const LEGACY_MOTOR_LOBS = [
   "Private Car-OD", "Private Car-SOD", "Private Car-Comprehensive", "Private Car-TP",
   "Taxi-Comprehensive", "Taxi-TP", "Commercial Vehicle-Comprehensive", "Commercial Vehicle-TP",
   "E-Rikshaw-TP", "E-Rikshaw-Comprehensive", "Two-Wheeler-TP", "New Vehicle Insurance", "New Two Wheeler Insurance",
 ];
 export const LOB_OPTIONS = [
-  "Health Insurance", "Motor Insurance", "Mobile/Electronic Equipment Insurance", "My Home",
+  "Health Insurance", "Motor Insurance", MOBILE_LOB, "My Home",
   "Mediclaim Health Insurance", "Bharat Sookshma Udyam Suraksha", "Bharat Laghu Udyam Suraksha",
   "Bharat Grih Raksha", "Burglary", "MARINE-OPEN", "MARINE-SPECIFIC", "MARINE-STOP",
   "PERSONAL ACCIDENT", "Employee Compensation", "Group Health Insurance", "Terms Insurance",
@@ -90,6 +95,7 @@ export const PAYMENT_STATUS_OPTIONS = ["Payment Done", "Payment Pending"];
 export const EMANDATE_ISSUANCE_STATUSES = ["e-Mandate Link Shared", "e-Mandate Done", "e-Mandate Pending"];
 export const ISSUANCE_STATUS_OPTIONS = [...EMANDATE_ISSUANCE_STATUSES, "Referred to UW", "Policy Issued", "Rejected"]; // health & others
 export { MOTOR_ISSUANCE_STATUS_OPTIONS };
+export { MOBILE_INSURERS, getChartPremium, composeMakeModel, productForInsurer };
 /** Status options after Payment Done: motor = inspection statuses; others = e-Mandate (EMI only), UW, Issued, Rejected */
 export const getIssuanceStatusOptions = (sections = {}, instalment = false) => {
   if (sections.motor) return [...MOTOR_ISSUANCE_STATUS_OPTIONS, "Rejected"];
@@ -226,12 +232,20 @@ export const STAGES = [
   { key: "PolicyIssuance", label: "Policy Issuance", access: "all", next: "Request for Payment URL" },
   { key: "Payment", label: "Payment", access: "admin", next: "EMI / Premium Details" },
   { key: "EmiDues", label: "EMI Dues", access: "admin", next: "PayOut & Cashback" },
+  // Mobile BRD only: Arshyan buys the policy from the insurer — insurer premium, payout, insurer copy
+  { key: "InsurerCalc", label: "Arshyan Calculation", access: "admin", next: "PayOut & Cashback" },
   { key: "Cashback", label: "Cashback / PayOut", access: "admin", next: "Arshyan Profit" },
   { key: "Profit", label: "Arshyan Profit", access: "admin", next: null },
 ];
 export const STAGE_KEYS = STAGES.map((s) => s.key);
 export const IDX = Object.fromEntries(STAGE_KEYS.map((k, i) => [k, i]));
 export const stageIndex = (key) => (key in IDX ? IDX[key] : 0);
+/** Button text for moving on from a module (Mobile: Payment -> Arshyan Calculation) */
+export const nextActionLabel = (current, nextKey) => {
+  if (current === "Payment" && nextKey === "InsurerCalc") return "Arshyan Calculation";
+  if (current === "Payment" && nextKey === "Cashback") return "PayOut & Cashback";
+  return getStage(current).next;
+};
 export const getStage = (key) => STAGES[stageIndex(key)];
 
 // ============================================================
@@ -376,14 +390,15 @@ export const newQuote = (insurerName) => ({
 // QUOTE / PAYMENT AMOUNTS
 // GST % = 0 now really means 0 (old code did `gst || 18`, turning 0 into 18)
 // ============================================================
-export const computeAmount = (net, gstPercent) => {
+// roundToRupee: Mobile premium chart rounds GST to the whole rupee (e.g. 7414 x 18% = 1335)
+export const computeAmount = (net, gstPercent, roundToRupee = false) => {
   const n = num(net);
   const g = num(gstPercent);
-  const gstValue = round2((n * g) / 100);
+  const gstValue = roundToRupee ? Math.round((n * g) / 100) : round2((n * g) / 100);
   return { net: n, gstPercent: g, gstValue, gross: round2(n + gstValue) };
 };
 export const computeQuote = (q = {}) => {
-  const { gstValue, gross } = computeAmount(q.netPremium, q.gstPercent);
+  const { gstValue, gross } = computeAmount(q.netPremium, q.gstPercent, !!q.roundGst);
   return { gstValue, grossPremium: gross };
 };
 export const getAcceptedQuote = (wf = {}) =>
@@ -394,7 +409,18 @@ export const getAcceptedQuote = (wf = {}) =>
 // ============================================================
 // CASHBACK / PAYOUT TO CUSTOMER / EMPLOYEE (BRD rows 106-114)
 // ============================================================
-export const computeCashback = ({ cashback = {}, paymentTerm, emiReceivedCount }) => {
+export const computeCashback = ({ cashback = {}, paymentTerm, emiReceivedCount, mobile = false }) => {
+  if (mobile) {
+    const storePayout = round2(cashback.storePayout);
+    const promoterPayout = round2(cashback.promoterPayout);
+    const total = round2(storePayout + promoterPayout);
+    const status = cashback.status || "Pending";
+    const settledAmount = status === "Settled" ? total : status === "Partial Settled" ? num(cashback.settledAmount) : 0;
+    return {
+      payoutMode: "One Time", payoutCount: 1, amountPerPayment: total, storePayout, promoterPayout, payoutAmount: total, status,
+      settledAmount: round2(settledAmount), pendingAmount: round2(Math.max(0, total - settledAmount)), totalPayout: total,
+    };
+  }
   const instalment = isInstalment(paymentTerm);
   const payoutMode = instalment ? "On Each Payment" : "One Time";
   const payoutCount = instalment ? Math.max(0, parseInt(emiReceivedCount, 10) || 0) : 1;
@@ -416,7 +442,11 @@ export const computeCashback = ({ cashback = {}, paymentTerm, emiReceivedCount }
 //   Arshyan Profit      = Grand Total - Total PayOut (cashback to customer/employee)
 // Motor: Insurer PayOut each = OD premium x OD slab + TP premium x TP slab.
 // ============================================================
-export const computeProfit = ({ payout = {}, workflow = {}, paymentTerm, isMotor = false, insuranceType = "", cashbackTotal = 0 }) => {
+export const computeProfit = ({ payout = {}, workflow = {}, paymentTerm, isMotor = false, insuranceType = "", cashbackTotal = 0, isMobile = false }) => {
+  if (isMobile) {
+    const chartGross = computeAmount(workflow.finalNetPremium, workflow.finalGstPercent, true).gross;
+    return computeMobileProfit({ payout, chartGross, cashbackTotal });
+  }
   const instalment = isInstalment(paymentTerm);
   const paymentCount = instalment ? Math.max(0, parseInt(workflow.emiReceivedCount, 10) || 0) : 1;
   const netPerPayment = instalment ? num(workflow.emiNetPremium) : num(workflow.finalNetPremium);
@@ -494,11 +524,13 @@ export const inferStage = (lead = {}) => {
 };
 
 /** Stages shown in the stepper (EMI Dues hidden when Paying Term is One Time) */
-export const getVisibleStages = (paymentTerm) =>
-  STAGES.filter((s) => s.key !== "EmiDues" || isInstalment(paymentTerm));
+export const getVisibleStages = (paymentTerm, lob) =>
+  STAGES.filter(
+    (s) => (s.key !== "EmiDues" || isInstalment(paymentTerm)) && (s.key !== "InsurerCalc" || isElectronicLob(lob))
+  );
 
-export const getNextStage = (current, paymentTerm) => {
-  const visible = getVisibleStages(paymentTerm);
+export const getNextStage = (current, paymentTerm, lob) => {
+  const visible = getVisibleStages(paymentTerm, lob);
   const i = visible.findIndex((s) => s.key === current);
   if (i === -1) {
     // current stage hidden (e.g. EmiDues after Paying Term changed) -> next visible one
@@ -524,6 +556,10 @@ export const emptyHealthDetails = () => ({
   portabilityDetails: [], medicalRemarks: "", members: [], proposerIsMember: "",
 });
 export const emptyElectronicDetails = () => ({
+  // Mobile BRD (Quote): make & model as Company_Model_RAM_Storage, address as per Aadhaar
+  deviceBrand: "", deviceModel: "", ram: "", storage: "", makeModel: "", addressAsPerAadhaar: "",
+  // Mobile BRD (Policy Issuance)
+  invoiceInProposerName: "", invoiceHolderRelation: "", issuanceRemarks: "",
   deviceType: "", otherDeviceType: "", dateOfPurchase: "", purchaseValue: "", aadhaarNumber: "", aadhaarFile: null,
   panNumber: "", panFile: null, imeiNumber: "", imeiImage: null, devicePhotos: [], purchaseInvoice: null,
 });
@@ -533,13 +569,18 @@ export const emptyWorkflow = () => ({
   finalNetPremium: "", finalGstPercent: DEFAULT_QUOTE_GST_PERCENT, emiNetPremium: "",
   paymentUrl: "", paymentStatus: "", utrNumber: "", paymentSnapshot: null,
   issuanceStatus: "", notIssuedRemarks: "", eMandateUrl: "", uwQuery: "",
+  paymentTakenMode: "", paymentQr: null, insurerPolicyCopy: null, // Mobile BRD
   policyNumber: "", policyIssuedOn: "", policyStartDate: "", policyExpiryDate: "", policyCopy: null,
   emiReceivedCount: "", lastEmiPaidOn: "",
   workflowRemarks: "",
 });
-export const emptyCashback = () => ({ payoutTo: "Customer", amountPerPayment: "", status: "Pending", settledAmount: "" });
+export const emptyCashback = () => ({
+  payoutTo: "Customer", amountPerPayment: "", status: "Pending", settledAmount: "",
+  storePayout: "", promoterPayout: "", // Mobile BRD
+});
 export const emptyPayout = () => ({
   payoutBasis: "Net Premium", // Motor: "Net Premium" (BRD) or "OD/TP Split"
+  insurerNetPremium: "", // Mobile: premium Arshyan pays the insurer
   payoutSlabPercent: "", gstPayoutPercent: String(DEFAULT_GST_PAYOUT_PERCENT), tdsPercent: String(DEFAULT_TDS_PERCENT),
   odPremium: "", tpPremium: "", odPayoutPercent: "", tpPayoutPercent: "",
 });
@@ -707,16 +748,53 @@ const validateMotorIssuance = (ctx, e) => {
 
 const validateElectronicQuote = (ctx, e) => {
   const d = ctx.electronicDetails;
-  if (!d.deviceType) e("deviceType", "Device type is required");
-  if (!d.dateOfPurchase) e("dateOfPurchase", "Date of Purchase is required");
-  if (!d.purchaseValue) e("purchaseValue", "Purchase Value is required");
-  if (d.aadhaarNumber && !validateAadhaar(d.aadhaarNumber)) e("electronicAadhaar", "Aadhaar must be exactly 12 digits");
-  if (d.panNumber && !validatePAN(d.panNumber)) e("electronicPan", "PAN format: ABCDE1234F");
-  if (d.dateOfPurchase) {
-    const days = Math.floor((new Date() - new Date(d.dateOfPurchase)) / 86400000);
-    if (days > 15 && !d.imeiNumber) e("imeiNumber", "IMEI Number is required for devices older than 15 days");
+  const f = ctx.formData;
+  if (!f.policyTenure) e("policyTenure", "Policy Tenure is required (1 / 2 / 3 Years)");
+  if (!(num(d.purchaseValue) > 0)) e("purchaseValue", "Invoice Price incl. GST / Sum Insured is required (digits)");
+  if (!d.deviceType) e("deviceType", "Device Type is required");
+  if (d.deviceType === "Other" && !String(d.otherDeviceType || "").trim()) e("otherDeviceType", "Specify the device type");
+  const dateErr = checkPurchaseDate(d.dateOfPurchase);
+  if (dateErr) e("dateOfPurchase", dateErr);
+  if (!String(d.deviceBrand || "").trim()) e("deviceBrand", "Company Name is required (Make & Model)");
+  if (!String(d.deviceModel || "").trim()) e("deviceModel", "Model is required (Make & Model)");
+  if (d.deviceType && d.deviceType !== "Other") {
+    if (!String(d.ram || "").trim()) e("ram", "RAM is required (Make & Model)");
+    if (!String(d.storage || "").trim()) e("storage", "Internal Storage is required (Make & Model)");
   }
-  if (d.imeiNumber && !/^[0-9]{15}$/.test(d.imeiNumber)) e("imeiNumber", "IMEI number must be 15 digits");
+  if (!String(d.addressAsPerAadhaar || "").trim()) e("addressAsPerAadhaar", "Full Address as per Aadhaar is required");
+  else if (!/\b\d{6}\b/.test(d.addressAsPerAadhaar)) e("addressAsPerAadhaar", "Add the 6-digit PIN code to the address");
+  const bad = (ctx.workflowDetails.selectedInsurers || []).filter((x) => !MOBILE_INSURERS.includes(x));
+  if (bad.length) e("selectedInsurers", `Mobile Insurance quotes are from TATA AIG / Bajaj General only (remove ${bad.join(", ")})`);
+};
+
+const validateMobileIssuance = (ctx, e) => {
+  const d = ctx.electronicDetails;
+  if (!d.purchaseInvoice) e("purchaseInvoice", "Upload the Invoice (not uploaded in the Quote)");
+  const photos = (d.devicePhotos || []).length;
+  if (photos < MOBILE_MIN_PHOTOS) e("devicePhotos", `Upload at least ${MOBILE_MIN_PHOTOS} device photos (${photos} so far)`);
+  if (usesImei(d.deviceType)) {
+    if (!d.imeiNumber) e("imeiNumber", "IMEI Number is required");
+    else if (!/^[0-9]{15}$/.test(d.imeiNumber)) e("imeiNumber", "IMEI Number must be 15 digits");
+    if (!d.imeiImage) e("imeiImage", "Upload the IMEI screenshot (dial *#06#)");
+  } else {
+    if (!String(d.imeiNumber || "").trim()) e("imeiNumber", "Serial Number is required");
+    if (!d.imeiImage) e("imeiImage", "Upload a photo of the serial number");
+  }
+  if (!d.invoiceInProposerName) e("invoiceInProposerName", "Is the invoice in the proposer's name?");
+  if (d.invoiceInProposerName === "No" && !d.invoiceHolderRelation) e("invoiceHolderRelation", "Select the proposer's relation with the invoice holder");
+  if (!d.aadhaarNumber) e("electronicAadhaar", "Aadhaar Number is required");
+  else if (!validateAadhaar(d.aadhaarNumber)) e("electronicAadhaar", "Aadhaar must be exactly 12 digits");
+  if (!d.aadhaarFile) e("electronicAadhaarFile", "Upload Aadhaar (mandatory)");
+  if (d.panNumber && !validatePAN(d.panNumber)) e("electronicPan", "PAN format: ABCDE1234F");
+};
+
+const validateInsurerCalcStage = (ctx, e) => {
+  const p = ctx.payoutDetails;
+  if (!(num(p.insurerNetPremium) > 0)) e("insurerNetPremium", "Enter the Insurer Net Premium");
+  ["payoutSlabPercent", "gstPayoutPercent", "tdsPercent"].forEach((k) => {
+    if (!isBlank(p[k]) && (num(p[k]) < 0 || num(p[k]) > 100)) e(`profit_${k}`, "Percent must be between 0 and 100");
+  });
+  if (ctx.advancing && isBlank(p.payoutSlabPercent)) e("profit_payoutSlabPercent", "Enter the PayOut %");
 };
 
 const validateQuoteStage = (ctx, e) => {
@@ -746,6 +824,7 @@ const validateQuoteWorkflowStage = (ctx, e) => {
 
 const validateIssuanceStage = (ctx, e) => {
   if (ctx.sections.motor) validateMotorIssuance(ctx, e);
+  if (ctx.sections.electronic) validateMobileIssuance(ctx, e);
   if (!ctx.sections.health) return;
   const h = ctx.healthDetails;
   const members = h.members || [];
@@ -831,6 +910,11 @@ const validatePaymentStage = (ctx, e) => {
   if (num(w.finalGstPercent) < 0 || num(w.finalGstPercent) > 100) e("finalGstPercent", "GST % must be 0-100");
   if (isInstalment(term) && !(num(w.emiNetPremium) > 0)) e("emiNetPremium", "EMI Net Premium is required (Paying Term is not One Time)");
   if (!w.paymentStatus) e("paymentStatus", "Payment Status is required");
+  if (ctx.sections.electronic && ctx.advancing) {
+    if (!w.paymentTakenMode) e("paymentTakenMode", "Select the Payment Taken Mode (URL / QR)");
+    else if (w.paymentTakenMode === "URL" && !String(w.paymentUrl || "").trim()) e("paymentUrl", "Paste the payment URL");
+    else if (w.paymentTakenMode === "QR" && !w.paymentQr) e("paymentQr", "Upload the payment QR");
+  }
   checkPaymentSteps(ctx, e);
   if (ctx.advancing) {
     if (w.paymentStatus !== PAYMENT_DONE) e("paymentStatus", "Payment must be Done before moving on");
@@ -856,6 +940,16 @@ const validateEmiStage = (ctx, e) => {
 
 const validateCashbackStage = (ctx, e) => {
   const c = ctx.cashbackDetails;
+  if (ctx.sections.electronic) {
+    ["storePayout", "promoterPayout"].forEach((k) => { if (num(c[k]) < 0) e(k, "Amount cannot be negative"); });
+    if (!c.status) e("cashbackStatus", "Select the PayOut Status");
+    if (c.status === "Partial Settled") {
+      const total = num(c.storePayout) + num(c.promoterPayout);
+      if (!(num(c.settledAmount) > 0)) e("cashbackSettled", "Enter the amount settled so far");
+      else if (num(c.settledAmount) >= total) e("cashbackSettled", "Partially settled amount must be less than the Total Cashback / PayOut");
+    }
+    return;
+  }
   if (isBlank(c.amountPerPayment)) e("cashbackAmount", "Enter PayOut Amt against each Payment (0 if none)");
   else if (num(c.amountPerPayment) < 0) e("cashbackAmount", "PayOut amount cannot be negative");
   if (!c.status) e("cashbackStatus", "Select the PayOut Status");
@@ -868,6 +962,7 @@ const validateCashbackStage = (ctx, e) => {
 
 const validateProfitStage = (ctx, e) => {
   const p = ctx.payoutDetails;
+  if (ctx.sections.electronic) return; // Mobile: inputs live in the Arshyan Calculation module
   ["payoutSlabPercent", "gstPayoutPercent", "tdsPercent"].forEach((k) => {
     if (!isBlank(p[k]) && (num(p[k]) < 0 || num(p[k]) > 100)) e(`profit_${k}`, "Percent must be between 0 and 100");
   });
@@ -896,6 +991,7 @@ const STAGE_VALIDATORS = {
   Payment: validatePaymentStage,
   EmiDues: validateEmiStage,
   Cashback: validateCashbackStage,
+  InsurerCalc: validateInsurerCalcStage,
   Profit: validateProfitStage,
 };
 
@@ -926,6 +1022,8 @@ export const validateFormats = (ctx) => {
     const d = ctx.electronicDetails || {};
     if (d.aadhaarNumber && !validateAadhaar(d.aadhaarNumber)) e("electronicAadhaar", "Aadhaar must be exactly 12 digits");
     if (d.panNumber && !validatePAN(d.panNumber)) e("electronicPan", "PAN format: ABCDE1234F");
+    if (d.dateOfPurchase && checkPurchaseDate(d.dateOfPurchase)) e("dateOfPurchase", checkPurchaseDate(d.dateOfPurchase));
+    if (usesImei(d.deviceType) && d.imeiNumber && !/^[0-9]{15}$/.test(d.imeiNumber)) e("imeiNumber", "IMEI Number must be 15 digits");
   }
   if (ctx.stageIdx >= IDX.QuoteWorkflow) validateQuoteWorkflowStage({ ...ctx }, (f, m) => {
     if (!/Accepted|accepted quote/.test(m)) e(f, m);
@@ -974,6 +1072,8 @@ export const collectDocuments = (lead) => {
   (w.insurerQuotes || []).forEach((q) => add(`Quote — ${q.insurerName}`, q.quoteUpload, "Quotes"));
   add("Payment Snapshot", w.paymentSnapshot, "Payment");
   add("Policy Copy", w.policyCopy, "Policy");
+  add("Payment QR", w.paymentQr, "Payment");
+  add("Insurer Policy Copy", w.insurerPolicyCopy, "Policy");
   ["paDetails", "travelDetails"].forEach((k) => {
     const d = lead[k] || {};
     Object.entries(d).forEach(([field, v]) => {

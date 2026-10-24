@@ -22,6 +22,11 @@ import {
   FaClock, FaUsers, FaLink, FaBell, FaHandHoldingUsd, FaChartLine, FaFolderOpen, FaClipboardList, FaLockOpen,
 } from "react-icons/fa";
 import PersonalAccidentForm from "./PersonalAccidentForm";
+import {
+  MOBILE_DEVICE_TYPES, MOBILE_TENURE_OPTIONS, MOBILE_INSURERS, INVOICE_HOLDER_RELATIONS, PAYMENT_TAKEN_MODES,
+  MOBILE_MIN_PHOTOS, MOBILE_CHART_MAX, productForInsurer, usesImei, purchaseDateBounds, composeMakeModel,
+  openMobileQuoteDocument, openMobilePolicyDocument,
+} from "./mobileInsurance";
 import TravelInsuranceForm from "./TravelInsuranceForm";
 import {
   OTHER_MANUFACTURER, getManufacturerOptions, isManufacturerValidForType, getMotorPremiumParts,
@@ -37,7 +42,7 @@ import {
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
   deriveCaseStatus, statusBadgeClass, getIssuanceStatusOptions, PAYOUT_BASIS_OPTIONS, normalizeRegistration,
-  PAYMENT_DONE,
+  PAYMENT_DONE, nextActionLabel,
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -239,7 +244,7 @@ export default function LeadCaseForm({
     workflowDetails, setWorkflowDetails, cashbackDetails, setCashbackDetails, payoutDetails, setPayoutDetails,
     caseStage, savedLead, quoteFiles, setQuoteFiles, validationErrors, validationPopup, setValidationPopup,
     showAddOnModal, setShowAddOnModal, isFetchingPin, pinFetchError,
-    sections, stageIdx, isAdmin, instalment, acceptedQuote, sourceDependentField, visibleStages, nextStage,
+    sections, stageIdx, isAdmin, instalment, acceptedQuote, sourceDependentField, visibleStages, nextStage, chartPremium,
     finalAmounts, emiAmounts, emiSchedule, cashbackCalc, profitCalc,
     toggleInsurer, updateQuote, updateMember, updateMemberRider, updatePortability, scrollToError,
   } = c;
@@ -248,7 +253,7 @@ export default function LeadCaseForm({
   const employeeView = audience === "employee" || !isAdmin;
   const hideAdminModules = audience === "employee";
   const canEdit = (key) => getStage(key).access === "all" || isAdmin;
-  const currentStageDef = getStage(caseStage);
+  const currentStageDef = { ...getStage(caseStage), next: nextActionLabel(caseStage, nextStage) };
   const canAdvance = !!nextStage && canEdit(caseStage);
 
   // ---- Submitted modules are locked; Admin can unlock one with "Edit" ----
@@ -326,273 +331,148 @@ export default function LeadCaseForm({
 
 
   // ============================================================
-  // RENDER: ELECTRONIC FORM
+  // MOBILE INSURANCE (Mobile BRD) — Quote
   // ============================================================
-  const renderElectronicForm = () => {
-    const isDeviceOlderThan15Days = () => {
-      if (!electronicDetails.dateOfPurchase) return false;
-      const purchaseDate = new Date(electronicDetails.dateOfPurchase);
-      const today = new Date();
-      const diffDays = Math.floor((today - purchaseDate) / (1000 * 60 * 60 * 24));
-      return diffDays > 15;
-    };
+  const setE = (patch) => setElectronicDetails((p) => ({ ...p, ...patch }));
 
-    const maxDate = getMaxDate();
-
+  const DevicePhotos = ({ required }) => {
+    const photos = electronicDetails.devicePhotos || [];
     return (
-      <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-        <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-          <FaMobileAlt /> Mobile/Electronic Equipment Details
-        </h3>
+      <Field
+        label={`Device Pictures (${MOBILE_MIN_PHOTOS}-4)${required ? " — Mandatory" : " (Not Mandatory)"}`} required={required}
+        error={err.devicePhotos} className="sm:col-span-2 lg:col-span-3"
+        hint={`${photos.length} added${required && photos.length < MOBILE_MIN_PHOTOS ? ` — add ${MOBILE_MIN_PHOTOS - photos.length} more` : ""}`}
+      >
+        <input
+          data-field="devicePhotos" type="file" multiple accept=".jpg,.jpeg,.pdf" className={inputCls(err.devicePhotos)}
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            if (files.length) setE({ devicePhotos: [...photos, ...files].slice(0, 6) });
+            e.target.value = "";
+          }}
+        />
+        {photos.length > 0 && (
+          <ul className="flex flex-wrap gap-2 mt-2">
+            {photos.map((ph, i) => (
+              <li key={i} className="text-xs border rounded-md px-2 py-1 flex items-center gap-2 bg-white">
+                {typeof ph === "string" ? <a href={ph} target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">Photo {i + 1}</a> : <span className="text-green-700">✓ {ph.name}</span>}
+                <button type="button" aria-label={`Remove photo ${i + 1}`} onClick={() => setE({ devicePhotos: photos.filter((_, k) => k !== i) })} className="text-gray-400 hover:text-red-600"><FaTimes className="h-2.5 w-2.5" /></button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Field>
+    );
+  };
 
+  const renderMobileQuote = () => {
+    const d = electronicDetails;
+    const bounds = purchaseDateBounds();
+    const outOfChart = Number(d.purchaseValue) > MOBILE_CHART_MAX;
+    return (
+      <div className="mb-6">
+        <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2"><FaMobileAlt /> Mobile Insurance — Quote Details</h4>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="text-sm font-medium text-gray-700">Device Type</label>
-            <select
-              data-field="deviceType"
-              value={electronicDetails.deviceType}
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, deviceType: e.target.value }))}
-              className={`w-full p-2 border rounded-lg ${validationErrors.deviceType ? 'border-red-500' : 'border-gray-300'}`}
-            >
+          <Field label="Policy Tenure" required error={err.policyTenure}>
+            <select data-field="policyTenure" value={formData.policyTenure} onChange={(e) => setFormData((p) => ({ ...p, policyTenure: e.target.value }))} className={inputCls(err.policyTenure)}>
               <option value="">Select</option>
-              {DEVICE_TYPE_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+              {MOBILE_TENURE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
             </select>
-            {validationErrors.deviceType && <p className="text-red-500 text-xs mt-1">{validationErrors.deviceType}</p>}
-          </div>
-
-          {electronicDetails.deviceType === "Other" && (
-            <div>
-              <label className="text-sm font-medium text-gray-700">Specify Device Type</label>
-              <input
-                type="text"
-                value={electronicDetails.otherDeviceType}
-                onChange={(e) => setElectronicDetails(prev => ({ ...prev, otherDeviceType: e.target.value }))}
-                className="w-full p-2 border border-gray-300 rounded-lg"
-              />
-            </div>
+          </Field>
+          <Field label="Invoice Price incl. GST / Sum Insured (₹)" required error={err.purchaseValue}>
+            <input data-field="purchaseValue" type="text" inputMode="numeric" value={d.purchaseValue} onChange={(e) => setE({ purchaseValue: e.target.value.replace(/\D/g, "") })} className={inputCls(err.purchaseValue)} />
+          </Field>
+          <Field label="Premium (as per chart)" hint={outOfChart ? `Above ₹${MOBILE_CHART_MAX.toLocaleString("en-IN")} — Admin will enter the premium` : chartPremium ? `Band ${chartPremium.band}` : "Enter invoice price + tenure"}>
+            <input type="text" readOnly value={chartPremium ? `₹ ${fmt(chartPremium.gross)} (net ${fmt(chartPremium.net)} + GST ${fmt(chartPremium.gst)})` : "—"} className={autoCls} />
+          </Field>
+          <Field label="Device Type" required error={err.deviceType}>
+            <select data-field="deviceType" value={d.deviceType} onChange={(e) => setE({ deviceType: e.target.value })} className={inputCls(err.deviceType)}>
+              <option value="">Select</option>
+              {MOBILE_DEVICE_TYPES.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          {d.deviceType === "Other" && (
+            <Field label="Specify Device Type" required error={err.otherDeviceType}>
+              <input data-field="otherDeviceType" type="text" value={d.otherDeviceType} onChange={(e) => setE({ otherDeviceType: e.target.value })} className={inputCls(err.otherDeviceType)} />
+            </Field>
           )}
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Date of Purchase</label>
-            <input
-              data-field="dateOfPurchase"
-              type="date"
-              max={maxDate}
-              value={electronicDetails.dateOfPurchase}
-              onChange={(e) => {
-                const selected = new Date(e.target.value);
-                const today = new Date();
-                if (selected > today) {
-                  alert("Date cannot be in the future");
-                  return;
-                }
-                setElectronicDetails(prev => ({ ...prev, dateOfPurchase: e.target.value }));
-              }}
-              className={`w-full p-2 border rounded-lg ${validationErrors.dateOfPurchase ? 'border-red-500' : 'border-gray-300'}`}
-            />
-            {validationErrors.dateOfPurchase && <p className="text-red-500 text-xs mt-1">{validationErrors.dateOfPurchase}</p>}
-            {isDeviceOlderThan15Days() && (
-              <p className="text-orange-500 text-xs mt-1">⚠️ Device is older than 15 days</p>
-            )}
+          <Field label="Date of Purchase" required error={err.dateOfPurchase} hint="Not older than 3 years, not a future date">
+            <input data-field="dateOfPurchase" type="date" min={bounds.min} max={bounds.max} value={d.dateOfPurchase} onChange={(e) => setE({ dateOfPurchase: e.target.value })} className={inputCls(err.dateOfPurchase)} />
+          </Field>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <label className="text-sm font-medium text-gray-700">Make and Model <span className="text-red-500">*</span> <span className="text-xs text-gray-500">(Company Name_Model_RAM_Internal Storage)</span></label>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mt-1">
+              <input data-field="deviceBrand" type="text" placeholder="Company (e.g. Samsung)" value={d.deviceBrand} onChange={(e) => setE({ deviceBrand: e.target.value })} className={inputCls(err.deviceBrand)} aria-label="Company name" />
+              <input data-field="deviceModel" type="text" placeholder="Model (e.g. Galaxy S24)" value={d.deviceModel} onChange={(e) => setE({ deviceModel: e.target.value })} className={inputCls(err.deviceModel)} aria-label="Model" />
+              <input data-field="ram" type="text" placeholder="RAM (e.g. 8GB)" value={d.ram} onChange={(e) => setE({ ram: e.target.value.toUpperCase() })} className={inputCls(err.ram)} aria-label="RAM" />
+              <input data-field="storage" type="text" placeholder="Storage (e.g. 256GB)" value={d.storage} onChange={(e) => setE({ storage: e.target.value.toUpperCase() })} className={inputCls(err.storage)} aria-label="Internal storage" />
+            </div>
+            {composeMakeModel(d) && <p className="text-xs text-gray-500 mt-1">Saved as: <span className="font-mono">{composeMakeModel(d)}</span></p>}
+            {[err.deviceBrand, err.deviceModel, err.ram, err.storage].filter(Boolean).map((m) => <p key={m} className="text-red-500 text-xs mt-1">{m}</p>)}
           </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Purchase Value (incl. Tax)</label>
-            <input
-              data-field="purchaseValue"
-              type="number"
-              value={electronicDetails.purchaseValue}
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseValue: e.target.value }))}
-              className={`w-full p-2 border rounded-lg ${validationErrors.purchaseValue ? 'border-red-500' : 'border-gray-300'}`}
-            />
-            {validationErrors.purchaseValue && <p className="text-red-500 text-xs mt-1">{validationErrors.purchaseValue}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Aadhaar Number</label>
-            <input
-              data-field="electronicAadhaar"
-              type="text"
-              value={electronicDetails.aadhaarNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                if (val.length <= 12) setElectronicDetails(prev => ({ ...prev, aadhaarNumber: val }));
-              }}
-              maxLength="12"
-              className={`w-full p-2 border rounded-lg ${validationErrors.electronicAadhaar ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder="Enter 12 digits only"
-            />
-            {electronicDetails.aadhaarNumber && electronicDetails.aadhaarNumber.length > 0 && !validateAadhaar(electronicDetails.aadhaarNumber) && (
-              <p className="text-red-500 text-xs mt-1">Enter exactly 12 digits</p>
-            )}
-            {validationErrors.electronicAadhaar && <p className="text-red-500 text-xs mt-1">{validationErrors.electronicAadhaar}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Upload Aadhaar</label>
-            {typeof electronicDetails.aadhaarFile === "string" && electronicDetails.aadhaarFile && (
-              <div className="mb-1">
-                <a
-                  href={electronicDetails.aadhaarFile}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 underline"
-                >
-                  View current Aadhaar file
-                </a>
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, aadhaarFile: e.target.files[0] || prev.aadhaarFile }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">PAN Number</label>
-            <input
-              data-field="electronicPan"
-              type="text"
-              value={electronicDetails.panNumber}
-              onChange={(e) => {
-                const val = e.target.value.toUpperCase();
-                if (val.length <= 10) setElectronicDetails(prev => ({ ...prev, panNumber: val }));
-              }}
-              maxLength="10"
-              className={`w-full p-2 border rounded-lg uppercase ${validationErrors.electronicPan ? 'border-red-500' : 'border-gray-300'}`}
-              placeholder="ABCDE1234F"
-            />
-            {electronicDetails.panNumber && electronicDetails.panNumber.length > 0 && !validatePAN(electronicDetails.panNumber) && (
-              <p className="text-red-500 text-xs mt-1">Format: ABCDE1234F (5 letters, 4 digits, 1 letter)</p>
-            )}
-            {validationErrors.electronicPan && <p className="text-red-500 text-xs mt-1">{validationErrors.electronicPan}</p>}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Upload PAN</label>
-            {typeof electronicDetails.panFile === "string" && electronicDetails.panFile && (
-              <div className="mb-1">
-                <a
-                  href={electronicDetails.panFile}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 underline"
-                >
-                  View current PAN file
-                </a>
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, panFile: e.target.files[0] || prev.panFile }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">IMEI Number</label>
-            <input
-              type="text"
-              value={electronicDetails.imeiNumber}
-              onChange={(e) => {
-                const val = e.target.value.replace(/\D/g, '');
-                if (val.length <= 15) setElectronicDetails(prev => ({ ...prev, imeiNumber: val }));
-              }}
-              maxLength="15"
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-            {isDeviceOlderThan15Days() && (
-              <p className="text-red-500 text-xs mt-1">IMEI required for devices older than 15 days</p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Upload IMEI Image</label>
-            {typeof electronicDetails.imeiImage === "string" && electronicDetails.imeiImage && (
-              <div className="mb-1">
-                <a
-                  href={electronicDetails.imeiImage}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 underline"
-                >
-                  View current IMEI image
-                </a>
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, imeiImage: e.target.files[0] || prev.imeiImage }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
-
-          <div className="lg:col-span-3">
-            <label className="text-sm font-medium text-gray-700">
-              Device Photos (3-4 photos from different angles showing IMEI)
-            </label>
-            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.length > 0 && (
-              <div className="mb-1 flex flex-wrap gap-2">
-                {electronicDetails.devicePhotos.map((photo, idx) => {
-                  if (typeof photo === "string" && photo) {
-                    return (
-                      <a
-                        key={idx}
-                        href={photo}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-indigo-600 underline"
-                      >
-                        View current photo {idx + 1}
-                      </a>
-                    );
-                  }
-                  return null;
-                })}
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".jpg,.jpeg"
-              multiple
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, devicePhotos: Array.from(e.target.files) }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-            {electronicDetails.devicePhotos && electronicDetails.devicePhotos.some(f => typeof f !== "string") && (
-              <p className="text-sm text-gray-500 mt-1">{electronicDetails.devicePhotos.filter(f => typeof f !== "string").length} new photos selected</p>
-            )}
-          </div>
-
-          <div>
-            <label className="text-sm font-medium text-gray-700">Upload Purchase Invoice</label>
-            {typeof electronicDetails.purchaseInvoice === "string" && electronicDetails.purchaseInvoice && (
-              <div className="mb-1">
-                <a
-                  href={electronicDetails.purchaseInvoice}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-indigo-600 underline"
-                >
-                  View current invoice
-                </a>
-              </div>
-            )}
-            <input
-              type="file"
-              accept=".pdf,.jpg,.jpeg"
-              onChange={(e) => setElectronicDetails(prev => ({ ...prev, purchaseInvoice: e.target.files[0] || prev.purchaseInvoice }))}
-              className="w-full p-2 border border-gray-300 rounded-lg"
-            />
-          </div>
+          <Field label="Full Address as per Aadhaar (with PIN code)" required error={err.addressAsPerAadhaar} className="sm:col-span-2 lg:col-span-3">
+            <textarea data-field="addressAsPerAadhaar" rows="2" value={d.addressAsPerAadhaar} onChange={(e) => setE({ addressAsPerAadhaar: e.target.value })} className={inputCls(err.addressAsPerAadhaar)} placeholder={formData.pinCode ? `House, street, area, ${formData.city || "city"} - ${formData.pinCode}` : "House, street, area, city - PIN"} />
+          </Field>
+          <FileField label="Upload Invoice (Not Mandatory)" dataField="purchaseInvoice" value={d.purchaseInvoice} onFile={(f) => setE({ purchaseInvoice: f })} accept=".jpg,.jpeg,.pdf" hint="Becomes mandatory at Policy Issuance" />
+          <DevicePhotos required={false} />
         </div>
       </div>
     );
   };
 
+  // ============================================================
+  // MOBILE INSURANCE — Policy Issuance
+  // ============================================================
+  const renderMobileIssuance = () => {
+    const d = electronicDetails;
+    const imei = usesImei(d.deviceType);
+    return (
+      <div className="space-y-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <FileField label={d.purchaseInvoice ? "Invoice" : "Upload Invoice (Mandatory)"} required error={err.purchaseInvoice} dataField="purchaseInvoice" value={d.purchaseInvoice} onFile={(f) => setE({ purchaseInvoice: f })} accept=".jpg,.jpeg,.pdf" hint={d.purchaseInvoice ? "From the Quote — replace if needed" : undefined} />
+          <Field label={imei ? "IMEI Number" : "Serial Number"} required error={err.imeiNumber} hint={imei ? "Dial *#06# to see the IMEI" : undefined}>
+            <input
+              data-field="imeiNumber" type="text" inputMode={imei ? "numeric" : "text"} maxLength={imei ? 15 : 30} value={d.imeiNumber}
+              onChange={(e) => setE({ imeiNumber: imei ? e.target.value.replace(/\D/g, "").slice(0, 15) : e.target.value.toUpperCase() })}
+              className={inputCls(err.imeiNumber)}
+            />
+          </Field>
+          <FileField label={imei ? "Upload IMEI Screenshot (Mandatory)" : "Upload Serial No. Photo (Mandatory)"} required error={err.imeiImage} dataField="imeiImage" value={d.imeiImage} onFile={(f) => setE({ imeiImage: f })} accept=".jpg,.jpeg,.pdf" />
+          <DevicePhotos required />
+          <Field label="Invoice in the Name of the Proposer?" required error={err.invoiceInProposerName}>
+            <select data-field="invoiceInProposerName" value={d.invoiceInProposerName} onChange={(e) => setE({ invoiceInProposerName: e.target.value })} className={inputCls(err.invoiceInProposerName)}>
+              <option value="">Select</option>
+              {YES_NO_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          {d.invoiceInProposerName === "No" && (
+            <Field label="Proposer's Relation with the Invoice Holder" required error={err.invoiceHolderRelation}>
+              <select data-field="invoiceHolderRelation" value={d.invoiceHolderRelation} onChange={(e) => setE({ invoiceHolderRelation: e.target.value })} className={inputCls(err.invoiceHolderRelation)}>
+                <option value="">Select</option>
+                {INVOICE_HOLDER_RELATIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </Field>
+          )}
+          <Field label="Aadhaar Number" required error={err.electronicAadhaar}>
+            <input data-field="electronicAadhaar" type="text" inputMode="numeric" maxLength="12" value={d.aadhaarNumber} onChange={(e) => setE({ aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} className={inputCls(err.electronicAadhaar)} />
+          </Field>
+          <FileField label="Upload Aadhaar (Mandatory)" required error={err.electronicAadhaarFile} dataField="electronicAadhaarFile" value={d.aadhaarFile} onFile={(f) => setE({ aadhaarFile: f })} />
+          <Field label="PAN Number" error={err.electronicPan}>
+            <input data-field="electronicPan" type="text" maxLength="10" value={d.panNumber} onChange={(e) => setE({ panNumber: e.target.value.toUpperCase().slice(0, 10) })} className={cx(inputCls(err.electronicPan), "uppercase")} placeholder="ABCDE1234F" />
+          </Field>
+          <FileField label="Upload PAN" dataField="electronicPanFile" value={d.panFile} onFile={(f) => setE({ panFile: f })} />
+          {isAdmin && !employeeView && acceptedQuote && (
+            <Field label="Pay Out on Net (%)" hint="Insurer payout % — Admin only">
+              <input data-field="mobilePayout" type="number" min="0" max="100" value={acceptedQuote.payoutPercent ?? ""} onChange={(e) => updateQuote(acceptedQuote.insurerName, "payoutPercent", e.target.value)} className={inputCls()} />
+            </Field>
+          )}
+          <Field label="Remarks (If Any)" className="sm:col-span-2 lg:col-span-3">
+            <textarea rows="2" value={d.issuanceRemarks} onChange={(e) => setE({ issuanceRemarks: e.target.value })} className={inputCls()} />
+          </Field>
+        </div>
+      </div>
+    );
+  };
 
   // ============================================================
   // 1. LEAD
@@ -1204,7 +1084,7 @@ export default function LeadCaseForm({
   // QUOTE — insurers to request quotes from (multiple choice) + remarks
   const renderQuoteRequest = () => {
     const sel = workflowDetails.selectedInsurers || [];
-    const unknown = sel.filter((n) => !isKnownInsurer(n));
+    const unknown = sel.filter((n) => !isKnownInsurer(n) || (sections.electronic && !MOBILE_INSURERS.includes(n)));
     const quotesLocked = sectionLocked("Quote");
     return (
       <div className="mt-2">
@@ -1227,7 +1107,7 @@ export default function LeadCaseForm({
           data-field="selectedInsurers"
           className={cx("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border p-2 rounded-lg max-h-64 overflow-y-auto", err.selectedInsurers ? "border-red-500" : "border-gray-300", quotesLocked && "bg-gray-50")}
         >
-          {INSURER_OPTIONS.map((ins) => (
+          {(sections.electronic ? MOBILE_INSURERS : INSURER_OPTIONS).map((ins) => (
             <label key={ins} className="flex items-center gap-2 text-sm">
               <input type="checkbox" className="rounded text-indigo-600" checked={sel.includes(ins)} disabled={quotesLocked} onChange={(e) => toggleInsurer(ins, e.target.checked)} />
               {ins}
@@ -1277,12 +1157,22 @@ export default function LeadCaseForm({
                 <Field label="Quote No." error={err[k("number")]}>
                   <input data-field={k("number")} type="text" disabled={L} value={q.quoteNumber || ""} onChange={(e) => updateQuote(ins, "quoteNumber", e.target.value)} className={inputCls(err[k("number")], L)} />
                 </Field>
-                <Field label="Quote Net Premium" error={err[k("net")]}>
-                  <input data-field={k("net")} type="number" min="0" disabled={L} value={q.netPremium ?? ""} onChange={(e) => updateQuote(ins, "netPremium", e.target.value)} className={inputCls(err[k("net")], L)} />
-                </Field>
-                <Field label="GST %" error={err[k("gst")]}>
-                  <input data-field={k("gst")} type="number" min="0" max="100" disabled={L} value={q.gstPercent ?? ""} onChange={(e) => updateQuote(ins, "gstPercent", e.target.value)} className={inputCls(err[k("gst")], L)} />
-                </Field>
+                {sections.electronic && !q.manualPremium ? (
+                  <Field label="Net Premium (chart)" hint={chartPremium ? `Band ${chartPremium.band} · ${formData.policyTenure}` : "Outside the chart — enter manually"}>
+                    <input data-field={k("net")} type="text" readOnly value={q.netPremium ? fmt(q.netPremium) : "—"} className={autoCls} />
+                  </Field>
+                ) : (
+                  <Field label="Quote Net Premium" error={err[k("net")]}>
+                    <input data-field={k("net")} type="number" min="0" disabled={L} value={q.netPremium ?? ""} onChange={(e) => updateQuote(ins, "netPremium", e.target.value)} className={inputCls(err[k("net")], L)} />
+                  </Field>
+                )}
+                {sections.electronic ? (
+                  <Field label="GST %"><input type="text" readOnly value="18%" className={autoCls} /></Field>
+                ) : (
+                  <Field label="GST %" error={err[k("gst")]}>
+                    <input data-field={k("gst")} type="number" min="0" max="100" disabled={L} value={q.gstPercent ?? ""} onChange={(e) => updateQuote(ins, "gstPercent", e.target.value)} className={inputCls(err[k("gst")], L)} />
+                  </Field>
+                )}
                 <Field label="GST Value (auto)"><input type="text" readOnly value={fmt(calc.gstValue)} className={autoCls} /></Field>
                 <Field label="Gross Premium (auto)"><input type="text" readOnly value={fmt(calc.grossPremium)} className={cx(autoCls, "font-medium")} /></Field>
                 <Field label={isAdmin ? "Upload Quote" : "Quote Document"}>
@@ -1292,7 +1182,7 @@ export default function LeadCaseForm({
                   ) : !q.quoteUpload && <p className="text-sm text-gray-400">Not uploaded yet</p>}
                   <NewFileTag file={quoteFiles[ins]} />
                 </Field>
-                {!employeeView && (
+                {!employeeView && !sections.electronic && (
                   <Field label="Pay Out (%)" error={err[k("payout")]} hint="Insurer payout slab offered on this quote">
                     <input data-field={k("payout")} type="number" min="0" max="100" value={q.payoutPercent ?? ""} onChange={(e) => updateQuote(ins, "payoutPercent", e.target.value)} className={inputCls(err[k("payout")])} />
                   </Field>
@@ -1303,6 +1193,38 @@ export default function LeadCaseForm({
                   </select>
                 </Field>
               </div>
+              {sections.electronic && (
+                <div className="mt-3 grid grid-cols-1 lg:grid-cols-3 gap-3">
+                  <div className="lg:col-span-2 text-xs text-gray-600 bg-white border rounded-lg p-2 grid grid-cols-2 gap-x-4 gap-y-1">
+                    <span>Name: <b>{formData.name || "—"}</b></span><span>Mobile: <b>{formData.mobileNo || "—"}</b></span>
+                    <span>E-mail: <b>{formData.email || "—"}</b></span><span>Tenure: <b>{formData.policyTenure || "—"}</b></span>
+                    <span>Invoice / SI: <b>₹ {fmt(electronicDetails.purchaseValue)}</b></span><span>Product: <b>{productForInsurer(ins) || "—"}</b></span>
+                    <span className="col-span-2">Make & Model: <b>{composeMakeModel(electronicDetails) || "—"}</b></span>
+                    <span className="col-span-2">Address: <b>{electronicDetails.addressAsPerAadhaar || "—"}</b></span>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    <button
+                      type="button" disabled={false}
+                      onClick={() => openMobileQuoteDocument({
+                        lead: formData, device: electronicDetails, quote: q, tenure: formData.policyTenure,
+                        quoteRef: q.quoteNumber || `${savedLead?.leadCode || "QUOTE"}-${productForInsurer(ins).replace(/\s/g, "").toUpperCase() || "MOB"}`,
+                      })}
+                      className="px-3 py-2 text-sm rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center justify-center gap-2"
+                    >
+                      <FaFileAlt /> Download Quote / Proforma
+                    </button>
+                    {isAdmin && !L && (
+                      <label className="text-xs text-gray-600 flex items-center gap-2">
+                        <input type="checkbox" checked={!!q.manualPremium} onChange={(e) => updateQuote(ins, "manualPremium", e.target.checked)} />
+                        Enter premium manually (outside chart)
+                      </label>
+                    )}
+                  </div>
+                  <Field label="Remarks, if any" className="lg:col-span-3">
+                    <input type="text" disabled={L} value={q.remarks || ""} onChange={(e) => updateQuote(ins, "remarks", e.target.value)} className={inputCls(false, L)} />
+                  </Field>
+                </div>
+              )}
               {sections.motor && (
                 <div className="mt-3">
                   <label className="text-sm font-medium text-gray-700">Add-ons accepted by this insurer</label>
@@ -1337,6 +1259,7 @@ export default function LeadCaseForm({
       ...(employeeView ? [] : [["Pay Out", acceptedQuote.payoutPercent !== undefined && acceptedQuote.payoutPercent !== "" ? `${acceptedQuote.payoutPercent}%` : "—"]]),
       ["Quote Status", acceptedQuote.quoteStatus],
       ...(sections.motor ? [["Add-ons accepted", (acceptedQuote.acceptedAddOns || []).join(", ") || "None"]] : []),
+      ...(sections.electronic ? [["Product", productForInsurer(acceptedQuote.insurerName) || "—"]] : []),
     ];
     return (
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-emerald-50/50 border border-emerald-200 rounded-lg p-3 mb-4 text-sm">
@@ -1602,14 +1525,27 @@ export default function LeadCaseForm({
           </>
         )}
 
-        <Field label="Payment URL" className="sm:col-span-2">
+        {sections.electronic && (
+          <Field label="Payment Taken Mode" required error={err.paymentTakenMode}>
+            <select data-field="paymentTakenMode" value={w.paymentTakenMode} onChange={(e) => setWf({ paymentTakenMode: e.target.value })} className={inputCls(err.paymentTakenMode)}>
+              <option value="">Select</option>
+              {PAYMENT_TAKEN_MODES.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+        )}
+        {sections.electronic && w.paymentTakenMode === "QR" && (
+          <FileField label="Upload Payment QR" required error={err.paymentQr} dataField="paymentQr" value={w.paymentQr} onFile={(f) => setWf({ paymentQr: f })} accept=".jpg,.jpeg,.png,.pdf" />
+        )}
+        {(!sections.electronic || w.paymentTakenMode === "URL") && (
+        <Field label="Payment URL" required={sections.electronic} error={err.paymentUrl} className="sm:col-span-2">
           <div className="flex gap-2">
-            <input type="url" value={w.paymentUrl} onChange={(e) => setWf({ paymentUrl: e.target.value })} className={inputCls()} placeholder="https://..." />
+            <input data-field="paymentUrl" type="url" value={w.paymentUrl} onChange={(e) => setWf({ paymentUrl: e.target.value })} className={inputCls(err.paymentUrl)} placeholder="https://..." />
             {w.paymentUrl && (
               <a href={w.paymentUrl} target="_blank" rel="noopener noreferrer" className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-1 text-sm"><FaLink /> Open</a>
             )}
           </div>
         </Field>
+        )}
         <Field label="Payment Status" required error={err.paymentStatus}>
           <select
             data-field="paymentStatus" value={w.paymentStatus} className={inputCls(err.paymentStatus)}
@@ -1688,6 +1624,17 @@ export default function LeadCaseForm({
                   <input type="date" readOnly value={w.policyExpiryDate} className={autoCls} />
                 </Field>
                 <FileField label="Upload Policy Copy" dataField="policyCopy" value={w.policyCopy} onFile={(f) => setWf({ policyCopy: f })} accept=".pdf" />
+                {sections.electronic && (
+                  <div className="flex items-end">
+                    <button
+                      type="button" disabled={!w.policyNumber}
+                      onClick={() => openMobilePolicyDocument({ lead: formData, device: electronicDetails, workflow: w, insurer: acceptedQuote?.insurerName, tenure: formData.policyTenure })}
+                      className="px-3 py-2 text-sm rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 flex items-center gap-2"
+                    >
+                      <FaFileAlt /> Generate Policy Schedule (PDF)
+                    </button>
+                  </div>
+                )}
               </>
             )}
           </>
@@ -1736,10 +1683,87 @@ export default function LeadCaseForm({
   // ============================================================
   // 7. CASHBACK / PAYOUT TO CUSTOMER / EMPLOYEE (Admin)
   // ============================================================
+  // ============================================================
+  // 6b. ARSHYAN CALCULATION ON MOBILE INSURANCE (Admin, Mobile only)
+  // ============================================================
+  const renderInsurerCalc = () => {
+    if (!isAdmin) return <ReadOnlyNote>Handled by Admin.</ReadOnlyNote>;
+    const p = payoutDetails;
+    const setP = (patch) => setPayoutDetails((x) => ({ ...x, ...patch }));
+    const P = profitCalc;
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Insurer Net Premium (₹)" required error={err.insurerNetPremium} hint="What Arshyan pays the insurer">
+            <input data-field="insurerNetPremium" type="number" min="0" value={p.insurerNetPremium} onChange={(e) => setP({ insurerNetPremium: e.target.value })} className={inputCls(err.insurerNetPremium)} />
+          </Field>
+          <Field label="Insurer GST 18% (auto)"><input type="text" readOnly value={fmt(P.insurerGstValue)} className={autoCls} /></Field>
+          <Field label="Insurer Gross Premium (auto)"><input type="text" readOnly value={fmt(P.insurerGrossPremium)} className={cx(autoCls, "font-medium")} /></Field>
+          <Field label="PayOut (%)" required error={err.profit_payoutSlabPercent} hint={acceptedQuote?.payoutPercent ? `Pay Out on Net set at issuance: ${acceptedQuote.payoutPercent}%` : undefined}>
+            <input data-field="profit_payoutSlabPercent" type="number" min="0" max="100" value={p.payoutSlabPercent} onChange={(e) => setP({ payoutSlabPercent: e.target.value })} className={inputCls(err.profit_payoutSlabPercent)} />
+          </Field>
+          <Field label="PayOut in Value (auto)" hint="PayOut % of Insurer Net Premium"><input type="text" readOnly value={fmt(P.insurerPayoutEach)} className={autoCls} /></Field>
+          <Field label="GST on PayOut (%)" error={err.profit_gstPayoutPercent} hint="BRD default 11.3%">
+            <input data-field="profit_gstPayoutPercent" type="number" min="0" max="100" value={p.gstPayoutPercent} onChange={(e) => setP({ gstPayoutPercent: e.target.value })} className={inputCls(err.profit_gstPayoutPercent)} />
+          </Field>
+          <Field label="TDS (%)" error={err.profit_tdsPercent} hint="BRD default 2%">
+            <input data-field="profit_tdsPercent" type="number" min="0" max="100" value={p.tdsPercent} onChange={(e) => setP({ tdsPercent: e.target.value })} className={inputCls(err.profit_tdsPercent)} />
+          </Field>
+          <FileField label="Upload Insurer Insurance Copy" dataField="insurerPolicyCopy" value={workflowDetails.insurerPolicyCopy} onFile={(f) => setWf({ insurerPolicyCopy: f })} accept=".pdf,.jpg,.jpeg" />
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm border rounded-lg">
+            <tbody>
+              {[
+                ["Chart Gross Premium (paid by customer)", P.chartGrossPremium],
+                ["Less: Insurer Gross Premium", -P.insurerGrossPremium],
+                ["Premium margin", P.premiumMargin, "font-medium"],
+                ["Insurer PayOut", P.insurerPayoutEach],
+                [`GST on PayOut ${num(P.gstPayoutPercent)}%`, P.gstPayoutEach, "text-emerald-700"],
+                [`TDS ${num(P.tdsPercent)}%`, -P.tdsEach, "text-red-600"],
+              ].map(([l, v, c]) => (
+                <tr key={l} className={cx("border-t", c)}><td className="p-2">{l}</td><td className="p-2 text-right tabular-nums">{fmt(v)}</td></tr>
+              ))}
+              <tr className="border-t bg-emerald-50 font-semibold"><td className="p-2">Arshyan PayOut on Mobile</td><td className="p-2 text-right tabular-nums">₹ {fmt(P.arshyanMobilePayout)}</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
   const renderCashback = () => {
     if (!isAdmin) return <ReadOnlyNote>Cashback / PayOut is handled by Admin.</ReadOnlyNote>;
     const cb = cashbackDetails;
     const setCb = (patch) => setCashbackDetails((p) => ({ ...p, ...patch }));
+    if (sections.electronic) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Store PayOut (₹)" error={err.storePayout}>
+            <input data-field="storePayout" type="number" min="0" value={cb.storePayout} onChange={(e) => setCb({ storePayout: e.target.value })} className={inputCls(err.storePayout)} />
+          </Field>
+          <Field label="Promoter PayOut (₹)" error={err.promoterPayout}>
+            <input data-field="promoterPayout" type="number" min="0" value={cb.promoterPayout} onChange={(e) => setCb({ promoterPayout: e.target.value })} className={inputCls(err.promoterPayout)} />
+          </Field>
+          <Field label="Total Cashback / PayOut (auto)" hint="Store + Promoter">
+            <input type="text" readOnly value={fmt(cashbackCalc.totalPayout)} className={cx(autoCls, "font-semibold")} />
+          </Field>
+          <Field label="Status" required error={err.cashbackStatus}>
+            <select data-field="cashbackStatus" value={cb.status} onChange={(e) => setCb({ status: e.target.value })} className={inputCls(err.cashbackStatus)}>
+              {CASHBACK_STATUS_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </Field>
+          {cb.status === "Partial Settled" && (
+            <Field label="Amount Settled (₹)" required error={err.cashbackSettled}>
+              <input data-field="cashbackSettled" type="number" min="0" value={cb.settledAmount} onChange={(e) => setCb({ settledAmount: e.target.value })} className={inputCls(err.cashbackSettled)} />
+            </Field>
+          )}
+          <Field label="Pending Amount (auto)">
+            <input type="text" readOnly value={fmt(cashbackCalc.pendingAmount)} className={cx(autoCls, cashbackCalc.pendingAmount > 0 ? "text-red-600" : "text-green-700")} />
+          </Field>
+        </div>
+      );
+    }
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Field label="PayOut To">
@@ -1784,6 +1808,38 @@ export default function LeadCaseForm({
   // ============================================================
   const renderProfit = () => {
     if (!isAdmin) return null;
+    if (sections.electronic) {
+      const P = profitCalc;
+      return (
+        <div className="space-y-4">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border rounded-lg">
+              <tbody>
+                {[
+                  ["PayOut Slab % (Insurer)", `${num(payoutDetails.payoutSlabPercent)}%`],
+                  ["Insurer PayOut", fmt(P.insurerPayoutEach)],
+                  [`GST PayOut ${num(P.gstPayoutPercent)}%`, fmt(P.gstPayoutEach)],
+                  [`TDS ${num(P.tdsPercent)}%`, fmt(-P.tdsEach)],
+                  ["Total PayOut (Insurer PayOut − TDS + GST)", fmt(P.totalPayoutEach)],
+                  ["Chart Gross Premium", fmt(P.chartGrossPremium)],
+                  ["Arshyan PayOut on Mobile", fmt(P.arshyanMobilePayout)],
+                  ["Less: Total Cashback / PayOut (Store + Promoter)", fmt(-P.totalCashbackPayout)],
+                ].map(([l, v]) => (
+                  <tr key={l} className="border-t"><td className="p-2">{l}</td><td className="p-2 text-right tabular-nums">{v}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className={cx("rounded-lg border p-4 flex flex-wrap items-center justify-between gap-2", P.arshyanProfit >= 0 ? "bg-emerald-50 border-emerald-300" : "bg-red-50 border-red-300")}>
+            <div>
+              <p className="text-sm font-semibold text-gray-700">Arshyan Profit</p>
+              <p className="text-xs text-gray-500">= Arshyan PayOut on Mobile − Total Cashback / PayOut</p>
+            </div>
+            <p className={cx("text-2xl font-bold tabular-nums", P.arshyanProfit >= 0 ? "text-emerald-700" : "text-red-600")}>₹ {fmt(P.arshyanProfit)}</p>
+          </div>
+        </div>
+      );
+    }
     const p = payoutDetails;
     const setP = (patch) => setPayoutDetails((x) => ({ ...x, ...patch }));
     const P = profitCalc;
@@ -1998,7 +2054,7 @@ export default function LeadCaseForm({
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate>
       <StageStepper
-        stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "Cashback", "Profit"].includes(x.key)) : visibleStages}
+        stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "InsurerCalc", "Cashback", "Profit"].includes(x.key)) : visibleStages}
         current={caseStage}
         labels={hideAdminModules ? { QuoteWorkflow: "Quotes", Payment: "Payment & Issuance (Admin)" } : {}}
       />
@@ -2023,9 +2079,9 @@ export default function LeadCaseForm({
         <Section n={num_("Quote")} title="Quote" icon={FaFileAlt} status={stageIdx > IDX.Quote ? "Requested" : undefined} lock={lockFor("Quote")}>
           {!formData.lob && <ReadOnlyNote>Select the LOB in the Lead module first.</ReadOnlyNote>}
           {sections.health && renderHealthQuote()}
-          {!sections.health && formData.lob && renderPolicyTerms()}
+          {!sections.health && !sections.electronic && formData.lob && renderPolicyTerms()}
           {sections.motor && renderMotorQuote()}
-          {sections.electronic && renderElectronicForm()}
+          {sections.electronic && renderMobileQuote()}
           {sections.pa && <PersonalAccidentForm details={paDetails} setDetails={setPaDetails} errors={err} insurerOptions={INSURER_OPTIONS} />}
           {sections.travel && <TravelInsuranceForm details={travelDetails} setDetails={setTravelDetails} errors={err} lead={formData} />}
           {formData.lob && renderQuoteRequest()}
@@ -2043,7 +2099,7 @@ export default function LeadCaseForm({
       {reached("PolicyIssuance") && (
         <Section n={num_("PolicyIssuance")} title="Policy Issuance" icon={FaUsers} lock={lockFor("PolicyIssuance")}>
           {renderAcceptedQuoteSummary()}
-          {sections.health ? renderHealthIssuance() : sections.motor ? renderMotorIssuance() : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
+          {sections.health ? renderHealthIssuance() : sections.motor ? renderMotorIssuance() : sections.electronic ? renderMobileIssuance() : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
         </Section>
       )}
 
@@ -2056,6 +2112,12 @@ export default function LeadCaseForm({
       {!hideAdminModules && reached("EmiDues") && instalment && (
         <Section n={num_("EmiDues")} title="EMI Dues" icon={FaClock} adminOnly tone="emerald" lock={lockFor("EmiDues")}>
           {renderEmiDues()}
+        </Section>
+      )}
+
+      {!hideAdminModules && reached("InsurerCalc") && sections.electronic && (
+        <Section n={num_("InsurerCalc")} title="Arshyan Calculation on Mobile Insurance" icon={FaChartLine} adminOnly tone="emerald" lock={lockFor("InsurerCalc")}>
+          {renderInsurerCalc()}
         </Section>
       )}
 

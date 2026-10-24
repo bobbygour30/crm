@@ -11,6 +11,7 @@ import {
   emptyMotorDetails, isAdminUser, OTHER_MANUFACTURER, motorDefaultsFromLob, insuranceTypeForPolicy,
 } from "./motorInsurance";
 import * as W from "./caseWorkflow";
+import { composeMakeModel, productForInsurer, MOBILE_GST_PAYOUT_PERCENT } from "./mobileInsurance";
 
 const str = (v) => (v === null || v === undefined ? "" : v);
 
@@ -46,6 +47,9 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   const [showAddOnModal, setShowAddOnModal] = useState(false);
   const [isFetchingPin, setIsFetchingPin] = useState(false);
   const [pinFetchError, setPinFetchError] = useState("");
+  // bumps every time a lead is opened / the form is reset, so "fill in automatically" effects
+  // re-run for the new lead even when its answers match the previous one (e.g. members list)
+  const [loadKey, setLoadKey] = useState(0);
 
   // ------------------------------------------------------------
   // DERIVED
@@ -56,16 +60,17 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   const instalment = W.isInstalment(formData.paymentTerm);
   const acceptedQuote = W.getAcceptedQuote(workflowDetails);
   const sourceDependentField = SOURCE_FIELD_LABEL[formData.source] || "";
-  const visibleStages = W.getVisibleStages(formData.paymentTerm);
-  const nextStage = W.getNextStage(caseStage, formData.paymentTerm);
+  const visibleStages = W.getVisibleStages(formData.paymentTerm, formData.lob);
+  const nextStage = W.getNextStage(caseStage, formData.paymentTerm, formData.lob);
+  const chartPremium = sections.electronic ? W.getChartPremium(electronicDetails.purchaseValue, formData.policyTenure) : null;
 
   // Quotes can't change once Payment has started; payment/policy fields lock once saved as Policy Issued
   // Employees can change the insurer list only until Admin starts working on quotes' results
   const quotesLocked = stageIdx > W.IDX.PolicyIssuance || (!isAdmin && stageIdx > W.IDX.QuoteWorkflow);
   const paymentLocked = savedIssued;
 
-  const finalAmounts = W.computeAmount(workflowDetails.finalNetPremium, workflowDetails.finalGstPercent);
-  const emiAmounts = W.computeAmount(workflowDetails.emiNetPremium, workflowDetails.finalGstPercent);
+  const finalAmounts = W.computeAmount(workflowDetails.finalNetPremium, workflowDetails.finalGstPercent, sections.electronic);
+  const emiAmounts = W.computeAmount(workflowDetails.emiNetPremium, workflowDetails.finalGstPercent, sections.electronic);
 
   const emiSchedule = useMemo(
     () =>
@@ -79,8 +84,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   );
 
   const cashbackCalc = useMemo(
-    () => W.computeCashback({ cashback: cashbackDetails, paymentTerm: formData.paymentTerm, emiReceivedCount: workflowDetails.emiReceivedCount }),
-    [cashbackDetails, formData.paymentTerm, workflowDetails.emiReceivedCount]
+    () => W.computeCashback({ cashback: cashbackDetails, paymentTerm: formData.paymentTerm, emiReceivedCount: workflowDetails.emiReceivedCount, mobile: sections.electronic }),
+    [cashbackDetails, formData.paymentTerm, workflowDetails.emiReceivedCount, sections.electronic]
   );
 
   const profitCalc = useMemo(
@@ -93,8 +98,9 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
         isMotor: sections.motor && payoutDetails.payoutBasis === "OD/TP Split",
         insuranceType: motorDetails.insuranceType || insuranceTypeForPolicy(motorDetails.policyType),
         cashbackTotal: cashbackCalc.totalPayout,
+        isMobile: sections.electronic,
       }),
-    [payoutDetails, workflowDetails, formData.paymentTerm, sections.motor, motorDetails.insuranceType, motorDetails.policyType, cashbackCalc.totalPayout]
+    [payoutDetails, workflowDetails, formData.paymentTerm, sections.motor, sections.electronic, motorDetails.insuranceType, motorDetails.policyType, cashbackCalc.totalPayout]
   );
 
   // ------------------------------------------------------------
@@ -136,10 +142,37 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     if (code !== (motorDetails.autoRtoCode || "")) setMotorDetails((prev) => ({ ...prev, autoRtoCode: code }));
   }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
 
-  // Motor premium is paid once (no EMI module)
+  // Motor + Mobile premium is paid once (no EMI module)
   useEffect(() => {
-    if (sections.motor && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
-  }, [sections.motor, formData.paymentTerm]);
+    if ((sections.motor || sections.electronic) && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
+  }, [sections.motor, sections.electronic, formData.paymentTerm]);
+
+  // Mobile: quote premiums come from the premium chart (invoice value + tenure), GST 18%.
+  // A quote Admin marked "manual" (value outside the chart) keeps its typed premium.
+  useEffect(() => {
+    if (!sections.electronic || !chartPremium) return;
+    setWorkflowDetails((prev) => {
+      let changed = false;
+      const insurerQuotes = (prev.insurerQuotes || []).map((q) => {
+        if (q.manualPremium) {
+          if (q.roundGst && String(q.gstPercent) === "18") return q;
+          changed = true;
+          return { ...q, gstPercent: "18", roundGst: true };
+        }
+        if (String(q.netPremium) === String(chartPremium.net) && String(q.gstPercent) === "18" && q.roundGst) return q;
+        changed = true;
+        return { ...q, netPremium: String(chartPremium.net), gstPercent: "18", roundGst: true };
+      });
+      return changed ? { ...prev, insurerQuotes } : prev;
+    });
+  }, [sections.electronic, chartPremium?.net, (workflowDetails.insurerQuotes || []).length, loadKey]);
+
+  // Mobile: GST on insurer payout defaults to 11.3% (BRD) instead of 11.5%
+  useEffect(() => {
+    if (!sections.electronic) return;
+    setPayoutDetails((prev) => (String(prev.gstPayoutPercent) === String(W.DEFAULT_GST_PAYOUT_PERCENT) && !savedLead?.payoutDetails?.gstPayoutPercent
+      ? { ...prev, gstPayoutPercent: String(MOBILE_GST_PAYOUT_PERCENT) } : prev));
+  }, [sections.electronic, loadKey]);
 
   // Motor: policy type drives the cover type and the previous-policy status for a brand-new vehicle
   useEffect(() => {
@@ -171,7 +204,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       }
       return Object.keys(patch).length ? { ...prev, ...patch } : prev;
     });
-  }, [sections.motor, stageIdx, formData.name, acceptedQuote?.insurerName, motorDetails.proposerDOB]);
+  }, [sections.motor, stageIdx, formData.name, acceptedQuote?.insurerName, motorDetails.proposerDOB, loadKey]);
 
   // Policy Expiry = Start + Tenure - 1 day
   useEffect(() => {
@@ -215,7 +248,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       });
       return { ...prev, members };
     });
-  }, [sections.health, stageIdx, healthDetails.policyType, healthDetails.numberOfAdults, healthDetails.numberOfChildren, healthDetails.proposerIsMember]);
+  }, [sections.health, stageIdx, healthDetails.policyType, healthDetails.numberOfAdults, healthDetails.numberOfChildren, healthDetails.proposerIsMember, (healthDetails.members || []).length, loadKey]);
 
   // Health: proposer member name follows Proposer Name
   useEffect(() => {
@@ -243,7 +276,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       );
       return { ...prev, portabilityDetails: rows };
     });
-  }, [sections.health, stageIdx, healthDetails.hasPreviousPolicy, healthDetails.previousPolicyCase, healthDetails.experienceYears]);
+  }, [sections.health, stageIdx, healthDetails.hasPreviousPolicy, healthDetails.previousPolicyCase, healthDetails.experienceYears, (healthDetails.portabilityDetails || []).length, loadKey]);
 
   // Payment: auto-fetch the accepted quote premium the first time
   useEffect(() => {
@@ -253,13 +286,13 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
         ? { ...prev, finalNetPremium: acceptedQuote.netPremium, finalGstPercent: W.isBlank(acceptedQuote.gstPercent) ? prev.finalGstPercent : acceptedQuote.gstPercent }
         : prev
     );
-  }, [stageIdx, acceptedQuote?.insurerName, acceptedQuote?.netPremium]);
+  }, [stageIdx, acceptedQuote?.insurerName, acceptedQuote?.netPremium, loadKey]);
 
   // Profit: PayOut Slab defaults to the accepted quote's Pay Out %
   useEffect(() => {
-    if (stageIdx < W.IDX.Profit || !acceptedQuote || W.isBlank(acceptedQuote.payoutPercent)) return;
+    if (stageIdx < (sections.electronic ? W.IDX.InsurerCalc : W.IDX.Profit) || !acceptedQuote || W.isBlank(acceptedQuote.payoutPercent)) return;
     setPayoutDetails((prev) => (W.isBlank(prev.payoutSlabPercent) ? { ...prev, payoutSlabPercent: acceptedQuote.payoutPercent } : prev));
-  }, [stageIdx, acceptedQuote?.insurerName, acceptedQuote?.payoutPercent]);
+  }, [stageIdx, acceptedQuote?.insurerName, acceptedQuote?.payoutPercent, loadKey]);
 
   // ------------------------------------------------------------
   // QUOTE HELPERS
@@ -352,6 +385,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setPinFetchError("");
     setIsFetchingPin(false);
     resetErrors();
+    setLoadKey((k) => k + 1);
   };
 
   const hydrate = (lead) => {
@@ -436,7 +470,15 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     const ed = lead.electronicDetails;
     setElectronicDetails(
       ed
-        ? { ...W.emptyElectronicDetails(), ...ed, dateOfPurchase: W.formatDateForInput(ed.dateOfPurchase), devicePhotos: ed.devicePhotos || [] }
+        ? {
+            ...W.emptyElectronicDetails(),
+            ...ed,
+            purchaseValue: str(ed.purchaseValue),
+            dateOfPurchase: W.formatDateForInput(ed.dateOfPurchase),
+            devicePhotos: ed.devicePhotos || [],
+            // address as per Aadhaar defaults to the lead's PIN so the zip is never missed
+            addressAsPerAadhaar: ed.addressAsPerAadhaar || "",
+          }
         : W.emptyElectronicDetails()
     );
 
@@ -474,6 +516,9 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       paymentStatus,
       eMandateUrl: str(wf.eMandateUrl),
       uwQuery: str(wf.uwQuery),
+      paymentTakenMode: str(wf.paymentTakenMode),
+      paymentQr: wf.paymentQr || null,
+      insurerPolicyCopy: wf.insurerPolicyCopy || null,
       utrNumber: str(wf.utrNumber),
       paymentSnapshot: wf.paymentSnapshot || null,
       issuanceStatus,
@@ -497,6 +542,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       amountPerPayment: str(cb.amountPerPayment),
       status: cb.status || "Pending",
       settledAmount: str(cb.settledAmount),
+      storePayout: str(cb.storePayout),
+      promoterPayout: str(cb.promoterPayout),
     });
 
     // ---- Arshyan Profit (legacy payout fields mapped) ----
@@ -504,6 +551,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setPayoutDetails({
       ...W.emptyPayout(),
       payoutBasis: pd.payoutBasis || (pd.isMotor && (pd.odPremium || pd.tpPremium) ? "OD/TP Split" : "Net Premium"),
+      insurerNetPremium: str(pd.insurerNetPremium),
       payoutSlabPercent: str(pd.payoutSlabPercent ?? accepted?.payoutPercent ?? ""),
       gstPayoutPercent: str(pd.gstPayoutPercent ?? pd.gstReturnSlabPercent ?? W.DEFAULT_GST_PAYOUT_PERCENT),
       tdsPercent: str(pd.tdsPercent ?? W.DEFAULT_TDS_PERCENT),
@@ -517,6 +565,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setQuoteFiles({});
     setShowAddOnModal(false);
     resetErrors();
+    setLoadKey((k) => k + 1);
   };
 
   // Used by the create form to open the next module without saving
@@ -603,6 +652,14 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     if (wf.issuanceStatus !== "e-Mandate Link Shared") wf.eMandateUrl = "";
     if (wf.issuanceStatus !== "Referred to UW") wf.uwQuery = "";
     if (wf.paymentSnapshot instanceof File) delete wf.paymentSnapshot;
+    if (wf.paymentQr instanceof File) delete wf.paymentQr;
+    if (wf.insurerPolicyCopy instanceof File) delete wf.insurerPolicyCopy;
+    if (sections.electronic) {
+      wf.product = productForInsurer(norm.acceptedInsurer); // Bajaj -> My Home, TATA -> Smart Home
+      if (wf.paymentTakenMode !== "QR") delete wf.paymentQr;
+    } else {
+      delete wf.paymentTakenMode;
+    }
     if (wf.policyCopy instanceof File) delete wf.policyCopy;
     wf.status = W.deriveCaseStatus(stage, wf);
     // never send "" for enum / number / date fields
@@ -688,9 +745,12 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
           delete e[f];
         }
       });
-      (electronicDetails.devicePhotos || []).forEach((p, i) => { if (p instanceof File) fd.append(`devicePhoto_${i}`, p); });
+      // number only the NEW photos (devicePhoto_0, _1 ...) — saved ones travel as URLs in the JSON
+      (electronicDetails.devicePhotos || []).filter((p) => p instanceof File).forEach((p, i) => fd.append(`devicePhoto_${i}`, p));
       e.devicePhotos = (e.devicePhotos || []).filter((p) => typeof p === "string");
-      if (e.deviceType || e.dateOfPurchase) fd.append("electronicDetails", JSON.stringify(e));
+      e.makeModel = composeMakeModel(e) || e.makeModel || "";
+      if (e.invoiceInProposerName !== "No") e.invoiceHolderRelation = "";
+      if (e.deviceType || e.dateOfPurchase || e.purchaseValue) fd.append("electronicDetails", JSON.stringify(e));
     }
 
     // ---- PA / Travel ----
@@ -701,13 +761,15 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     fd.append("workflowDetails", JSON.stringify(wf));
     if (workflowDetails.paymentSnapshot instanceof File) fd.append("paymentSnapshot", workflowDetails.paymentSnapshot);
     if (workflowDetails.policyCopy instanceof File) fd.append("policyCopy", workflowDetails.policyCopy);
+    if (workflowDetails.paymentQr instanceof File && workflowDetails.paymentTakenMode === "QR") fd.append("paymentQr", workflowDetails.paymentQr);
+    if (workflowDetails.insurerPolicyCopy instanceof File) fd.append("insurerPolicyCopy", workflowDetails.insurerPolicyCopy);
     (wf.insurerQuotes || []).forEach((q, idx) => {
       const file = quoteFiles[q.insurerName];
       if (file instanceof File) fd.append(`${quoteFilePrefix}${idx}`, file);
     });
 
     // ---- Cashback + Arshyan Profit (only once those modules are reached) ----
-    if (W.stageIndex(stage) >= W.IDX.Cashback) {
+    if (W.stageIndex(stage) >= W.IDX.InsurerCalc) {
       fd.append("cashbackDetails", JSON.stringify({ ...cashbackDetails, ...cashbackCalc }));
       fd.append("payoutDetails", JSON.stringify({
         ...payoutDetails,
@@ -734,7 +796,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     caseStage, savedLead, quoteFiles, setQuoteFiles, validationErrors, validationPopup, setValidationPopup,
     showAddOnModal, setShowAddOnModal, isFetchingPin, pinFetchError,
     // derived
-    sections, stageIdx, isAdmin, instalment, acceptedQuote, sourceDependentField, visibleStages, nextStage,
+    sections, stageIdx, isAdmin, instalment, acceptedQuote, sourceDependentField, visibleStages, nextStage, chartPremium,
     quotesLocked, paymentLocked, finalAmounts, emiAmounts, emiSchedule, cashbackCalc, profitCalc,
     // actions
     toggleInsurer, updateQuote, updateMember, updateMemberRider, updatePortability,

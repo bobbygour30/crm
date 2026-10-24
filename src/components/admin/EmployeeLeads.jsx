@@ -251,7 +251,8 @@ function EmployeeLeads() {
         "Grand Total PayOut": l.payoutDetails?.grandTotalPayout ?? "", "Arshyan Profit": l.payoutDetails?.arshyanProfit ?? "",
         "Motor Policy Type": l.motorDetails?.policyType || "", "Vehicle Type": l.motorDetails?.vehicleType || "",
         "Registration / RTO": l.motorDetails?.registrationNumber || l.motorDetails?.rtoCode || "",
-        "Vehicle Manufacturer": getDisplayManufacturer(l.motorDetails), "Vehicle Model": l.motorDetails?.model || "",
+        "Vehicle Manufacturer": getDisplayManufacturer(l.motorDetails),
+        "Device (Make & Model)": l.electronicDetails?.makeModel || "", "IMEI / Serial": l.electronicDetails?.imeiNumber || "", "Product": l.workflowDetails?.product || "", "Vehicle Model": l.motorDetails?.model || "",
         "Created At": l.createdAt ? new Date(l.createdAt).toLocaleDateString() : "",
       };
     });
@@ -315,6 +316,7 @@ function EmployeeLeads() {
             {item("Policy Tenure / Paying Term", [l.policyTenure, l.paymentTerm].filter(Boolean).join(" / "))}
             {item("Sum Insured", l.sumInsured)}
             {l.motorDetails && item("Vehicle", [l.motorDetails.policyType, l.motorDetails.vehicleType, getDisplayManufacturer(l.motorDetails), l.motorDetails.model, l.motorDetails.registrationNumber || l.motorDetails.rtoCode].filter(Boolean).join(" · "))}
+            {l.electronicDetails && item("Device", [l.electronicDetails.deviceType, l.electronicDetails.makeModel, l.electronicDetails.imeiNumber && `IMEI/Serial ${l.electronicDetails.imeiNumber}`, l.workflowDetails?.product].filter(Boolean).join(" · "))}
             {l.healthDetails && item("Health", [l.healthDetails.policyType, l.healthDetails.proposerName, `${l.healthDetails.members?.length || 0} member(s)`].filter(Boolean).join(" · "))}
             {item("Insurers Requested", (wf.selectedInsurers || []).join(", "))}
             {item("Accepted Quote", accepted ? `${accepted.insurerName} — ₹${fmt(accepted.netPremium)} net` : "")}
