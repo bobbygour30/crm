@@ -517,6 +517,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       eMandateUrl: str(wf.eMandateUrl),
       uwQuery: str(wf.uwQuery),
       paymentTakenMode: str(wf.paymentTakenMode),
+      certificateNumber: str(wf.certificateNumber),
+      policyCopyAuto: !!wf.policyCopyAuto,
       paymentQr: wf.paymentQr || null,
       insurerPolicyCopy: wf.insurerPolicyCopy || null,
       utrNumber: str(wf.utrNumber),

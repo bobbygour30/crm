@@ -25,7 +25,6 @@ import PersonalAccidentForm from "./PersonalAccidentForm";
 import {
   MOBILE_DEVICE_TYPES, MOBILE_TENURE_OPTIONS, MOBILE_INSURERS, INVOICE_HOLDER_RELATIONS, PAYMENT_TAKEN_MODES,
   MOBILE_MIN_PHOTOS, MOBILE_CHART_MAX, productForInsurer, usesImei, purchaseDateBounds, composeMakeModel,
-  openMobileQuoteDocument, openMobilePolicyDocument,
 } from "./mobileInsurance";
 import TravelInsuranceForm from "./TravelInsuranceForm";
 import {
@@ -1175,6 +1174,15 @@ export default function LeadCaseForm({
                 )}
                 <Field label="GST Value (auto)"><input type="text" readOnly value={fmt(calc.gstValue)} className={autoCls} /></Field>
                 <Field label="Gross Premium (auto)"><input type="text" readOnly value={fmt(calc.grossPremium)} className={cx(autoCls, "font-medium")} /></Field>
+                {sections.electronic ? (
+                  <Field label="Quote (On Letter Head)" hint="Auto-generated PDF">
+                    {q.autoQuote && q.quoteUpload ? (
+                      <a href={q.quoteUpload} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 underline flex items-center gap-1"><FaFileAlt /> View / Download PDF</a>
+                    ) : (
+                      <p className="text-sm text-gray-500">{q.netPremium ? "Generated when you save" : "Generated once the premium is in"}</p>
+                    )}
+                  </Field>
+                ) : (
                 <Field label={isAdmin ? "Upload Quote" : "Quote Document"}>
                   <ViewLink url={q.quoteUpload} label="View quote" />
                   {isAdmin ? (
@@ -1182,6 +1190,7 @@ export default function LeadCaseForm({
                   ) : !q.quoteUpload && <p className="text-sm text-gray-400">Not uploaded yet</p>}
                   <NewFileTag file={quoteFiles[ins]} />
                 </Field>
+                )}
                 {!employeeView && !sections.electronic && (
                   <Field label="Pay Out (%)" error={err[k("payout")]} hint="Insurer payout slab offered on this quote">
                     <input data-field={k("payout")} type="number" min="0" max="100" value={q.payoutPercent ?? ""} onChange={(e) => updateQuote(ins, "payoutPercent", e.target.value)} className={inputCls(err[k("payout")])} />
@@ -1203,16 +1212,6 @@ export default function LeadCaseForm({
                     <span className="col-span-2">Address: <b>{electronicDetails.addressAsPerAadhaar || "—"}</b></span>
                   </div>
                   <div className="flex flex-col gap-2">
-                    <button
-                      type="button" disabled={false}
-                      onClick={() => openMobileQuoteDocument({
-                        lead: formData, device: electronicDetails, quote: q, tenure: formData.policyTenure,
-                        quoteRef: q.quoteNumber || `${savedLead?.leadCode || "QUOTE"}-${productForInsurer(ins).replace(/\s/g, "").toUpperCase() || "MOB"}`,
-                      })}
-                      className="px-3 py-2 text-sm rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center justify-center gap-2"
-                    >
-                      <FaFileAlt /> Download Quote / Proforma
-                    </button>
                     {isAdmin && !L && (
                       <label className="text-xs text-gray-600 flex items-center gap-2">
                         <input type="checkbox" checked={!!q.manualPremium} onChange={(e) => updateQuote(ins, "manualPremium", e.target.checked)} />
@@ -1266,7 +1265,8 @@ export default function LeadCaseForm({
         {rows.map(([l, v]) => (
           <div key={l}><p className="text-xs text-gray-500">{l}</p><p className="font-medium text-gray-800 break-words">{v}</p></div>
         ))}
-        <div><p className="text-xs text-gray-500">Uploaded Quote</p><ViewLink url={acceptedQuote.quoteUpload} label="View quote" />{!acceptedQuote.quoteUpload && <p className="text-gray-400">—</p>}</div>
+        <div><p className="text-xs text-gray-500">{sections.electronic ? "Quote (On Letter Head)" : "Uploaded Quote"}</p><ViewLink url={acceptedQuote.quoteUpload} label={sections.electronic ? "View / Download PDF" : "View quote"} />{!acceptedQuote.quoteUpload && <p className="text-gray-400">—</p>}</div>
+        {sections.electronic && workflowDetails.certificateNumber && <div><p className="text-xs text-gray-500">Certificate No.</p><p className="font-medium text-gray-800">{workflowDetails.certificateNumber}</p></div>}
       </div>
     );
   };
@@ -1623,17 +1623,16 @@ export default function LeadCaseForm({
                 <Field label="Policy Expiry Date (auto)" hint="Start Date + Policy Tenure">
                   <input type="date" readOnly value={w.policyExpiryDate} className={autoCls} />
                 </Field>
-                <FileField label="Upload Policy Copy" dataField="policyCopy" value={w.policyCopy} onFile={(f) => setWf({ policyCopy: f })} accept=".pdf" />
-                {sections.electronic && (
-                  <div className="flex items-end">
-                    <button
-                      type="button" disabled={!w.policyNumber}
-                      onClick={() => openMobilePolicyDocument({ lead: formData, device: electronicDetails, workflow: w, insurer: acceptedQuote?.insurerName, tenure: formData.policyTenure })}
-                      className="px-3 py-2 text-sm rounded-lg border border-indigo-300 text-indigo-700 hover:bg-indigo-50 disabled:opacity-50 flex items-center gap-2"
-                    >
-                      <FaFileAlt /> Generate Policy Schedule (PDF)
-                    </button>
-                  </div>
+                {sections.electronic ? (
+                  <Field label="Policy Copy (On Letter Head)" hint={`Auto-generated PDF${w.certificateNumber ? ` · Certificate No. ${w.certificateNumber}` : ""}`}>
+                    {w.policyCopyAuto && typeof w.policyCopy === "string" && w.policyCopy ? (
+                      <a href={w.policyCopy} target="_blank" rel="noopener noreferrer" className="text-sm text-indigo-600 underline flex items-center gap-1"><FaFileAlt /> View / Download PDF</a>
+                    ) : (
+                      <p className="text-sm text-gray-500">Generated when you save with Policy Number + Start Date</p>
+                    )}
+                  </Field>
+                ) : (
+                  <FileField label="Upload Policy Copy" dataField="policyCopy" value={w.policyCopy} onFile={(f) => setWf({ policyCopy: f })} accept=".pdf" />
                 )}
               </>
             )}
@@ -2091,7 +2090,7 @@ export default function LeadCaseForm({
       {hideAdminModules && reached("QuoteWorkflow") && renderEmployeeStatus()}
 
       {reached("QuoteWorkflow") && (
-        <Section n={num_("QuoteWorkflow")} title={hideAdminModules ? "Quotes" : "Quote Workflow"} icon={FaClipboardList} status={acceptedQuote ? `Accepted: ${acceptedQuote.insurerName}` : undefined} lock={lockFor("QuoteWorkflow")}>
+        <Section n={num_("QuoteWorkflow")} title={hideAdminModules ? "Quotes" : "Quote Workflow"} icon={FaClipboardList} status={[sections.electronic && workflowDetails.certificateNumber ? `Certificate No. ${workflowDetails.certificateNumber}` : "", acceptedQuote ? `Accepted: ${acceptedQuote.insurerName}` : ""].filter(Boolean).join(" · ") || undefined} lock={lockFor("QuoteWorkflow")}>
           {renderQuoteWorkflow()}
         </Section>
       )}

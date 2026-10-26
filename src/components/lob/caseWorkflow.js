@@ -1069,9 +1069,21 @@ export const collectDocuments = (lead) => {
   add("Purchase Invoice", el.purchaseInvoice, "Device");
   (el.devicePhotos || []).forEach((p, i) => add(`Device Photo ${i + 1}`, p, "Device"));
   const w = lead.workflowDetails || {};
-  (w.insurerQuotes || []).forEach((q) => add(`Quote — ${q.insurerName}`, q.quoteUpload, "Quotes"));
+  // Mobile: Quote + Policy Copy are auto-generated on the Vidhant letter head
+  const LH = "Letter Head (Auto Generated)";
+  const quotes = w.insurerQuotes || [];
+  const accepted = quotes.find((q) => q.quoteStatus === "Accepted");
+  quotes.forEach((q) => {
+    if (q.autoQuote) {
+      const showAll = !accepted; // before acceptance list every insurer's quote, afterwards only the accepted one
+      if (showAll || q === accepted) add(`Quote (On Letter Head — Auto Generated)${showAll && quotes.length > 1 ? ` — ${q.insurerName}` : ""}`, q.quoteUpload, LH);
+    } else {
+      add(`Quote — ${q.insurerName}`, q.quoteUpload, "Quotes");
+    }
+  });
   add("Payment Snapshot", w.paymentSnapshot, "Payment");
-  add("Policy Copy", w.policyCopy, "Policy");
+  if (w.policyCopyAuto) add(`Policy Copy (On Letter Head — Auto Generated)${w.certificateNumber ? ` — ${w.certificateNumber}` : ""}`, w.policyCopy, LH);
+  else add("Policy Copy", w.policyCopy, "Policy");
   add("Payment QR", w.paymentQr, "Payment");
   add("Insurer Policy Copy", w.insurerPolicyCopy, "Policy");
   ["paDetails", "travelDetails"].forEach((k) => {
