@@ -17,6 +17,7 @@ import {
   campaigns,
 } from "../../data/mockData";
 import EmployeeSalarySlipViewer from "./EmployeeSalarySlipViewer";
+import PolicyReports from "../reports/PolicyReports";
 
 function UserApp({ handleLogout }) {
   const [activeTab, setActiveTab] = useState("home");
@@ -181,6 +182,7 @@ function UserApp({ handleLogout }) {
             <Route path="/vehicle-quote" element={<VehicleQuote user={currentUser} />} />
             <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={currentUser} />} />
             <Route path="/quote" element={<Quote user={currentUser} />} />
+            <Route path="/reports" element={<PolicyReports />} />
           </Routes>
         </div>
       </div>
