@@ -11,7 +11,7 @@
 // ============================================================
 import {
   isMotorLob, validateMotorPayout, computeMotorPayout, OTHER_MANUFACTURER, MOTOR_ISSUANCE_STATUS_OPTIONS,
-  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE,
+  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE, NO_ADDON,
 } from "./motorInsurance";
 import {
   MOBILE_LOB, MOBILE_INSURERS, getChartPremium, checkPurchaseDate, usesImei, computeMobileProfit, MOBILE_MIN_PHOTOS,
@@ -25,6 +25,8 @@ import {
 // The older per-vehicle motor LOBs are no longer offered; leads saved with them still open
 // (their vehicle + policy type are worked out by motorDefaultsFromLob).
 export const LEGACY_MOBILE_LOBS = ["Mobile/Electronic Equipment Insurance"];
+export const PA_LOB = "Personal Accident (PA)";
+export const LEGACY_PA_LOBS = ["PERSONAL ACCIDENT"];
 export const LEGACY_MOTOR_LOBS = [
   "Private Car-OD", "Private Car-SOD", "Private Car-Comprehensive", "Private Car-TP",
   "Taxi-Comprehensive", "Taxi-TP", "Commercial Vehicle-Comprehensive", "Commercial Vehicle-TP",
@@ -34,7 +36,7 @@ export const LOB_OPTIONS = [
   "Health Insurance", "Motor Insurance", MOBILE_LOB, "My Home",
   "Mediclaim Health Insurance", "Bharat Sookshma Udyam Suraksha", "Bharat Laghu Udyam Suraksha",
   "Bharat Grih Raksha", "Burglary", "MARINE-OPEN", "MARINE-SPECIFIC", "MARINE-STOP",
-  "PERSONAL ACCIDENT", "Employee Compensation", "Group Health Insurance", "Terms Insurance",
+  PA_LOB, "Employee Compensation", "Group Health Insurance", "Terms Insurance",
   "Ulip Plan", "Traditional Plan", "Travel Insurance", "Other Insurance",
 ];
 export const SOURCE_OPTIONS = ["Employee", "Channel Partner", "Direct Client", "Social Media", "Store", "Other"];
@@ -212,10 +214,14 @@ export const detectSections = (lob) => ({
   health: isHealthLob(lob),
   motor: isMotorLob(lob),
   electronic: isElectronicLob(lob),
-  pa: lob === "PERSONAL ACCIDENT",
-  travel: lob === "Travel Insurance",
+  pa: isPaLob(lob),
+  travel: isTravelLob(lob),
 });
 // EMI (instalment) premium is only offered for these LOBs
+export const isPaLob = (lob) => !!lob && (lob === "PERSONAL ACCIDENT" || /personal accident/i.test(lob) || /\(PA\)/.test(lob));
+export const isTravelLob = (lob) => !!lob && /travel/i.test(lob);
+/** Premium paid once (no Paying Term / EMI): Motor, Mobile, PA, Travel */
+export const isOneTimeLob = (lob) => isMotorLob(lob) || isElectronicLob(lob) || isPaLob(lob) || isTravelLob(lob);
 export const isEmiEligibleLob = (lob) => {
   const l = (lob || "").toLowerCase();
   return l.includes("health") || l.includes("term");
@@ -230,7 +236,8 @@ export const STAGES = [
   // premiums / files / payout are Admin-only; the quote STATUS (and proceeding) is open to Employee + Admin
   { key: "QuoteWorkflow", label: "Quote Workflow", access: "all", next: "Proceed with Accepted Quote" },
   { key: "PolicyIssuance", label: "Policy Issuance", access: "all", next: "Request for Payment URL" },
-  { key: "Payment", label: "Payment", access: "admin", next: "EMI / Premium Details" },
+  // Admin + Employee: payment status, policy status and policy details; pricing stays Admin-only
+  { key: "Payment", label: "Payment", access: "all", next: "EMI / Premium Details" },
   { key: "EmiDues", label: "EMI Dues", access: "admin", next: "PayOut & Cashback" },
   // Mobile BRD only: Arshyan buys the policy from the insurer — insurer premium, payout, insurer copy
   { key: "InsurerCalc", label: "Arshyan Calculation", access: "admin", next: "PayOut & Cashback" },
@@ -683,6 +690,7 @@ const validateMotorQuote = (ctx, e) => {
     if (!m.monthOfManufacturing || !m.yearOfManufacturing) e("monthOfManufacturing", "Manufacturer Date (MM/YYYY) is required");
     if (!m.ownerType) e("ownerType", "Type of Owner is required");
     if (!(num(m.idvAsPerInvoice) > 0)) e("idvAsPerInvoice", "IDV is required (digits only)");
+    if (!(m.selectedAddOns || []).length) e("selectedAddOns", `Choose the add-ons, or "${NO_ADDON}"`);
   } else if (m.policyType) {
     if (!m.registrationNumber) e("registrationNumber", "Registration No. is required");
     else if (!validateRegistration(m.registrationNumber)) e("registrationNumber", "Registration No. format, e.g. BR01BS6139");
@@ -706,6 +714,7 @@ const validateMotorQuote = (ctx, e) => {
         if (m.claimTaken === "No" && !m.ncb) e("ncb", "Select the NCB in current policy");
       }
       if (notActive && !(num(m.idvRequired) > 0)) e("idvRequired", "IDV Required for (digits) is required");
+      if ((active || notActive) && !(m.selectedAddOns || []).length) e("selectedAddOns", `Choose the add-ons required, or "${NO_ADDON}"`);
     }
     if (active || notActive) {
       if (!m.rcFrontFile) e("rcFrontFile", "Upload RC — Front side");
@@ -802,7 +811,7 @@ const validateQuoteStage = (ctx, e) => {
   if (s.health) validateHealthQuote(ctx, e);
   if (s.motor) validateMotorQuote(ctx, e);
   if (s.electronic) validateElectronicQuote(ctx, e);
-  if (s.pa && ctx.validatePA) ctx.validatePA(ctx.paDetails).forEach(({ field, message }) => e(field, message));
+  if (s.pa && ctx.validatePA) ctx.validatePA(ctx.paDetails, ctx.formData).forEach(({ field, message }) => e(field, message));
   if (s.travel && ctx.validateTravel) ctx.validateTravel(ctx.travelDetails).forEach(({ field, message }) => e(field, message));
   if (!(ctx.workflowDetails.selectedInsurers || []).length) e("selectedInsurers", "Select at least one insurer to request quotes from");
 };
@@ -812,6 +821,7 @@ const validateQuoteWorkflowStage = (ctx, e) => {
   quotes.forEach((q) => {
     if (!isBlank(q.gstPercent) && (num(q.gstPercent) < 0 || num(q.gstPercent) > 100)) e(`quote_${q.insurerName}_gst`, `${q.insurerName}: GST % must be 0-100`);
     if (!isBlank(q.payoutPercent) && (num(q.payoutPercent) < 0 || num(q.payoutPercent) > 100)) e(`quote_${q.insurerName}_payout`, `${q.insurerName}: Pay Out % must be 0-100`);
+    if (!isBlank(q.idv) && !(num(q.idv) > 0)) e(`quote_${q.insurerName}_idv`, `${q.insurerName}: IDV must be a positive amount`);
   });
   const accepted = quotes.filter((q) => q.quoteStatus === "Accepted");
   if (accepted.length === 0) e("quoteStatus", "Mark one quote as Accepted to proceed");
@@ -825,6 +835,8 @@ const validateQuoteWorkflowStage = (ctx, e) => {
 const validateIssuanceStage = (ctx, e) => {
   if (ctx.sections.motor) validateMotorIssuance(ctx, e);
   if (ctx.sections.electronic) validateMobileIssuance(ctx, e);
+  if (ctx.sections.pa && ctx.validatePAIssuance) ctx.validatePAIssuance(ctx.paDetails).forEach(({ field, message }) => e(field, message));
+  if (ctx.sections.travel && ctx.validateTravelIssuance) ctx.validateTravelIssuance(ctx.travelDetails).forEach(({ field, message }) => e(field, message));
   if (!ctx.sections.health) return;
   const h = ctx.healthDetails;
   const members = h.members || [];
@@ -906,9 +918,11 @@ const checkPaymentSteps = (ctx, e) => {
 const validatePaymentStage = (ctx, e) => {
   const w = ctx.workflowDetails;
   const term = ctx.formData.paymentTerm;
-  if (!(num(w.finalNetPremium) > 0)) e("finalNetPremium", "Final Net Premium is required");
+  // pricing is Admin's: tell an employee who to ask rather than asking them to fill a locked field
+  const askAdmin = ctx.isAdmin === false ? " — Admin sets it; ask Admin before submitting" : "";
+  if (!(num(w.finalNetPremium) > 0)) e("finalNetPremium", `Final Net Premium is required${askAdmin}`);
   if (num(w.finalGstPercent) < 0 || num(w.finalGstPercent) > 100) e("finalGstPercent", "GST % must be 0-100");
-  if (isInstalment(term) && !(num(w.emiNetPremium) > 0)) e("emiNetPremium", "EMI Net Premium is required (Paying Term is not One Time)");
+  if (isInstalment(term) && !(num(w.emiNetPremium) > 0)) e("emiNetPremium", `EMI Net Premium is required (Paying Term is not One Time)${askAdmin}`);
   if (!w.paymentStatus) e("paymentStatus", "Payment Status is required");
   if (ctx.sections.electronic && ctx.advancing) {
     if (!w.paymentTakenMode) e("paymentTakenMode", "Select the Payment Taken Mode (URL / QR)");
@@ -1086,11 +1100,29 @@ export const collectDocuments = (lead) => {
   else add("Policy Copy", w.policyCopy, "Policy");
   add("Payment QR", w.paymentQr, "Payment");
   add("Insurer Policy Copy", w.insurerPolicyCopy, "Policy");
-  ["paDetails", "travelDetails"].forEach((k) => {
-    const d = lead[k] || {};
-    Object.entries(d).forEach(([field, v]) => {
-      if (typeof v === "string" && /^https?:\/\//.test(v)) add(field, v, k === "paDetails" ? "Personal Accident" : "Travel");
-    });
+  const pa = lead.paDetails || {};
+  add("Renewal — Previous Policy", pa.renewalDetails?.uploadPolicy, "Personal Accident");
+  (pa.portabilityDetails || []).forEach((p, i) => add(`Portability PYP ${i + 1}`, p.uploadPYP, "Personal Accident"));
+  add("Proposer Aadhaar", pa.aadhaarFile, "Personal Accident");
+  add("Proposer PAN", pa.panFile, "Personal Accident");
+  add("Previous Policy", pa.prevPolicyFile, "Personal Accident");
+  (pa.members || []).forEach((m, i) => {
+    add(`Member ${i + 1} Aadhaar (front)`, m.aadhaarFront, "Personal Accident");
+    add(`Member ${i + 1} Aadhaar (back)`, m.aadhaarBack, "Personal Accident");
+    add(`Member ${i + 1} PAN`, m.panFile, "Personal Accident");
+  });
+  const tr = lead.travelDetails || {};
+  add("Passport (front)", tr.passportFront, "Travel");
+  add("Passport (back)", tr.passportBack, "Travel");
+  add("Aadhaar", tr.aadhaarFile, "Travel");
+  (tr.companions || []).forEach((c, i) => {
+    add(`${c.fullName || `Traveller ${i + 2}`} — Passport (front)`, c.passportFront, "Travel");
+    add(`${c.fullName || `Traveller ${i + 2}`} — Passport (back)`, c.passportBack, "Travel");
+  });
+  (tr.travelers || []).forEach((t, i) => {
+    add(`${t.fullName || `Traveller ${i + 1}`} — Passport`, t.passportFile, "Travel");
+    add(`${t.fullName || `Traveller ${i + 1}`} — Aadhaar`, t.aadhaarFile, "Travel");
+    add(`${t.fullName || `Traveller ${i + 1}`} — PAN`, t.panFile, "Travel");
   });
   return docs;
 };

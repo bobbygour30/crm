@@ -20,6 +20,7 @@ import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
 import WelcomeLetterGenerator from './WelcomeLetterGenerator';
 import EmployeeLeads from './EmployeeLeads'; // ← ADDED
+import PolicyReports from '../reports/PolicyReports';
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -68,6 +70,7 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -319,6 +322,7 @@ function AdminApp({ handleLogout }) {
                   />
                 )}
                 {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
+                {activeTab === 'reports' && <PolicyReports />}
                 {activeTab === 'tasks' && (
                   <TaskList
                     tasks={taskList}

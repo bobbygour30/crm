@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
+    { name: 'Reports', icon: FaChartBar, key: 'reports' },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
@@ -29,6 +30,7 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     dashboard: '/admin',
     leads: '/admin/leads',
     'employee-leads': '/admin/employee-leads', // ← ADDED
+    reports: '/admin/reports',
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',
