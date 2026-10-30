@@ -35,12 +35,15 @@ function AdminApp({ handleLogout }) {
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
       reports: '/admin/reports',
+<<<<<<< HEAD
       'reports-leads': '/admin/reports/leads',
       'reports-active': '/admin/reports/active',
       'reports-expired': '/admin/reports/expired',
       'reports-renewal': '/admin/reports/renewal',
       'reports-emi': '/admin/reports/emi',
       'reports-all': '/admin/reports/all',
+=======
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -77,12 +80,15 @@ function AdminApp({ handleLogout }) {
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
       reports: '/admin/reports',
+<<<<<<< HEAD
       'reports-leads': '/admin/reports/leads',
       'reports-active': '/admin/reports/active',
       'reports-expired': '/admin/reports/expired',
       'reports-renewal': '/admin/reports/renewal',
       'reports-emi': '/admin/reports/emi',
       'reports-all': '/admin/reports/all',
+=======
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -334,9 +340,13 @@ function AdminApp({ handleLogout }) {
                   />
                 )}
                 {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
+<<<<<<< HEAD
                 {(activeTab === 'reports' || activeTab.startsWith('reports-')) && (
                   <PolicyReports key={activeTab} report={activeTab === 'reports' ? 'leads' : activeTab.replace('reports-', '')} />
                 )}
+=======
+                {activeTab === 'reports' && <PolicyReports />}
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
                 {activeTab === 'tasks' && (
                   <TaskList
                     tasks={taskList}

@@ -582,8 +582,11 @@ export const emptyWorkflow = () => ({
   emiReceivedCount: "", lastEmiPaidOn: "",
   workflowRemarks: "",
 });
+<<<<<<< HEAD
 // shown at the bottom of the case form so you can tell which build a site is running
 export const APP_BUILD = "Build 2026-10-29b";
+=======
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
 export const PAYOUT_MODE_OPTIONS = ["One Time", "On Each Payment"];
 /** PayOut Mode choices: a One Time premium can only be paid out once */
 export const payoutModeOptions = (paymentTerm) => (isInstalment(paymentTerm) ? PAYOUT_MODE_OPTIONS : ["One Time"]);

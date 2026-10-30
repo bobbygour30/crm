@@ -42,7 +42,11 @@ import {
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
   deriveCaseStatus, statusBadgeClass, getIssuanceStatusOptions, PAYOUT_BASIS_OPTIONS, normalizeRegistration,
+<<<<<<< HEAD
   PAYMENT_DONE, nextActionLabel, payoutModeOptions, APP_BUILD,
+=======
+  PAYMENT_DONE, nextActionLabel, payoutModeOptions,
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -2207,16 +2211,24 @@ export default function LeadCaseForm({
         </Section>
       )}
 
+<<<<<<< HEAD
       {(reached("Cashback") || (hideAdminModules && stageIdx > IDX.Payment)) && (
+=======
+      {reached("Cashback") && (
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
         <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly={!hideAdminModules} tone="amber" lock={hideAdminModules ? undefined : lockFor("Cashback")}>
           {hideAdminModules || !isAdmin ? (
             // the lead's employee / channel partner sees the cashback, Admin fills it
             <fieldset disabled data-readonly="cashback">
+<<<<<<< HEAD
               <p className="text-xs text-gray-500 mb-3">
                 {savedLead?.cashbackDetails && (savedLead.cashbackDetails.amountPerPayment || savedLead.cashbackDetails.storePayout || savedLead.cashbackDetails.promoterPayout)
                   ? "Filled by Admin — shown here for your reference."
                   : "Not filled by Admin yet — it will show here once Admin enters the cashback / payout."}
               </p>
+=======
+              <p className="text-xs text-gray-500 mb-3">Filled by Admin — shown here for your reference.</p>
+>>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
               {renderCashback()}
             </fieldset>
           ) : renderCashback()}
