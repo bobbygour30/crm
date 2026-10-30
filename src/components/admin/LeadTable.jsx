@@ -1,16 +1,18 @@
 // src/components/LeadTable.jsx
 import { motion } from "framer-motion";
 import {
-  FaEye, FaEdit, FaTimes, FaDownload, FaSearch, FaUpload, FaFilter, FaFileExcel, FaBell, FaClock,
+  FaEye, FaEdit, FaTimes, FaSearch, FaUpload, FaFilter, FaFileExcel, FaBell, FaClock,
   FaExclamationTriangle, FaUserPlus, FaCheckCircle,
 } from "react-icons/fa";
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import LeadCaseForm from "../lob/LeadCaseForm";
+import BulkUploadModal from "./BulkUploadModal";
+import { prepareUpload, uploadErrorMessage } from "../lob/uploadUtils";
 import useLeadCase from "../lob/useLeadCase";
 import { getDisplayManufacturer } from "../lob/motorInsurance";
 import {
-  validateMobile, getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST, statusBadgeClass,
+  getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST, statusBadgeClass,
 } from "../lob/caseWorkflow";
 
 // one colour map for all lead pages (includes the motor inspection statuses)
@@ -39,8 +41,7 @@ function LeadTable() {
     employees: false, stores: false, channelPartners: false, socialMedia: false, directSource: false,
   });
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState({ show: false, message: "", type: "" });
-  const [isUploading, setIsUploading] = useState(false);
+  const [showBulk, setShowBulk] = useState(false);
   const [renewalAlerts, setRenewalAlerts] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [flash, setFlash] = useState("");
@@ -48,7 +49,6 @@ function LeadTable() {
   const [channelPartners, setChannelPartners] = useState([]);
 
   const filterDropdownRef = useRef(null);
-  const fileInputRef = useRef(null);
   const API_BASE = import.meta.env.VITE_BACKEND_URL;
 
   // ============================================================
@@ -149,16 +149,6 @@ function LeadTable() {
   // ============================================================
   // BULK UPLOAD / EXPORT
   // ============================================================
-  const downloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([{
-      name: "JOHN DOE", email: "john@example.com", mobileNo: "9876543210", gender: "Male", source: "Employee",
-      remarks: "Customer remarks", lob: "Health Insurance", policyTenure: "1 Year", paymentTerm: "Yearly", sumInsured: "10 Lakh",
-    }]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "LeadTemplate");
-    XLSX.writeFile(wb, "lead_upload_template.xlsx");
-  };
-
   const downloadExcel = () => {
     if (!filteredLeads.length) {
       alert("No leads data to export!");
@@ -190,46 +180,6 @@ function LeadTable() {
     XLSX.writeFile(wb, `leads_export_${new Date().toISOString().split("T")[0]}.xlsx`);
   };
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const done = (message, type) => {
-      setUploadStatus({ show: true, message, type });
-      setIsUploading(false);
-      e.target.value = "";
-      setTimeout(() => setUploadStatus({ show: false, message: "", type: "" }), 5000);
-    };
-    if (!file.name.match(/\.(xlsx|xls)$/)) return done("Incorrect format! Please upload only .xlsx or .xls files.", "error");
-    setIsUploading(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const wb = XLSX.read(new Uint8Array(event.target.result), { type: "array" });
-        const rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-        if (!rows.length) return done("The uploaded file contains no data.", "error");
-        const errors = [];
-        rows.forEach((row, i) => {
-          if (!row.name || !row.mobileNo) errors.push(`Row ${i + 2}: Missing name or mobile number`);
-          if (row.mobileNo && !validateMobile(row.mobileNo.toString())) errors.push(`Row ${i + 2}: Invalid mobile number`);
-        });
-        if (errors.length) return done(errors.join("\n"), "error");
-        const body = new FormData();
-        body.append("file", file);
-        const res = await fetch(`${API_BASE}/api/leads/upload`, { method: "POST", headers: authHeaders(), body });
-        if (res.ok) {
-          const result = await res.json();
-          fetchLeads();
-          return done(`${result.count || result.leads?.length || 0} leads uploaded successfully!`, "success");
-        }
-        const error = await res.json().catch(() => ({}));
-        return done("Upload failed: " + (error.error || error.message || "Unknown error"), "error");
-      } catch (err) {
-        return done("Error processing file: " + err.message, "error");
-      }
-    };
-    reader.readAsArrayBuffer(file);
-  };
-
   // ============================================================
   // CREATE / UPDATE (staged)
   // ============================================================
@@ -241,7 +191,7 @@ function LeadTable() {
   const submitCreate = async (stage) => {
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/leads`, { method: "POST", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/leads`, { method: "POST", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -252,7 +202,7 @@ function LeadTable() {
       c.reset();
       setFlash(stage === "QuoteWorkflow" ? "Lead created and quotes requested." : "Lead saved.");
     } catch (err) {
-      c.showErrors([{ field: "general", message: "Error: " + err.message }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -274,7 +224,7 @@ function LeadTable() {
     if (!editLead?._id) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -293,7 +243,7 @@ function LeadTable() {
         setFlash("Lead updated.");
       }
     } catch (err) {
-      c.showErrors([{ field: "general", message: "Error: " + err.message }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -422,6 +372,7 @@ function LeadTable() {
         <LeadCaseForm
           c={c} mode={mode} employees={employees} channelPartners={channelPartners}
           isSubmitting={isSubmitting} onCancel={onClose} onSave={onSave} onAdvance={onAdvance}
+          recordUrl={mode === "edit" && editLead ? `${API_BASE}/api/leads/${editLead._id}` : null}
         />
       </motion.div>
     </motion.div>
@@ -490,10 +441,11 @@ function LeadTable() {
   // ============================================================
   return (
     <div className="space-y-4 p-4">
-      {uploadStatus.show && (
-        <motion.div initial={{ opacity: 0, y: -20 }} animate={{ opacity: 1, y: 0 }} className={`p-4 rounded-lg whitespace-pre-line ${uploadStatus.type === "success" ? "bg-green-100 text-green-800" : "bg-red-100 text-red-800"}`}>
-          {uploadStatus.type === "success" ? "✓ " : "✗ "}{uploadStatus.message}
-        </motion.div>
+      {showBulk && (
+        <BulkUploadModal
+          onClose={() => setShowBulk(false)}
+          onUploaded={(n) => { fetchLeads(); setFlash(`${n} lead(s) uploaded.`); }}
+        />
       )}
       {flash && !showEditModal && !showLeadForm && (
         <div className="p-3 rounded-lg bg-green-50 border border-green-200 text-green-700 text-sm flex items-center gap-2"><FaCheckCircle /> {flash}</div>
@@ -504,12 +456,8 @@ function LeadTable() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl shadow-lg border border-gray-100">
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto flex-wrap">
           <button onClick={openCreate} className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 flex items-center gap-2"><FaUserPlus /> Add New Lead</button>
-          <button onClick={downloadTemplate} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center gap-2"><FaDownload /> Download Template</button>
+          <button onClick={() => setShowBulk(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"><FaUpload className="h-4 w-4" /> Bulk Upload</button>
           <button onClick={downloadExcel} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center gap-2"><FaFileExcel /> Export Excel</button>
-          <label className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 cursor-pointer flex items-center gap-2">
-            <FaUpload className="h-4 w-4" /> {isUploading ? "Uploading..." : "Upload Excel"}
-            <input type="file" accept=".xlsx,.xls" onChange={handleFileUpload} className="hidden" ref={fileInputRef} disabled={isUploading} />
-          </label>
         </div>
       </div>
 

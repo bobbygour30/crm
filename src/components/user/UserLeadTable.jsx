@@ -17,6 +17,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import LeadCaseForm from "../../components/lob/LeadCaseForm";
+import { prepareUpload, uploadErrorMessage } from "../lob/uploadUtils";
 import useLeadCase from "../../components/lob/useLeadCase";
 import { getDisplayManufacturer } from "../../components/lob/motorInsurance";
 import {
@@ -30,16 +31,22 @@ const canEmployeeDelete = (lead) => inferStage(lead) === "Lead";
 // Employees see their own names for steps Admin handles (internal steps like "Cashback" / "Arshyan Profit" stay hidden)
 const employeeStageLabel = (lead) => {
   const key = inferStage(lead);
-  if (lead.status === "Policy Issued" && stageIndex(key) >= IDX.Payment) return "Policy Issued";
+  if (lead.status === "Policy Issued" && stageIndex(key) > IDX.Payment) return "Policy Issued";
   if (key === "QuoteWorkflow") return "Quotes";
-  if (stageIndex(key) >= IDX.Payment) return "Payment & Issuance (Admin)";
+  if (key === "Payment") return "Payment & Issuance";
+  if (stageIndex(key) > IDX.Payment) return "With Admin";
   return getStage(key).label;
 };
 
 // Who has the next action on this case
 const nextActor = (lead) => {
   const key = inferStage(lead);
-  if (lead.status === "Policy Issued") return { label: "Issued", cls: "text-emerald-700" };
+  // after the employee's final submission (leaving Payment) the case is with Admin
+  if (stageIndex(key) > IDX.Payment) {
+    if (lead.status === "Policy Issued") return { label: "Issued", cls: "text-emerald-700" };
+    if (lead.status === "Rejected") return { label: "Rejected", cls: "text-red-600" };
+    return { label: "With Admin", cls: "text-gray-500" };
+  }
   if (lead.status === "Rejected") return { label: "Rejected", cls: "text-red-600" };
   // Quotes: the employee reviews / accepts once Admin has added premiums
   if (key === "QuoteWorkflow") {
@@ -49,7 +56,8 @@ const nextActor = (lead) => {
   return getStage(key).access === "admin" ? { label: "With Admin", cls: "text-gray-500" } : { label: "Your action", cls: "text-indigo-700 font-medium" };
 };
 // after the employee's final submission the case is view-only for them
-const canEmployeeEdit = (lead) => nextActor(lead).label === "Your action" && stageIndex(inferStage(lead)) < IDX.Payment;
+// employees work up to and including the Payment module (payment / policy status)
+const canEmployeeEdit = (lead) => nextActor(lead).label === "Your action" && stageIndex(inferStage(lead)) <= IDX.Payment;
 
 function UserLeadTable() {
   const c = useLeadCase({ quoteFilePrefix: "insurerQuoteFile_", role: "employee" });
@@ -273,7 +281,7 @@ function UserLeadTable() {
   const submitCreate = async (stage) => {
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user-leads`, { method: "POST", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/user-leads`, { method: "POST", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -284,7 +292,7 @@ function UserLeadTable() {
       c.reset();
       setFlash(stage === "QuoteWorkflow" ? "Lead created — quotes requested from Admin." : "Lead saved.");
     } catch (err) {
-      c.showErrors([{ field: "general", message: "Error: " + err.message }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -305,7 +313,7 @@ function UserLeadTable() {
     if (!editLead?._id) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -322,7 +330,7 @@ function UserLeadTable() {
         setFlash("Lead updated.");
       }
     } catch (err) {
-      c.showErrors([{ field: "general", message: "Error: " + err.message }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -413,6 +421,7 @@ function UserLeadTable() {
         <LeadCaseForm
           c={c} mode={mode} audience="employee" employees={employees} channelPartners={channelPartners}
           isSubmitting={isSubmitting} onCancel={onClose} onSave={onSave} onAdvance={onAdvance}
+          recordUrl={mode === "edit" && editLead ? `${API_BASE}/api/user-leads/${editLead._id}` : null}
         />
       </motion.div>
     </motion.div>

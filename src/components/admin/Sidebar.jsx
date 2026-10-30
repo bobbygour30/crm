@@ -2,7 +2,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -12,6 +12,11 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
+    {
+      name: 'Reports', icon: FaChartBar, key: 'reports',
+      // sub-modules open just below "Reports"
+      children: [{ name: 'Leads', key: 'reports-leads' }, { name: 'Active Policy', key: 'reports-active' }, { name: 'Expired Policy', key: 'reports-expired' }, { name: 'Renewal Alert', key: 'reports-renewal' }, { name: 'EMI Due', key: 'reports-emi' }, { name: 'All Data', key: 'reports-all' }],
+    },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
@@ -29,6 +34,13 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     dashboard: '/admin',
     leads: '/admin/leads',
     'employee-leads': '/admin/employee-leads', // ← ADDED
+    reports: '/admin/reports',
+    'reports-leads': '/admin/reports/leads',
+    'reports-active': '/admin/reports/active',
+    'reports-expired': '/admin/reports/expired',
+    'reports-renewal': '/admin/reports/renewal',
+    'reports-emi': '/admin/reports/emi',
+    'reports-all': '/admin/reports/all',
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',
@@ -86,20 +98,39 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
         </div>
         <nav className="flex flex-col space-y-2 p-2 h-[calc(100%-100px)] justify-between">
           <div>
-            {tabs.map((tab) => (
-              <motion.button
-                key={tab.key}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
-                  activeTab === tab.key ? 'bg-indigo-600 shadow-md' : 'hover:bg-indigo-700'
-                }`}
-                onClick={() => handleTabClick(tab.key)}
-              >
-                <tab.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
-                {isSidebarOpen && <span>{tab.name}</span>}
-              </motion.button>
-            ))}
+            {tabs.map((tab) => {
+              const inGroup = !!tab.children && (activeTab === tab.key || activeTab.startsWith(`${tab.key}-`));
+              return (
+                <div key={tab.key} className="flex flex-col">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    aria-expanded={tab.children ? inGroup : undefined}
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-lg text-left text-sm md:text-base transition-colors duration-200 ${
+                      activeTab === tab.key || (inGroup && !isSidebarOpen) ? 'bg-indigo-600 shadow-md' : inGroup ? 'bg-indigo-700' : 'hover:bg-indigo-700'
+                    }`}
+                    onClick={() => handleTabClick(tab.children ? tab.children[0].key : tab.key)}
+                  >
+                    <tab.icon className="h-5 w-5 md:h-6 md:w-6 flex-shrink-0" />
+                    {isSidebarOpen && <span>{tab.name}</span>}
+                  </motion.button>
+                  {inGroup && isSidebarOpen && (
+                    <div className="ml-6 mt-1 mb-1 flex flex-col border-l border-indigo-400/50">
+                      {tab.children.map((sub) => (
+                        <button
+                          key={sub.key}
+                          onClick={() => handleTabClick(sub.key)}
+                          aria-current={activeTab === sub.key ? 'page' : undefined}
+                          className={`text-left text-sm pl-4 pr-3 py-2 rounded-r-lg transition-colors ${activeTab === sub.key ? 'bg-indigo-600 font-medium' : 'hover:bg-indigo-700 text-indigo-100'}`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}

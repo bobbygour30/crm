@@ -20,6 +20,7 @@ import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
 import WelcomeLetterGenerator from './WelcomeLetterGenerator';
 import EmployeeLeads from './EmployeeLeads'; // ← ADDED
+import PolicyReports from '../reports/PolicyReports';
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -33,6 +34,13 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -68,6 +76,13 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -319,6 +334,9 @@ function AdminApp({ handleLogout }) {
                   />
                 )}
                 {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
+                {(activeTab === 'reports' || activeTab.startsWith('reports-')) && (
+                  <PolicyReports key={activeTab} report={activeTab === 'reports' ? 'leads' : activeTab.replace('reports-', '')} />
+                )}
                 {activeTab === 'tasks' && (
                   <TaskList
                     tasks={taskList}

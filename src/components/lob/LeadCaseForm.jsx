@@ -20,17 +20,18 @@ import {
   FaTimes, FaCheck, FaCar, FaEdit, FaShieldAlt, FaMobileAlt, FaExclamationCircle, FaExclamationTriangle,
   FaSpinner, FaSave, FaLock, FaMicrophone, FaStop, FaArrowRight, FaHeartbeat, FaFileAlt, FaMoneyBillWave,
   FaClock, FaUsers, FaLink, FaBell, FaHandHoldingUsd, FaChartLine, FaFolderOpen, FaClipboardList, FaLockOpen,
+  FaEnvelope,
 } from "react-icons/fa";
-import PersonalAccidentForm from "./PersonalAccidentForm";
+import { PAQuoteSection, PAIssuanceSection, PA_SUM_INSURED } from "./PersonalAccidentForm";
 import {
   MOBILE_DEVICE_TYPES, MOBILE_TENURE_OPTIONS, MOBILE_INSURERS, INVOICE_HOLDER_RELATIONS, PAYMENT_TAKEN_MODES,
   MOBILE_MIN_PHOTOS, MOBILE_CHART_MAX, productForInsurer, usesImei, purchaseDateBounds, composeMakeModel,
 } from "./mobileInsurance";
-import TravelInsuranceForm from "./TravelInsuranceForm";
+import { TravelQuoteSection, TravelIssuanceSection } from "./TravelInsuranceForm";
 import {
   OTHER_MANUFACTURER, getManufacturerOptions, isManufacturerValidForType, getMotorPremiumParts,
   MOTOR_POLICY_TYPES, MOTOR_POLICY_TYPE_LABELS, MOTOR_FUEL_OPTIONS, OWNER_TYPE_OPTIONS,
-  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE,
+  PREVIOUS_POLICY_ACTIVE, PREVIOUS_POLICY_NOT_ACTIVE, NO_ADDON,
 } from "./motorInsurance";
 import {
   LOB_OPTIONS, SOURCE_OPTIONS, GENDER_OPTIONS, POLICY_TYPE_OPTIONS, QUALIFICATION_OPTIONS, OCCUPATION_OPTIONS,
@@ -41,7 +42,7 @@ import {
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
   deriveCaseStatus, statusBadgeClass, getIssuanceStatusOptions, PAYOUT_BASIS_OPTIONS, normalizeRegistration,
-  PAYMENT_DONE, nextActionLabel,
+  PAYMENT_DONE, nextActionLabel, payoutModeOptions, APP_BUILD,
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -154,22 +155,30 @@ const StageStepper = ({ stages, current, labels = {} }) => {
 };
 
 // Multi-choice add-on picker (Motor BRD: "Multiple choice enabled")
-const AddOnPicker = ({ options, value = [], onChange, disabled, dataField, error }) => (
-  <div
-    data-field={dataField}
-    className={cx("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border rounded-lg p-2 max-h-56 overflow-y-auto", error ? "border-red-500" : "border-gray-300", disabled && "bg-gray-50")}
-  >
-    {options.map((o) => (
-      <label key={o} className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox" className="rounded text-indigo-600" disabled={disabled} checked={value.includes(o)}
-          onChange={(e) => onChange(e.target.checked ? [...value, o] : value.filter((x) => x !== o))}
-        />
-        {o}
-      </label>
-    ))}
-  </div>
-);
+// `exclusive`: an option that can only be chosen on its own (e.g. "No Add-on Required")
+const AddOnPicker = ({ options, value = [], onChange, disabled, dataField, error, exclusive }) => {
+  const toggle = (o, checked) => {
+    if (!checked) return onChange(value.filter((x) => x !== o));
+    if (exclusive && o === exclusive) return onChange([o]);
+    return onChange([...value.filter((x) => x !== exclusive), o]);
+  };
+  return (
+    <div
+      data-field={dataField}
+      className={cx("grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 border rounded-lg p-2 max-h-56 overflow-y-auto", error ? "border-red-500" : "border-gray-300", disabled && "bg-gray-50")}
+    >
+      {options.map((o) => (
+        <label key={o} className={cx("flex items-center gap-2 text-sm", o === exclusive && "font-medium text-gray-800")}>
+          <input type="checkbox" className="rounded text-indigo-600" disabled={disabled} checked={value.includes(o)} onChange={(e) => toggle(o, e.target.checked)} />
+          {o}
+        </label>
+      ))}
+      {error && <p className="text-red-500 text-xs sm:col-span-2 lg:col-span-3">{error}</p>}
+    </div>
+  );
+};
+// add-ons the customer asks for (motor): "No Add-on Required" first, then the list
+const addOnChoice = (v) => ({ selectedAddOns: v, addOnRequired: v.includes(NO_ADDON) ? "No" : v.length ? "Yes" : "" });
 
 const FileField = ({ label, required, error, dataField, value, onFile, accept = ".pdf,.jpg,.jpeg,.png", hint, className }) => (
   <Field label={label} required={required} error={error} hint={hint} className={className}>
@@ -226,8 +235,77 @@ const VoiceNoteButton = ({ onText }) => {
 // ============================================================
 // COMPONENT
 // ============================================================
+// ============================================================
+// Mobile: e-mail the issued policy copy (draft preview -> send on click)
+// ============================================================
+function PolicyMailPanel({ recordUrl, lead }) {
+  const [draft, setDraft] = useState(null);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
+  const [sent, setSent] = useState(lead?.workflowDetails?.policyMailSentAt ? { at: lead.workflowDetails.policyMailSentAt, to: lead.workflowDetails.policyMailSentTo } : null);
+  const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" });
+  const openDraft = async () => {
+    setBusy("draft"); setError("");
+    try {
+      const res = await fetch(`${recordUrl}/policy-mail`, { headers: headers() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Server error ${res.status}`);
+      setDraft(data);
+    } catch (e) { setError(e.message); } finally { setBusy(""); }
+  };
+  const send = async () => {
+    setBusy("send"); setError("");
+    try {
+      const res = await fetch(`${recordUrl}/policy-mail`, { method: "POST", headers: headers() });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error([data.error, ...(data.errors || [])].filter(Boolean).join(": ") || `Server error ${res.status}`);
+      setSent({ at: data.sentAt, to: data.to });
+      setDraft(null);
+    } catch (e) { setError(e.message); } finally { setBusy(""); }
+  };
+  const when = (v) => new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  return (
+    <div className="sm:col-span-2 lg:col-span-3 border border-indigo-200 bg-indigo-50/40 rounded-lg p-3 flex flex-wrap items-center gap-3" data-panel="policy-mail">
+      <button type="button" onClick={openDraft} disabled={!!busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+        <FaEnvelope /> {busy === "draft" ? "Preparing…" : sent ? "Send e-Mail again" : "Send e-Mail"}
+      </button>
+      <span className="text-xs text-gray-600">
+        {sent ? <>Sent to <b>{sent.to}</b> on {when(sent.at)}</> : "Policy copy e-mail to the insured person — preview first, nothing is sent until you confirm."}
+      </span>
+      {error && !draft && <p className="w-full text-sm text-red-600" role="alert">{error}</p>}
+      {draft && (
+        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Policy e-mail">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
+            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2"><FaEnvelope className="text-indigo-600" /> Send policy e-mail</h3>
+            <dl className="text-sm grid grid-cols-[80px_1fr] gap-y-1 mb-3">
+              <dt className="text-gray-500">To</dt><dd className="font-medium break-all">{draft.to || "—"}</dd>
+              <dt className="text-gray-500">From</dt><dd className="break-all">{draft.from}</dd>
+              <dt className="text-gray-500">Subject</dt><dd>{draft.subject}</dd>
+              <dt className="text-gray-500">Attachment</dt><dd className="flex items-center gap-1"><FaFileAlt className="text-red-500" /> {draft.attachmentName}</dd>
+            </dl>
+            <pre className="whitespace-pre-wrap font-sans text-sm text-gray-800 bg-gray-50 border rounded-lg p-3 mb-3">{draft.text}</pre>
+            {draft.missing?.length > 0 && (
+              <ul className="mb-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg p-3 list-disc pl-5" role="alert">
+                {draft.missing.map((m) => <li key={m}>{m}</li>)}
+              </ul>
+            )}
+            {error && <p className="mb-3 text-sm text-red-600" role="alert">{error}</p>}
+            <div className="flex justify-end gap-2">
+              <button type="button" onClick={() => { setDraft(null); setError(""); }} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm">Cancel</button>
+              <button type="button" onClick={send} disabled={!!busy || draft.missing?.length > 0} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm">
+                <FaEnvelope /> {busy === "send" ? "Sending…" : "Send e-Mail"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function LeadCaseForm({
   c,
+  recordUrl = null,         // API address of the saved case (enables actions such as the policy e-mail)
   mode = "edit",            // "create" | "edit"
   audience = "auto",        // "auto" | "employee" (employee panel: admin modules are not rendered at all)
   employees = [],
@@ -268,7 +346,8 @@ export default function LeadCaseForm({
     onLock: () => setUnlocked((u) => ({ ...u, [key]: false })),
   });
   // after the employee's final submission (Request for Payment URL) the whole case is Admin-only
-  const employeeReadOnly = employeeView && stageIdx >= IDX.Payment;
+  // after the employee's final submission (leaving the Payment module) the case is Admin-only
+  const employeeReadOnly = employeeView && stageIdx > IDX.Payment;
 
   const renderValidationPopup = () => {
     if (!validationPopup.show) return null;
@@ -867,8 +946,8 @@ export default function LeadCaseForm({
               <input data-field="idvAsPerInvoice" type="text" inputMode="numeric" value={m.idvAsPerInvoice} onChange={(e) => setM({ idvAsPerInvoice: e.target.value.replace(/\D/g, "") })} className={inputCls(err.idvAsPerInvoice)} />
             </Field>
             <FileField label="Upload Invoice (Not Mandatory)" dataField="invoiceCopy" value={m.invoiceCopy} onFile={(f) => setM({ invoiceCopy: f })} hint="Becomes mandatory at Policy Issuance" />
-            <Field label="Add-ons" className="sm:col-span-2 lg:col-span-3">
-              <AddOnPicker options={ADD_ON_OPTIONS} value={m.selectedAddOns || []} onChange={(v) => setM({ selectedAddOns: v, addOnRequired: v.length ? "Yes" : "No" })} />
+            <Field label="Add-ons" required className="sm:col-span-2 lg:col-span-3">
+              <AddOnPicker options={[NO_ADDON, ...ADD_ON_OPTIONS]} exclusive={NO_ADDON} dataField="selectedAddOns" error={err.selectedAddOns} value={m.selectedAddOns || []} onChange={(v) => setM(addOnChoice(v))} />
             </Field>
           </div>
         </div>
@@ -951,9 +1030,6 @@ export default function LeadCaseForm({
               {m.claimTaken === "Yes" && (
                 <Field label="NCB in Current Policy" hint="Claim taken → NCB resets to 0%"><input type="text" readOnly value="0%" className={autoCls} /></Field>
               )}
-              <Field label="Add-ons in the Active Policy" className="sm:col-span-2 lg:col-span-3">
-                <AddOnPicker options={ADD_ON_OPTIONS} value={m.existingAddOns || []} onChange={(v) => setM({ existingAddOns: v })} />
-              </Field>
             </>
           )}
 
@@ -969,8 +1045,8 @@ export default function LeadCaseForm({
               </select>
             </Field>
           ) : (active || notActive) && (
-            <Field label={active ? "Add-ons Required" : "Add-ons"} className="sm:col-span-2 lg:col-span-3">
-              <AddOnPicker options={ADD_ON_OPTIONS} value={m.selectedAddOns || []} onChange={(v) => setM({ selectedAddOns: v, addOnRequired: v.length ? "Yes" : "No" })} />
+            <Field label="Add-ons Required" required className="sm:col-span-2 lg:col-span-3">
+              <AddOnPicker options={[NO_ADDON, ...ADD_ON_OPTIONS]} exclusive={NO_ADDON} dataField="selectedAddOns" error={err.selectedAddOns} value={m.selectedAddOns || []} onChange={(v) => setM(addOnChoice(v))} />
             </Field>
           )}
         </div>
@@ -1131,7 +1207,7 @@ export default function LeadCaseForm({
     const sel = workflowDetails.selectedInsurers || [];
     const quotes = workflowDetails.insurerQuotes || [];
     const findQ = (ins) => quotes.find((q) => q.insurerName === ins) || { insurerName: ins, gstPercent: "18", quoteStatus: "Pending", acceptedAddOns: [] };
-    const requestedAddOns = sections.motor ? (motorDetails.selectedAddOns || []).filter((a) => a !== "Not Required") : [];
+    const requestedAddOns = sections.motor ? (motorDetails.selectedAddOns || []).filter((a) => a !== "Not Required" && a !== NO_ADDON) : [];
     if (!sel.length) return <ReadOnlyNote>No insurers were selected in the Quote module.</ReadOnlyNote>;
 
     const dataLocked = !isAdmin; // premiums, files, payout, accepted add-ons: Admin only
@@ -1163,6 +1239,11 @@ export default function LeadCaseForm({
                 ) : (
                   <Field label="Quote Net Premium" error={err[k("net")]}>
                     <input data-field={k("net")} type="number" min="0" disabled={L} value={q.netPremium ?? ""} onChange={(e) => updateQuote(ins, "netPremium", e.target.value)} className={inputCls(err[k("net")], L)} />
+                  </Field>
+                )}
+                {sections.motor && (
+                  <Field label="IDV (₹)" error={err[k("idv")]} hint={isAdmin ? "IDV offered by this insurer" : undefined}>
+                    <input data-field={k("idv")} type="text" inputMode="numeric" disabled={L} value={q.idv ?? ""} onChange={(e) => updateQuote(ins, "idv", e.target.value.replace(/\D/g, ""))} className={inputCls(err[k("idv")], L)} />
                   </Field>
                 )}
                 {sections.electronic ? (
@@ -1257,6 +1338,7 @@ export default function LeadCaseForm({
       ["Gross Premium", fmt(calc.grossPremium)],
       ...(employeeView ? [] : [["Pay Out", acceptedQuote.payoutPercent !== undefined && acceptedQuote.payoutPercent !== "" ? `${acceptedQuote.payoutPercent}%` : "—"]]),
       ["Quote Status", acceptedQuote.quoteStatus],
+      ...(sections.motor && acceptedQuote.idv ? [["IDV", fmt(acceptedQuote.idv)]] : []),
       ...(sections.motor ? [["Add-ons accepted", (acceptedQuote.acceptedAddOns || []).join(", ") || "None"]] : []),
       ...(sections.electronic ? [["Product", productForInsurer(acceptedQuote.insurerName) || "—"]] : []),
     ];
@@ -1315,7 +1397,7 @@ export default function LeadCaseForm({
               }}
             />
           </Field>
-          <Field label={first ? "Upload Aadhaar (Mandatory)" : "Upload Aadhaar / Other Birth Proof (Not Mandatory)"} required={first} error={err[k("aadhaarFile")]}>
+          <Field label={first ? "Upload Aadhaar (Not Mandatory)" : "Upload Aadhaar / Other Birth Proof (Not Mandatory)"} error={err[k("aadhaarFile")]}>
             <ViewLink url={m.aadhaarFile} />
             <input data-field={k("aadhaarFile")} type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => e.target.files[0] && updateMember(i, "aadhaarFile", e.target.files[0])} className={inputCls(err[k("aadhaarFile")])} />
             <NewFileTag file={m.aadhaarFile} />
@@ -1458,8 +1540,8 @@ export default function LeadCaseForm({
                       {SUM_INSURED_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
                     </select>
                   </Field>
-                  <Field label="No Claim Bonus (₹, if any)">
-                    <input type="number" min="0" value={d.noClaimBonus || ""} onChange={(e) => updatePortability(i, "noClaimBonus", e.target.value)} className={inputCls()} />
+                  <Field label="Any CB / No Claim Bonus (₹)" hint="Enter the amount in rupees">
+                    <input data-field={`portabilityNcb_${i}`} type="text" inputMode="numeric" placeholder="e.g. 50000" value={d.noClaimBonus || ""} onChange={(e) => updatePortability(i, "noClaimBonus", e.target.value.replace(/\D/g, ""))} className={inputCls()} />
                   </Field>
                   <Field label="Any IPD Claim taken?">
                     <select value={d.ipdClaimTaken || ""} onChange={(e) => updatePortability(i, "ipdClaimTaken", e.target.value)} className={inputCls()}>
@@ -1488,15 +1570,7 @@ export default function LeadCaseForm({
 
   const renderPayment = () => {
     const w = workflowDetails;
-    if (!isAdmin) {
-      return (
-        <ReadOnlyNote>
-          Payment is handled by Admin. Payment Status: <b>{w.paymentStatus || "Payment Pending"}</b>
-          {w.issuanceStatus ? <> · Status: <b>{w.issuanceStatus}</b></> : null}
-          {w.policyNumber ? <> · Policy No: <b>{w.policyNumber}</b></> : null}
-        </ReadOnlyNote>
-      );
-    }
+    const pricingLocked = !isAdmin; // final premium / GST / EMI premium are set by Admin
     const paid = w.paymentStatus === PAYMENT_DONE;
     const statusOptions = getIssuanceStatusOptions(sections, instalment);
     const pypDue = sections.motor && motorDetails.previousInsuranceStatus === PREVIOUS_POLICY_ACTIVE
@@ -1505,10 +1579,10 @@ export default function LeadCaseForm({
     return (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <Field label="Final Net Premium" required error={err.finalNetPremium} hint={acceptedQuote ? `Accepted quote: ${fmt(acceptedQuote.netPremium)}` : undefined}>
-          <input data-field="finalNetPremium" type="number" min="0" value={w.finalNetPremium} onChange={(e) => setWf({ finalNetPremium: e.target.value })} className={inputCls(err.finalNetPremium)} />
+          <input data-field="finalNetPremium" type="number" min="0" readOnly={pricingLocked} value={w.finalNetPremium} onChange={(e) => setWf({ finalNetPremium: e.target.value })} className={inputCls(err.finalNetPremium, pricingLocked)} />
         </Field>
         <Field label="GST %" error={err.finalGstPercent}>
-          <input data-field="finalGstPercent" type="number" min="0" max="100" value={w.finalGstPercent} onChange={(e) => setWf({ finalGstPercent: e.target.value })} className={inputCls(err.finalGstPercent)} />
+          <input data-field="finalGstPercent" type="number" min="0" max="100" readOnly={pricingLocked} value={w.finalGstPercent} onChange={(e) => setWf({ finalGstPercent: e.target.value })} className={inputCls(err.finalGstPercent, pricingLocked)} />
         </Field>
         <Field label="GST Value (auto)"><input type="text" readOnly value={fmt(finalAmounts.gstValue)} className={autoCls} /></Field>
         <Field label="Gross Premium (auto)"><input type="text" readOnly value={fmt(finalAmounts.gross)} className={cx(autoCls, "font-medium")} /></Field>
@@ -1516,7 +1590,7 @@ export default function LeadCaseForm({
         {instalment && (
           <>
             <Field label={`EMI Net Premium (${formData.paymentTerm})`} required error={err.emiNetPremium}>
-              <input data-field="emiNetPremium" type="number" min="0" value={w.emiNetPremium} onChange={(e) => setWf({ emiNetPremium: e.target.value })} className={inputCls(err.emiNetPremium)} />
+              <input data-field="emiNetPremium" type="number" min="0" readOnly={pricingLocked} value={w.emiNetPremium} onChange={(e) => setWf({ emiNetPremium: e.target.value })} className={inputCls(err.emiNetPremium, pricingLocked)} />
             </Field>
             <Field label="EMI GST Value (auto)"><input type="text" readOnly value={fmt(emiAmounts.gstValue)} className={autoCls} /></Field>
             <Field label="EMI Premium — Gross (auto)" hint={`${emiSchedule.total} EMIs over ${formData.policyTenure || "1 Year"}`}>
@@ -1732,7 +1806,6 @@ export default function LeadCaseForm({
   };
 
   const renderCashback = () => {
-    if (!isAdmin) return <ReadOnlyNote>Cashback / PayOut is handled by Admin.</ReadOnlyNote>;
     const cb = cashbackDetails;
     const setCb = (patch) => setCashbackDetails((p) => ({ ...p, ...patch }));
     if (sections.electronic) {
@@ -1770,10 +1843,12 @@ export default function LeadCaseForm({
             {CASHBACK_PAYEE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
           </select>
         </Field>
-        <Field label="PayOut Mode (auto)" hint={instalment ? "Paying Term is not One Time → against each premium" : "Paying Term is One Time"}>
-          <input type="text" readOnly value={cashbackCalc.payoutMode} className={autoCls} />
+        <Field label="PayOut Mode" hint={instalment ? "On Each Payment = against every EMI received" : "Paying Term is One Time → One Time only"}>
+          <select data-field="payoutMode" value={cashbackCalc.payoutMode} onChange={(e) => setCb({ payoutMode: e.target.value })} className={inputCls()}>
+            {payoutModeOptions(formData.paymentTerm).map((o) => <option key={o} value={o}>{o}</option>)}
+          </select>
         </Field>
-        <Field label="PayOut Count (auto)" hint={instalment ? "From Received EMI Count" : undefined}>
+        <Field label="PayOut Count (auto)" hint={cashbackCalc.payoutMode === "On Each Payment" ? "From Received EMI Count" : "Paid once"}>
           <input type="text" readOnly value={cashbackCalc.payoutCount} className={autoCls} />
         </Field>
         <Field label="PayOut Amt against each Payment (₹)" required error={err.cashbackAmount}>
@@ -2002,7 +2077,8 @@ export default function LeadCaseForm({
     else if (w.issuanceStatus === "Policy Issued") headline = "Policy issued.";
     else if (w.issuanceStatus === "Referred to UW") headline = `Referred to UW${w.uwQuery ? ` — query: ${w.uwQuery}` : ""}.`;
     else if (w.issuanceStatus) headline = `Policy status: ${w.issuanceStatus}${w.notIssuedRemarks ? ` — ${w.notIssuedRemarks}` : ""}.`;
-    else headline = "Admin is processing the payment and policy issuance.";
+    else if (stageIdx === IDX.Payment) headline = "Update the Payment Status below — once payment is done, set the policy Status and details.";
+    else headline = "Submitted — Admin is completing the case.";
     const row = (label, value) =>
       value || value === 0 ? (
         <div><p className="text-xs text-gray-500">{label}</p><p className="font-medium text-gray-800 break-words">{value}</p></div>
@@ -2053,9 +2129,9 @@ export default function LeadCaseForm({
   return (
     <form onSubmit={(e) => e.preventDefault()} noValidate>
       <StageStepper
-        stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "InsurerCalc", "Cashback", "Profit"].includes(x.key)) : visibleStages}
+        stages={hideAdminModules ? visibleStages.filter((x) => !["EmiDues", "InsurerCalc", "Profit"].includes(x.key)) : visibleStages}
         current={caseStage}
-        labels={hideAdminModules ? { QuoteWorkflow: "Quotes", Payment: "Payment & Issuance (Admin)" } : {}}
+        labels={hideAdminModules ? { QuoteWorkflow: "Quotes", Payment: "Payment & Issuance" } : {}}
       />
       {hideAdminModules && currentStageDef.access === "admin" ? (
         <p className="text-xs text-gray-500 mb-2">
@@ -2078,11 +2154,11 @@ export default function LeadCaseForm({
         <Section n={num_("Quote")} title="Quote" icon={FaFileAlt} status={stageIdx > IDX.Quote ? "Requested" : undefined} lock={lockFor("Quote")}>
           {!formData.lob && <ReadOnlyNote>Select the LOB in the Lead module first.</ReadOnlyNote>}
           {sections.health && renderHealthQuote()}
-          {!sections.health && !sections.electronic && formData.lob && renderPolicyTerms()}
+          {!sections.health && !sections.electronic && !sections.pa && !sections.travel && formData.lob && renderPolicyTerms()}
           {sections.motor && renderMotorQuote()}
           {sections.electronic && renderMobileQuote()}
-          {sections.pa && <PersonalAccidentForm details={paDetails} setDetails={setPaDetails} errors={err} insurerOptions={INSURER_OPTIONS} />}
-          {sections.travel && <TravelInsuranceForm details={travelDetails} setDetails={setTravelDetails} errors={err} lead={formData} />}
+          {sections.pa && <PAQuoteSection details={paDetails} setDetails={setPaDetails} errors={err} formData={formData} setFormData={setFormData} insurerOptions={INSURER_OPTIONS} />}
+          {sections.travel && <TravelQuoteSection details={travelDetails} setDetails={setTravelDetails} errors={err} />}
           {formData.lob && renderQuoteRequest()}
         </Section>
       )}
@@ -2098,14 +2174,25 @@ export default function LeadCaseForm({
       {reached("PolicyIssuance") && (
         <Section n={num_("PolicyIssuance")} title="Policy Issuance" icon={FaUsers} lock={lockFor("PolicyIssuance")}>
           {renderAcceptedQuoteSummary()}
-          {sections.health ? renderHealthIssuance() : sections.motor ? renderMotorIssuance() : sections.electronic ? renderMobileIssuance() : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
+          {sections.health ? renderHealthIssuance()
+            : sections.motor ? renderMotorIssuance()
+            : sections.electronic ? renderMobileIssuance()
+            : sections.pa ? <PAIssuanceSection details={paDetails} setDetails={setPaDetails} errors={err} insurerOptions={INSURER_OPTIONS} sumInsuredOptions={PA_SUM_INSURED} />
+            : sections.travel ? <TravelIssuanceSection details={travelDetails} setDetails={setTravelDetails} errors={err} />
+            : <p className="text-sm text-gray-500">No additional proposer details are needed for this LOB — continue to request the payment URL.</p>}
         </Section>
       )}
 
-      {!hideAdminModules && reached("Payment") && (
-        <Section n={num_("Payment")} title="Payment for the Policy" icon={FaMoneyBillWave} adminOnly tone="emerald" status={workflowDetails.issuanceStatus || undefined} lock={lockFor("Payment")}>
+      {reached("Payment") && (
+        <Section n={num_("Payment")} title="Payment for the Policy" icon={FaMoneyBillWave} tone="emerald" status={workflowDetails.issuanceStatus || undefined} lock={lockFor("Payment")}>
           {renderPayment()}
         </Section>
+      )}
+      {/* an action, not an edit: stays usable when the Payment section is locked */}
+      {sections.electronic && recordUrl && savedLead?.workflowDetails?.issuanceStatus === "Policy Issued" && (
+        <div className="mb-6 -mt-2 grid">
+          <PolicyMailPanel key={savedLead._id} recordUrl={recordUrl} lead={savedLead} />
+        </div>
       )}
 
       {!hideAdminModules && reached("EmiDues") && instalment && (
@@ -2120,9 +2207,19 @@ export default function LeadCaseForm({
         </Section>
       )}
 
-      {!hideAdminModules && reached("Cashback") && (
-        <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly tone="amber" lock={lockFor("Cashback")}>
-          {renderCashback()}
+      {(reached("Cashback") || (hideAdminModules && stageIdx > IDX.Payment)) && (
+        <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly={!hideAdminModules} tone="amber" lock={hideAdminModules ? undefined : lockFor("Cashback")}>
+          {hideAdminModules || !isAdmin ? (
+            // the lead's employee / channel partner sees the cashback, Admin fills it
+            <fieldset disabled data-readonly="cashback">
+              <p className="text-xs text-gray-500 mb-3">
+                {savedLead?.cashbackDetails && (savedLead.cashbackDetails.amountPerPayment || savedLead.cashbackDetails.storePayout || savedLead.cashbackDetails.promoterPayout)
+                  ? "Filled by Admin — shown here for your reference."
+                  : "Not filled by Admin yet — it will show here once Admin enters the cashback / payout."}
+              </p>
+              {renderCashback()}
+            </fieldset>
+          ) : renderCashback()}
         </Section>
       )}
 
@@ -2153,6 +2250,7 @@ export default function LeadCaseForm({
             {isSubmitting ? "Saving..." : <>{currentStageDef.next} <FaArrowRight /></>}
           </button>
         )}
+        <span className="w-full text-right text-[10px] text-gray-400" data-build={APP_BUILD}>{APP_BUILD}</span>
       </div>
     </form>
   );

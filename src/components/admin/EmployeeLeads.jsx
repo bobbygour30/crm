@@ -7,6 +7,7 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import LeadCaseForm from "../lob/LeadCaseForm";
+import { prepareUpload, uploadErrorMessage } from "../lob/uploadUtils";
 import useLeadCase from "../lob/useLeadCase";
 import { getDisplayManufacturer } from "../lob/motorInsurance";
 import { getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST, STAGES, statusBadgeClass } from "../lob/caseWorkflow";
@@ -146,7 +147,7 @@ function EmployeeLeads() {
     if (!editLead?._id) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -164,7 +165,7 @@ function EmployeeLeads() {
       }
     } catch (err) {
       console.error("Update error:", err);
-      c.showErrors([{ field: "general", message: "Network error. Please try again." }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -282,6 +283,7 @@ function EmployeeLeads() {
         <LeadCaseForm
           c={c} mode="edit" employees={sourceEmployees} channelPartners={sourcePartners}
           isSubmitting={isSubmitting} onCancel={() => setShowEditModal(false)} onSave={handleSave} onAdvance={handleAdvance}
+          recordUrl={editLead ? `${API_BASE}/api/user-leads/${editLead._id}` : null}
         />
       </motion.div>
     </motion.div>
