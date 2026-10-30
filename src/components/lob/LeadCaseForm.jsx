@@ -42,11 +42,7 @@ import {
   ISSUANCE_STATUS_OPTIONS, CASHBACK_STATUS_OPTIONS, CASHBACK_PAYEE_OPTIONS,
   IDX, STAGES, stageIndex, getStage, isEmiEligibleLob, isKnownInsurer, computeQuote, fmt, num,
   deriveCaseStatus, statusBadgeClass, getIssuanceStatusOptions, PAYOUT_BASIS_OPTIONS, normalizeRegistration,
-<<<<<<< HEAD
   PAYMENT_DONE, nextActionLabel, payoutModeOptions, APP_BUILD,
-=======
-  PAYMENT_DONE, nextActionLabel, payoutModeOptions,
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
   validateMobile, validateEmail, validateAadhaar, validatePAN, validatePIN, toUpperCase,
   getMaxDate, getODDueDateRestrictions, memberLabel, collectDocuments,
 } from "./caseWorkflow";
@@ -2193,9 +2189,22 @@ export default function LeadCaseForm({
         </Section>
       )}
       {/* an action, not an edit: stays usable when the Payment section is locked */}
-      {sections.electronic && recordUrl && savedLead?.workflowDetails?.issuanceStatus === "Policy Issued" && (
+      {sections.electronic && recordUrl && reached("Payment") && (
         <div className="mb-6 -mt-2 grid">
-          <PolicyMailPanel key={savedLead._id} recordUrl={recordUrl} lead={savedLead} />
+          {savedLead?.workflowDetails?.issuanceStatus === "Policy Issued" ? (
+            <PolicyMailPanel key={savedLead._id} recordUrl={recordUrl} lead={savedLead} />
+          ) : (
+            // shown early so people know where it is; enabled once the policy is saved as issued
+            <div className="border border-gray-200 bg-gray-50 rounded-lg p-3 flex flex-wrap items-center gap-3" data-panel="policy-mail-waiting">
+              <button type="button" disabled className="px-4 py-2 rounded-lg bg-gray-300 text-gray-600 flex items-center gap-2 text-sm cursor-not-allowed">
+                <FaEnvelope /> Send e-Mail
+              </button>
+              <span className="text-xs text-gray-600">
+                Policy copy e-mail — available once the case is <b>saved</b> with Status = <b>Policy Issued</b>
+                {!formData.email ? " and the customer's e-mail ID is filled in the Lead section" : ""}.
+              </span>
+            </div>
+          )}
         </div>
       )}
 
@@ -2211,24 +2220,16 @@ export default function LeadCaseForm({
         </Section>
       )}
 
-<<<<<<< HEAD
       {(reached("Cashback") || (hideAdminModules && stageIdx > IDX.Payment)) && (
-=======
-      {reached("Cashback") && (
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
         <Section n={num_("Cashback")} title="Cashback / PayOut to Customer / Employee" icon={FaHandHoldingUsd} adminOnly={!hideAdminModules} tone="amber" lock={hideAdminModules ? undefined : lockFor("Cashback")}>
           {hideAdminModules || !isAdmin ? (
             // the lead's employee / channel partner sees the cashback, Admin fills it
             <fieldset disabled data-readonly="cashback">
-<<<<<<< HEAD
               <p className="text-xs text-gray-500 mb-3">
                 {savedLead?.cashbackDetails && (savedLead.cashbackDetails.amountPerPayment || savedLead.cashbackDetails.storePayout || savedLead.cashbackDetails.promoterPayout)
                   ? "Filled by Admin — shown here for your reference."
                   : "Not filled by Admin yet — it will show here once Admin enters the cashback / payout."}
               </p>
-=======
-              <p className="text-xs text-gray-500 mb-3">Filled by Admin — shown here for your reference.</p>
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
               {renderCashback()}
             </fieldset>
           ) : renderCashback()}

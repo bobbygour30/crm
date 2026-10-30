@@ -21,11 +21,7 @@ const API_BASE = import.meta.env.VITE_BACKEND_URL;
 const CATEGORIES = ["Motor", "Health", "PA", "Mobile", "Travel", "Other"];
 const CATEGORY_LABEL = { Motor: "Motor Insurance", Health: "Health Insurance", PA: "PA", Mobile: "Mobile Insurance", Travel: "Travel Insurance", Other: "Other" };
 const EMI_CATEGORIES = ["Health", "Life", "ULIP", "Other"];
-<<<<<<< HEAD
 const POLICY_TYPES = ["Fresh", "Renewal", "Portability", "Roll Over"];
-=======
-const POLICY_TYPES = ["Fresh", "Renewal", "Portability"];
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
 const POLICY_STATUSES = ["Active", "Renewed", "Expired", "Cancel", "Portability"];
 const RENEWAL_WINDOWS = [7, 15, 30, 45, 60, 90];
 
@@ -68,23 +64,15 @@ const statusBadge = (s) =>
 
 const PAGE_SIZE = 50;
 
-<<<<<<< HEAD
 // `report` comes from the Admin sidebar sub-menu (Reports › Leads / Active Policy / ...);
 // without it (employee app) the page shows its own report tabs.
 export default function PolicyReports({ report: reportProp }) {
-=======
-export default function PolicyReports() {
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
   const [rows, setRows] = useState([]);
   const [role, setRole] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-<<<<<<< HEAD
   const [reportState, setReport] = useState(reportProp || "leads");
   const report = reportProp || reportState;
-=======
-  const [report, setReport] = useState("leads");
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
   const [group, setGroup] = useState("All");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ from: "", to: "", policyType: "", insurer: "", lob: "", leadOf: "", policyStatus: "", search: "", window: 30 });
@@ -160,7 +148,6 @@ export default function PolicyReports() {
   const pages = Math.max(1, Math.ceil(visible.length / PAGE_SIZE));
   const pageRows = visible.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
-<<<<<<< HEAD
   // ---- columns: related details stacked in one cell, so the table fits the screen width ----
   const sub = (v) => (v ? <div className="text-gray-500">{v}</div> : null);
   const days = (iso) => daysFromToday(iso);
@@ -250,49 +237,6 @@ export default function PolicyReports() {
 
   const exportExcel = () => {
     const data = visible.map((r) => Object.fromEntries(EXPORT.map(([label, get]) => [label, get(r) ?? ""])));
-=======
-  // ---- columns ----
-  const columns = [
-    { key: "leadCode", label: "Lead Code" },
-    { key: "name", label: "Customer" },
-    { key: "mobileNo", label: "Mobile" },
-    { key: "lob", label: "LOB" },
-    ...(report === "leads"
-      ? [{ key: "stage", label: "Stage", render: (r) => (r.stage === "Lead" ? "Lead" : "Quote (not requested)") }, { key: "createdAt", label: "Created", render: (r) => fmtDate(r.createdAt) }]
-      : [
-          { key: "insurer", label: "Insurer" },
-          { key: "policyNumber", label: "Policy No." },
-          { key: "policyType", label: "Policy Type" },
-          { key: "policyStatus", label: "Status", render: (r) => <span className={cx("px-2 py-0.5 rounded-full text-xs", statusBadge(r.policyStatus))}>{r.policyStatus || r.status}</span> },
-          { key: "policyStartDate", label: "Start", render: (r) => fmtDate(r.policyStartDate) },
-          { key: "policyExpiryDate", label: "Expiry", render: (r) => fmtDate(r.policyExpiryDate) },
-        ]),
-    ...(report === "renewal" ? [{ key: "daysLeft", label: "Days Left", render: (r) => { const d = daysFromToday(r.policyExpiryDate); return <span className={cx("font-medium", d <= 7 ? "text-red-600" : d <= 15 ? "text-orange-600" : "text-gray-700")}>{d}</span>; } }] : []),
-    ...(report === "expired" ? [{ key: "daysAgo", label: "Expired (days ago)", render: (r) => Math.abs(daysFromToday(r.policyExpiryDate) || 0) }] : []),
-    ...(report === "emi"
-      ? [
-          { key: "paymentTerm", label: "Paying Term" },
-          { key: "emi", label: "EMIs Paid", render: (r) => `${r.emiReceived} / ${r.emiTotal}` },
-          { key: "nextDueDate", label: "Next Due", render: (r) => { const d = daysFromToday(r.nextDueDate); return <span className={cx(d !== null && d < 0 && "text-red-600 font-medium")}>{fmtDate(r.nextDueDate)}{d !== null && d < 0 ? " (overdue)" : ""}</span>; } },
-        ]
-      : []),
-    ...(report !== "leads" ? [{ key: "grossPremium", label: "Gross Premium", render: (r) => money(r.grossPremium) }] : []),
-    ...(isAdmin && report !== "leads" ? [{ key: "netPremium", label: "Net Premium", render: (r) => money(r.netPremium) }, { key: "arshyanProfit", label: "Arshyan Profit", render: (r) => money(r.arshyanProfit) }] : []),
-    { key: "leadOf", label: "Lead Of", render: (r) => [r.leadOf, r.source && r.source !== r.leadOf ? r.source : ""].filter(Boolean).join(" · ") || "—" },
-  ];
-
-  const exportExcel = () => {
-    const plain = (r, c) => {
-      if (c.key === "emi") return `${r.emiReceived} / ${r.emiTotal}`;
-      if (c.key === "daysLeft") return daysFromToday(r.policyExpiryDate);
-      if (c.key === "daysAgo") return Math.abs(daysFromToday(r.policyExpiryDate) || 0);
-      if (c.key === "stage") return r.stage;
-      if (c.key === "policyStatus") return r.policyStatus || r.status;
-      if (c.key === "leadOf") return [r.leadOf, r.source].filter(Boolean).join(" · ");
-      return r[c.key] ?? "";
-    };
-    const data = visible.map((r) => Object.fromEntries([["Category", def.groupOf(r)], ...columns.map((c) => [c.label, plain(r, c)])]));
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, def.label.slice(0, 30));
@@ -315,7 +259,6 @@ export default function PolicyReports() {
         </div>
       </div>
 
-<<<<<<< HEAD
       {/* report tabs with counts (the Admin sidebar replaces these with Reports › sub-menu) */}
       {reportProp ? (
         <div className="flex items-baseline gap-3" data-report={report}>
@@ -323,9 +266,6 @@ export default function PolicyReports() {
           <span className="text-sm text-gray-500">{loading ? "…" : `${counts[report]} records`}</span>
         </div>
       ) : (
-=======
-      {/* report tabs with counts */}
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2" role="tablist" aria-label="Report">
         {REPORTS.map((d) => {
           const Icon = d.icon;
@@ -341,10 +281,7 @@ export default function PolicyReports() {
           );
         })}
       </div>
-<<<<<<< HEAD
       )}
-=======
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
 
       {/* filters */}
       <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
@@ -441,7 +378,6 @@ export default function PolicyReports() {
           <div className="p-8 text-center text-gray-500 text-sm">No records for this report{filtersActive ? " with these filters" : ""}.</div>
         ) : (
           <>
-<<<<<<< HEAD
             <table className="w-full table-fixed text-xs" data-table="report">
               <thead className="bg-gray-50 text-left text-[11px] uppercase tracking-wide text-gray-500">
                 <tr>{columns.map((c) => <th key={c.key} className={cx("px-2 py-2 font-medium", c.w)}>{c.label}</th>)}</tr>
@@ -456,24 +392,6 @@ export default function PolicyReports() {
                 ))}
               </tbody>
             </table>
-=======
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-left text-xs text-gray-600">
-                  <tr>{columns.map((c) => <th key={c.key} className="px-3 py-2 whitespace-nowrap">{c.label}</th>)}</tr>
-                </thead>
-                <tbody>
-                  {pageRows.map((r) => (
-                    <tr key={`${r.origin}-${r.id}`} className="border-t hover:bg-gray-50">
-                      {columns.map((c) => (
-                        <td key={c.key} className="px-3 py-2 whitespace-nowrap">{c.render ? c.render(r) : r[c.key] || "—"}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
             <div className="flex items-center justify-between px-3 py-2 border-t text-xs text-gray-600">
               <span>Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, visible.length)} of {visible.length}</span>
               <div className="flex gap-2">

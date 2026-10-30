@@ -12,15 +12,11 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Dashboard', icon: FaHome, key: 'dashboard' },
     { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
-<<<<<<< HEAD
     {
       name: 'Reports', icon: FaChartBar, key: 'reports',
       // sub-modules open just below "Reports"
       children: [{ name: 'Leads', key: 'reports-leads' }, { name: 'Active Policy', key: 'reports-active' }, { name: 'Expired Policy', key: 'reports-expired' }, { name: 'Renewal Alert', key: 'reports-renewal' }, { name: 'EMI Due', key: 'reports-emi' }, { name: 'All Data', key: 'reports-all' }],
     },
-=======
-    { name: 'Reports', icon: FaChartBar, key: 'reports' },
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
     { name: 'Salary Slip', icon: FaMoneyCheckAlt, key: 'salary-slip' },
@@ -39,15 +35,12 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     leads: '/admin/leads',
     'employee-leads': '/admin/employee-leads', // ← ADDED
     reports: '/admin/reports',
-<<<<<<< HEAD
     'reports-leads': '/admin/reports/leads',
     'reports-active': '/admin/reports/active',
     'reports-expired': '/admin/reports/expired',
     'reports-renewal': '/admin/reports/renewal',
     'reports-emi': '/admin/reports/emi',
     'reports-all': '/admin/reports/all',
-=======
->>>>>>> 9495971fa64cffa1b83d542b92dcdda305710c9c
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',
