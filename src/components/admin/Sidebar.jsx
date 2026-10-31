@@ -2,11 +2,7 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
-<<<<<<< HEAD
   FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar, FaIdBadge
-=======
-  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
 } from 'react-icons/fa';
 import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -17,13 +13,10 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Insurance Policy Punch', icon: FaUsers, key: 'leads' },
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
     {
-<<<<<<< HEAD
       name: 'My HR', icon: FaIdBadge, key: 'hr',
       children: [{ name: 'Offer Letters', key: 'hr-offers' }, { name: 'Document Validation', key: 'hr-validation' }, { name: 'Employees', key: 'hr-employees' }, { name: 'HR Attendance', key: 'hr-attendance' }, { name: 'Salary Register', key: 'hr-salary' }, { name: 'HR Salary Slip', key: 'hr-slips' }, { name: 'Promotions', key: 'hr-promotions' }, { name: 'Settings', key: 'hr-settings' }],
     },
     {
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
       name: 'Reports', icon: FaChartBar, key: 'reports',
       // sub-modules open just below "Reports"
       children: [{ name: 'Leads', key: 'reports-leads' }, { name: 'Active Policy', key: 'reports-active' }, { name: 'Expired Policy', key: 'reports-expired' }, { name: 'Renewal Alert', key: 'reports-renewal' }, { name: 'EMI Due', key: 'reports-emi' }, { name: 'All Data', key: 'reports-all' }],
@@ -52,7 +45,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'reports-renewal': '/admin/reports/renewal',
     'reports-emi': '/admin/reports/emi',
     'reports-all': '/admin/reports/all',
-<<<<<<< HEAD
     'hr-offers': '/admin/my-hr/offers',
     'hr-validation': '/admin/my-hr/validation',
     'hr-employees': '/admin/my-hr/employees',
@@ -61,8 +53,6 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'hr-slips': '/admin/my-hr/slips',
     'hr-promotions': '/admin/my-hr/promotions',
     'hr-settings': '/admin/my-hr/settings',
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',

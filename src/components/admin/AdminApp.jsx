@@ -21,10 +21,7 @@ import SalarySlipGenerator from './SalarySlipGenerator';
 import WelcomeLetterGenerator from './WelcomeLetterGenerator';
 import EmployeeLeads from './EmployeeLeads'; // ← ADDED
 import PolicyReports from '../reports/PolicyReports';
-<<<<<<< HEAD
 import MyHR from '../hr/MyHR';
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -45,7 +42,6 @@ function AdminApp({ handleLogout }) {
       'reports-renewal': '/admin/reports/renewal',
       'reports-emi': '/admin/reports/emi',
       'reports-all': '/admin/reports/all',
-<<<<<<< HEAD
       'hr-offers': '/admin/my-hr/offers',
       'hr-validation': '/admin/my-hr/validation',
       'hr-employees': '/admin/my-hr/employees',
@@ -54,8 +50,6 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -98,7 +92,6 @@ function AdminApp({ handleLogout }) {
       'reports-renewal': '/admin/reports/renewal',
       'reports-emi': '/admin/reports/emi',
       'reports-all': '/admin/reports/all',
-<<<<<<< HEAD
       'hr-offers': '/admin/my-hr/offers',
       'hr-validation': '/admin/my-hr/validation',
       'hr-employees': '/admin/my-hr/employees',
@@ -107,8 +100,6 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -360,10 +351,7 @@ function AdminApp({ handleLogout }) {
                   />
                 )}
                 {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
-<<<<<<< HEAD
                 {activeTab.startsWith('hr-') && <MyHR key={activeTab} section={activeTab.replace('hr-', '')} />}
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
                 {(activeTab === 'reports' || activeTab.startsWith('reports-')) && (
                   <PolicyReports key={activeTab} report={activeTab === 'reports' ? 'leads' : activeTab.replace('reports-', '')} />
                 )}

@@ -239,7 +239,6 @@ const VoiceNoteButton = ({ onText }) => {
 // Mobile: e-mail the issued policy copy (draft preview -> send on click)
 // ============================================================
 function PolicyMailPanel({ recordUrl, lead }) {
-<<<<<<< HEAD
   // Send e-Mail -> preview -> "Open in Gmail": the draft (Customer Service Letter attached) is created in the
   // Vidhant Gmail account and Gmail opens on it; the user checks it and clicks Send there.
   const [draft, setDraft] = useState(null);
@@ -252,15 +251,6 @@ function PolicyMailPanel({ recordUrl, lead }) {
   const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" });
   const openDraft = async () => {
     setBusy("draft"); setError(""); setOpened(null); setFallback(false);
-=======
-  const [draft, setDraft] = useState(null);
-  const [busy, setBusy] = useState("");
-  const [error, setError] = useState("");
-  const [sent, setSent] = useState(lead?.workflowDetails?.policyMailSentAt ? { at: lead.workflowDetails.policyMailSentAt, to: lead.workflowDetails.policyMailSentTo } : null);
-  const headers = () => ({ Authorization: `Bearer ${localStorage.getItem("token")}`, "Content-Type": "application/json" });
-  const openDraft = async () => {
-    setBusy("draft"); setError("");
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
     try {
       const res = await fetch(`${recordUrl}/policy-mail`, { headers: headers() });
       const data = await res.json().catch(() => ({}));
@@ -268,7 +258,6 @@ function PolicyMailPanel({ recordUrl, lead }) {
       setDraft(data);
     } catch (e) { setError(e.message); } finally { setBusy(""); }
   };
-<<<<<<< HEAD
   const openInGmail = async () => {
     const win = window.open("", "_blank"); // opened on the click so the browser doesn't block it
     setBusy("gmail"); setError("");
@@ -284,43 +273,21 @@ function PolicyMailPanel({ recordUrl, lead }) {
       setError(e.message);
       setFallback(true);
     } finally { setBusy(""); }
-=======
-  const send = async () => {
-    setBusy("send"); setError("");
-    try {
-      const res = await fetch(`${recordUrl}/policy-mail`, { method: "POST", headers: headers() });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error([data.error, ...(data.errors || [])].filter(Boolean).join(": ") || `Server error ${res.status}`);
-      setSent({ at: data.sentAt, to: data.to });
-      setDraft(null);
-    } catch (e) { setError(e.message); } finally { setBusy(""); }
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
   };
   const when = (v) => new Date(v).toLocaleString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
   return (
     <div className="sm:col-span-2 lg:col-span-3 border border-indigo-200 bg-indigo-50/40 rounded-lg p-3 flex flex-wrap items-center gap-3" data-panel="policy-mail">
       <button type="button" onClick={openDraft} disabled={!!busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-<<<<<<< HEAD
         <FaEnvelope /> {busy === "draft" ? "Preparing…" : "Send e-Mail"}
       </button>
       <span className="text-xs text-gray-600">
         {last ? <>{last.sent ? "Sent" : "Gmail draft created"} for <b>{last.to}</b> on {when(last.at)}</> : "Opens Gmail with the message and the Customer Service Letter attached — you send it from Gmail."}
-=======
-        <FaEnvelope /> {busy === "draft" ? "Preparing…" : sent ? "Send e-Mail again" : "Send e-Mail"}
-      </button>
-      <span className="text-xs text-gray-600">
-        {sent ? <>Sent to <b>{sent.to}</b> on {when(sent.at)}</> : "Policy copy e-mail to the insured person — preview first, nothing is sent until you confirm."}
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
       </span>
       {error && !draft && <p className="w-full text-sm text-red-600" role="alert">{error}</p>}
       {draft && (
         <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Policy e-mail">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-5">
-<<<<<<< HEAD
             <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2"><FaEnvelope className="text-indigo-600" /> Policy e-mail</h3>
-=======
-            <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2"><FaEnvelope className="text-indigo-600" /> Send policy e-mail</h3>
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
             <dl className="text-sm grid grid-cols-[80px_1fr] gap-y-1 mb-3">
               <dt className="text-gray-500">To</dt><dd className="font-medium break-all">{draft.to || "—"}</dd>
               <dt className="text-gray-500">From</dt><dd className="break-all">{draft.from}</dd>
@@ -333,7 +300,6 @@ function PolicyMailPanel({ recordUrl, lead }) {
                 {draft.missing.map((m) => <li key={m}>{m}</li>)}
               </ul>
             )}
-<<<<<<< HEAD
             {opened && (
               <p className="mb-3 text-sm text-emerald-800 bg-emerald-50 border border-emerald-200 rounded-lg p-3" data-gmail="opened">
                 Gmail opened in a new tab with this message and <b>{opened.attachmentName}</b> attached. Check it and click <b>Send</b> in Gmail.{" "}
@@ -354,14 +320,6 @@ function PolicyMailPanel({ recordUrl, lead }) {
                   <FaEnvelope /> {busy === "gmail" ? "Opening Gmail…" : "Open in Gmail"}
                 </button>
               )}
-=======
-            {error && <p className="mb-3 text-sm text-red-600" role="alert">{error}</p>}
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => { setDraft(null); setError(""); }} className="px-4 py-2 rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300 text-sm">Cancel</button>
-              <button type="button" onClick={send} disabled={!!busy || draft.missing?.length > 0} className="px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2 text-sm">
-                <FaEnvelope /> {busy === "send" ? "Sending…" : "Send e-Mail"}
-              </button>
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
             </div>
           </div>
         </div>

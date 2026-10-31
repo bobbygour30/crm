@@ -12,10 +12,7 @@ import {
   FaSignOutAlt,
   FaChartBar,
   FaChartLine,
-<<<<<<< HEAD
   FaIdBadge,
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,10 +26,7 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
     { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
     { name: "Reports", icon: FaChartLine, path: "/reports" },
-<<<<<<< HEAD
     { name: "My HR", icon: FaIdBadge, path: "/my-hr" },
-=======
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
     { name: "Salary Slip", icon: FaMoneyCheckAlt, path: "/salary-slip" },
     { name: "Quote", icon: FaBullhorn, path: "/quote" },

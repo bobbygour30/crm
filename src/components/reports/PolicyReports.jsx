@@ -406,8 +406,4 @@ export default function PolicyReports({ report: reportProp }) {
       {!isAdmin && role && <p className="text-xs text-gray-500">You see the leads you created or were assigned, with the details you can fill.</p>}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
