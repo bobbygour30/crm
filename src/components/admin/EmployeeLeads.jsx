@@ -7,6 +7,8 @@ import {
 } from "react-icons/fa";
 import * as XLSX from "xlsx";
 import LeadCaseForm from "../lob/LeadCaseForm";
+import Pagination, { usePagination } from "../lob/Pagination";
+import { prepareUpload, uploadErrorMessage } from "../lob/uploadUtils";
 import useLeadCase from "../lob/useLeadCase";
 import { getDisplayManufacturer } from "../lob/motorInsurance";
 import { getStage, inferStage, getAcceptedQuote, collectDocuments, fmt, CASE_STATUS_LIST, STAGES, statusBadgeClass } from "../lob/caseWorkflow";
@@ -146,7 +148,7 @@ function EmployeeLeads() {
     if (!editLead?._id) return;
     setIsSubmitting(true);
     try {
-      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: c.buildFormData(stage) });
+      const res = await fetch(`${API_BASE}/api/user-leads/${editLead._id}`, { method: "PUT", headers: authHeaders(), body: await prepareUpload(c.buildFormData(stage)) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         c.showErrors(serverErrors(data));
@@ -164,7 +166,7 @@ function EmployeeLeads() {
       }
     } catch (err) {
       console.error("Update error:", err);
-      c.showErrors([{ field: "general", message: "Network error. Please try again." }]);
+      c.showErrors([{ field: "general", message: uploadErrorMessage(err) }]);
     } finally {
       setIsSubmitting(false);
     }
@@ -219,6 +221,9 @@ function EmployeeLeads() {
       (!to || (created && created <= to))
     );
   });
+
+  // pagination: back to page 1 when the search / filters change (not when a lead is edited)
+  const pager = usePagination(filteredLeads, { resetKeys: [globalSearch, searchEmployee, searchName, searchPolicy, searchLOB, fromDate, toDate, filter, stageFilter] });
 
   const filtersActive = !!(searchEmployee || searchName || searchPolicy || searchLOB || fromDate || toDate || filter !== "All" || stageFilter !== "All");
   const clearFilters = () => {
@@ -282,6 +287,7 @@ function EmployeeLeads() {
         <LeadCaseForm
           c={c} mode="edit" employees={sourceEmployees} channelPartners={sourcePartners}
           isSubmitting={isSubmitting} onCancel={() => setShowEditModal(false)} onSave={handleSave} onAdvance={handleAdvance}
+          recordUrl={editLead ? `${API_BASE}/api/user-leads/${editLead._id}` : null}
         />
       </motion.div>
     </motion.div>
@@ -452,7 +458,7 @@ function EmployeeLeads() {
                   </td>
                 </tr>
               ) : (
-                filteredLeads.map((lead) => (
+                pager.pageItems.map((lead) => (
                   <tr key={lead._id} className="border-b hover:bg-gray-50">
                     <td className="p-4"><div className="flex items-center gap-2"><FaUser className="text-gray-400" />{getEmployeeName(lead.employeeId)}</div></td>
                     <td className="p-4"><span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{lead.leadCode || "-"}</span></td>
@@ -477,6 +483,7 @@ function EmployeeLeads() {
             </tbody>
           </table>
         </div>
+        <Pagination p={pager} />
       </div>
 
       {selectedLead && renderLeadDetails()}

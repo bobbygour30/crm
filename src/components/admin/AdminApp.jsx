@@ -20,6 +20,8 @@ import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
 import WelcomeLetterGenerator from './WelcomeLetterGenerator';
 import EmployeeLeads from './EmployeeLeads'; // ← ADDED
+import PolicyReports from '../reports/PolicyReports';
+import MyHR from '../hr/MyHR';
 
 function AdminApp({ handleLogout }) {
   const navigate = useNavigate();
@@ -33,6 +35,21 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
+      'hr-offers': '/admin/my-hr/offers',
+      'hr-validation': '/admin/my-hr/validation',
+      'hr-employees': '/admin/my-hr/employees',
+      'hr-attendance': '/admin/my-hr/attendance',
+      'hr-salary': '/admin/my-hr/salary',
+      'hr-slips': '/admin/my-hr/slips',
+      'hr-promotions': '/admin/my-hr/promotions',
+      'hr-settings': '/admin/my-hr/settings',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -68,6 +85,21 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
+      'hr-offers': '/admin/my-hr/offers',
+      'hr-validation': '/admin/my-hr/validation',
+      'hr-employees': '/admin/my-hr/employees',
+      'hr-attendance': '/admin/my-hr/attendance',
+      'hr-salary': '/admin/my-hr/salary',
+      'hr-slips': '/admin/my-hr/slips',
+      'hr-promotions': '/admin/my-hr/promotions',
+      'hr-settings': '/admin/my-hr/settings',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -319,6 +351,10 @@ function AdminApp({ handleLogout }) {
                   />
                 )}
                 {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
+                {activeTab.startsWith('hr-') && <MyHR key={activeTab} section={activeTab.replace('hr-', '')} />}
+                {(activeTab === 'reports' || activeTab.startsWith('reports-')) && (
+                  <PolicyReports key={activeTab} report={activeTab === 'reports' ? 'leads' : activeTab.replace('reports-', '')} />
+                )}
                 {activeTab === 'tasks' && (
                   <TaskList
                     tasks={taskList}

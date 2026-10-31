@@ -1,378 +1,425 @@
-import { useState } from "react";
-import { FaShieldAlt, FaPlus, FaTrash } from "react-icons/fa";
+// src/components/lob/PersonalAccidentForm.jsx
+// ============================================================
+// PERSONAL ACCIDENT (PA BRD) — staged like Health / Motor / Mobile:
+//   Quote module           -> <PAQuoteSection>     (Admin + Employee)
+//   Policy Issuance module -> <PAIssuanceSection>  (Admin + Employee)
+// Leads saved with the older single-page PA form are converted on load.
+// ============================================================
+import { useEffect } from "react";
+import { FaShieldAlt } from "react-icons/fa";
 import {
-  YES_NO, GENDERS, MARITAL, QUALIFICATIONS, OCCUPATIONS, NOMINEE_RELATIONS, TENURES,
-  Field, FileInput, Select, inputCls, inr, rupeeOptions, range,
-  validateAadhaar, validatePAN, validatePIN, fetchPinInfo, addYearsStr,
-  maxAdultDob, todayStr, fmtDate, stripFiles, hasFile,
+  YES_NO, QUALIFICATIONS, OCCUPATIONS, Field, FileInput, Select, inputCls, rupeeOptions, range,
+  validateAadhaar, validatePAN, maxAdultDob, todayStr, fmtDate, stripFiles, hasFile,
 } from "./LobShared";
+
+// ---- option lists (PA BRD) ----
+export const PA_POLICY_TYPES = ["Individual", "Family Floater"];
+export const PA_TENURES = ["1 Year", "2 Years", "3 Years"];
+export const PA_SUM_INSURED = ["1 Lakh", "2 Lakh", "3 Lakh", "5 Lakh", "7.5 Lakh", "10 Lakh", "15 Lakh", "20 Lakh", "25 Lakh", "50 Lakh", "75 Lakh", "1 Crore", "2 Crore"];
+export const PA_MARITAL = ["Married", "Unmarried", "Live-in Relationship", "Widow", "Divorcee"];
+const PREVIOUS_CASES = ["Renew Case", "Portability Case", "Fresh Case"];
+const EXPERIENCE_YEARS = Array.from({ length: 20 }, (_, i) => i + 1);
 
 const HEALTH_PRIME = [
   ...Array.from({ length: 8 }, (_, i) => `Individual Option ${i + 1}`),
   ...Array.from({ length: 6 }, (_, i) => `Floater Option ${i + 1}`),
 ];
+const lakh = (n) => n * 100000;
 
-const COVERS = [
-  { key: "accidentalHospitalization", label: "Accidental Hospitalization Expenses", type: "select", options: rupeeOptions(range(200000, 2500000, 100000)) },
-  { key: "adventureSports", label: "Adventure Sports Benefit (Death)", type: "number" },
-  { key: "airAmbulance", label: "Air Ambulance Cover", type: "select", options: rupeeOptions([500000, 1000000, 1500000, 2000000, 2500000]) },
-  { key: "coma", label: "COMA due to Accidental Bodily Injury", type: "select", options: rupeeOptions(range(100000, 1000000, 100000)) },
-  { key: "fractureCare", label: "Fracture Care", type: "select", options: rupeeOptions([50000, 75000, 100000, 200000, 300000, 400000, 500000]) },
+// The 14 additional covers of the PA BRD
+//   select = pick a Sum Insured, number = type the amount, fixed = fixed SI, na = no SI
+export const PA_COVERS = [
+  { key: "accidentalHospitalization", label: "Accidental Hospitalization Expenses", type: "select", options: rupeeOptions(range(lakh(2), lakh(25), lakh(1))) },
+  { key: "adventureSportsDeath", label: "Adventure Sports Benefit (Death)", type: "na" },
+  { key: "airAmbulance", label: "Air Ambulance Cover", type: "select", options: rupeeOptions([5, 10, 15, 20, 25].map(lakh)) },
+  { key: "coma", label: "COMA due to Accidental Bodily Injury", type: "select", options: rupeeOptions(range(lakh(1), lakh(10), lakh(1))) },
+  { key: "fractureCare", label: "Fracture Care", type: "select", options: rupeeOptions([50000, 75000, lakh(1), lakh(2), lakh(3), lakh(4), lakh(5)]) },
+  { key: "loanProtector", label: "Loan Protector Cover", type: "number" },
   { key: "roadAmbulance", label: "Road Ambulance Cover", type: "fixed", value: 25000 },
   { key: "healthPrime", label: "Health Prime Rider", type: "select", options: HEALTH_PRIME },
+  { key: "adventureSportsPTD", label: "Adventure Sports Benefit (PTD)", type: "na" },
+  { key: "childrenEducation", label: "Children Education Benefit", type: "select", options: rupeeOptions(range(lakh(1), lakh(10), lakh(1))) },
+  { key: "emiPayment", label: "EMI Payment Cover", type: "select", options: rupeeOptions([50000, 75000, lakh(1), lakh(2), lakh(3), lakh(4), lakh(5)]) },
   { key: "hospitalCash", label: "Hospital Cash Benefit", type: "select", options: rupeeOptions(range(1000, 10000, 1000)) },
-  { key: "lossOfIncome", label: "Loss of Income due to Disability from Accident", type: "select", options: rupeeOptions(range(1000, 50000, 1000)) },
+  { key: "lossOfIncome", label: "Loss of Income due to Disability from Accident", type: "select", options: rupeeOptions(range(32000, 50000, 1000)) },
   { key: "travelExpenses", label: "Travel Expenses Benefit", type: "fixed", value: 25000 },
 ];
+const coverNeedsValue = (c) => c.type === "select" || c.type === "number";
 
-const emptyMember = () => ({
-  fullName: "", dob: "", grossMonthlyIncome: "", occupation: "",
-  deathSI: "", ppdSI: "", ptdSI: "",
-  wantAdditionalCover: "", covers: {},
-  gender: "", height: "", weight: "",
-  aadhaarNumber: "", aadhaarFront: null, aadhaarBack: null,
-  panNumber: "", panFile: null, maritalStatus: "", qualification: "",
-  nomineeName: "", nomineeDOB: "", nomineeRelation: "",
-  hasPED: "", pedDetails: "",
-});
+/** "Air Ambulance Cover (₹10,00,000), Road Ambulance Cover (₹25,000)" */
+export const describeCovers = (d = {}) => {
+  if (d.wantAdditionalCover !== "Yes") return d.wantAdditionalCover === "No" ? "No additional cover" : "";
+  return PA_COVERS.filter((c) => d.covers?.[c.key]?.selected)
+    .map((c) => {
+      const v = c.type === "fixed" ? c.value : d.covers[c.key].value;
+      if (c.type === "na" || !v) return c.label;
+      return `${c.label} (${/^\d+$/.test(String(v)) ? `₹${Number(v).toLocaleString("en-IN")}` : v})`;
+    })
+    .join(", ");
+};
 
+// ============================================================
+// STATE
+// ============================================================
 export const emptyPA = () => ({
-  policyCase: "",
-  insurerName: "", policyStartDate: "", policyTenure: "", policyEndDate: "",
-  prevInsurerName: "", prevPolicyNumber: "", prevPolicyDueDate: "", prevPolicyFile: null,
-  pinCode: "", city: "", state: "", address: "", familyIncome: "",
-  members: [emptyMember()],
+  // Quote
+  hasPreviousPolicy: "", previousPolicyCase: "", experienceYears: "",
+  renewalDetails: { insurerName: "", policyNumber: "", policyDueDate: "", uploadPolicy: null },
+  portabilityDetails: [],
+  policyType: "", proposerName: "", proposerDOB: "", familyIncome: "", grossMonthlyIncome: "", occupation: "",
+  deathSI: "", ppdSI: "", ptdSI: "", pedRemarks: "", wantAdditionalCover: "", covers: {},
+  // Policy Issuance
+  maritalStatus: "", height: "", weight: "", qualification: "",
+  aadhaarNumber: "", aadhaarFile: null, panNumber: "", panFile: null, issuanceRemarks: "",
 });
 
-// Use when loading a saved lead into the edit form
-export const hydratePA = (s) => {
-  if (!s) return emptyPA();
+const str = (v) => (v === null || v === undefined ? "" : String(v));
+
+/** Load a saved lead; older single-page PA leads are mapped onto the staged fields */
+export const hydratePA = (s, leadName = "") => {
+  if (!s) return { ...emptyPA(), proposerName: leadName };
+  const m = (s.members && s.members[0]) || {};
+  const legacy = !s.policyType && s.members?.length;
+  const base = { ...emptyPA(), ...s };
+  if (legacy) {
+    Object.assign(base, {
+      hasPreviousPolicy: s.policyCase ? (s.policyCase === "New" ? "No" : "Yes") : "",
+      previousPolicyCase: s.policyCase === "Renew" ? "Renew Case" : s.policyCase === "Portability" ? "Portability Case" : "",
+      renewalDetails: { insurerName: s.prevInsurerName || "", policyNumber: s.prevPolicyNumber || "", policyDueDate: s.prevPolicyDueDate || "", uploadPolicy: s.prevPolicyFile || null },
+      policyType: "Individual",
+      proposerName: m.fullName || leadName, proposerDOB: m.dob, grossMonthlyIncome: m.grossMonthlyIncome, occupation: m.occupation,
+      deathSI: m.deathSI, ppdSI: m.ppdSI, ptdSI: m.ptdSI, wantAdditionalCover: m.wantAdditionalCover || "", covers: m.covers || {},
+      pedRemarks: m.pedDetails || "", maritalStatus: m.maritalStatus || "", height: m.height || "", weight: m.weight,
+      qualification: m.qualification || "", aadhaarNumber: m.aadhaarNumber || "", aadhaarFile: m.aadhaarFront || null,
+      panNumber: m.panNumber || "", panFile: m.panFile || null,
+    });
+  }
   return {
-    ...emptyPA(), ...s,
-    policyStartDate: fmtDate(s.policyStartDate),
-    policyEndDate: fmtDate(s.policyEndDate),
-    prevPolicyDueDate: fmtDate(s.prevPolicyDueDate),
-    members: (s.members?.length ? s.members : [{}]).map((m) => ({
-      ...emptyMember(), ...m,
-      dob: fmtDate(m.dob), nomineeDOB: fmtDate(m.nomineeDOB), covers: m.covers || {},
+    ...base,
+    proposerName: base.proposerName || leadName,
+    experienceYears: str(base.experienceYears),
+    familyIncome: str(base.familyIncome), grossMonthlyIncome: str(base.grossMonthlyIncome),
+    deathSI: str(base.deathSI), ppdSI: str(base.ppdSI), ptdSI: str(base.ptdSI), weight: str(base.weight),
+    proposerDOB: fmtDate(base.proposerDOB),
+    covers: base.covers || {},
+    renewalDetails: { insurerName: "", policyNumber: "", uploadPolicy: null, ...(base.renewalDetails || {}), policyDueDate: fmtDate(base.renewalDetails?.policyDueDate) },
+    portabilityDetails: (base.portabilityDetails || []).map((p) => ({
+      ...p, policyActiveFrom: fmtDate(p.policyActiveFrom), policyTillDate: fmtDate(p.policyTillDate), uploadPYP: p.uploadPYP || null,
     })),
   };
 };
 
-// Adds paDetails JSON + files to a FormData
+/** Adds paDetails JSON + files to the FormData */
 export const appendPA = (fd, d) => {
   fd.append("paDetails", stripFiles(d));
-  if (d.prevPolicyFile instanceof File) fd.append("paPrevPolicyFile", d.prevPolicyFile);
-  d.members.forEach((m, i) => {
-    if (m.aadhaarFront instanceof File) fd.append(`paAadhaarFront_${i}`, m.aadhaarFront);
-    if (m.aadhaarBack instanceof File) fd.append(`paAadhaarBack_${i}`, m.aadhaarBack);
-    if (m.panFile instanceof File) fd.append(`paPan_${i}`, m.panFile);
-  });
+  if (d.renewalDetails?.uploadPolicy instanceof File) fd.append("paRenewalPolicyFile", d.renewalDetails.uploadPolicy);
+  (d.portabilityDetails || []).forEach((p, i) => { if (p.uploadPYP instanceof File) fd.append(`paPortabilityPYP_${i}`, p.uploadPYP); });
+  if (d.aadhaarFile instanceof File) fd.append("paAadhaarFile", d.aadhaarFile);
+  if (d.panFile instanceof File) fd.append("paPanFile", d.panFile);
 };
 
-export const validatePA = (d) => {
+// ============================================================
+// VALIDATION
+// ============================================================
+const multipleOf1000 = (v) => Number(v) > 0 && Number(v) % 1000 === 0;
+
+/** Quote module (formData carries Policy Tenure + Sum Insured) */
+export const validatePA = (d, formData = {}) => {
   const out = [];
   const add = (field, message) => out.push({ field, message });
-
-  if (!d.policyCase) add("pa_policyCase", "PA: Select New / Portability / Renew");
-  if (d.policyCase === "New") {
-    if (!d.insurerName) add("pa_insurerName", "PA: Insurer is required");
-    if (!d.policyStartDate) add("pa_policyStartDate", "PA: Policy Start Date is required");
-    if (!d.policyTenure) add("pa_policyTenure", "PA: Policy Tenure is required");
-  } else if (d.policyCase) {
-    if (!d.prevInsurerName) add("pa_prevInsurerName", "PA: Previous Insurer is required");
-    if (!d.prevPolicyNumber) add("pa_prevPolicyNumber", "PA: Previous Policy No. is required");
-    if (!d.prevPolicyDueDate) add("pa_prevPolicyDueDate", "PA: Policy Due Date is required");
-  }
-  if (!validatePIN(d.pinCode)) add("pa_pinCode", "PA: Enter a valid 6-digit PIN code");
-  if (!d.address?.trim()) add("pa_address", "PA: Complete address (as per Aadhaar) is required");
-  if (!d.familyIncome) add("pa_familyIncome", "PA: Family Income is required");
-
-  d.members.forEach((m, i) => {
-    const p = `pa_m${i}_`;
-    const w = `PA Member ${i + 1}: `;
-    if (!m.fullName?.trim()) add(p + "fullName", w + "Full name is required");
-    if (!m.dob) add(p + "dob", w + "DOB is required");
-    else if (m.dob > maxAdultDob()) add(p + "dob", w + "must be at least 18 years old");
-    if (!m.grossMonthlyIncome) add(p + "grossMonthlyIncome", w + "Gross monthly income is required");
-    if (!m.occupation) add(p + "occupation", w + "Occupation is required");
-    if (!m.deathSI) add(p + "deathSI", w + "Death Sum Insured is required");
-    if (!m.ppdSI) add(p + "ppdSI", w + "Permanent Partial Disability SI is required");
-    if (!m.ptdSI) add(p + "ptdSI", w + "Permanent Total Disability SI is required");
-    if (!m.wantAdditionalCover) add(p + "wantAdditionalCover", w + "Select whether additional cover is needed");
-    if (m.wantAdditionalCover === "Yes") {
-      const picked = COVERS.filter((c) => m.covers?.[c.key]?.selected);
-      if (!picked.length) add(p + "wantAdditionalCover", w + "Select at least one additional cover");
-      picked.forEach((c) => {
-        if (!m.covers[c.key].value) add(p + "covers", `${w}${c.label}: value is required`);
-      });
+  if (!d.hasPreviousPolicy) add("pa_hasPreviousPolicy", "PA: Select whether there is an Active Policy");
+  if (d.hasPreviousPolicy === "Yes") {
+    if (!d.previousPolicyCase) add("pa_previousPolicyCase", "PA: Select the Previous Policy Case");
+    if (d.previousPolicyCase === "Renew Case") {
+      if (!d.renewalDetails?.insurerName) add("pa_renewalInsurer", "PA Renewal: Insurer Name is required");
+      if (!d.renewalDetails?.policyNumber) add("pa_renewalPolicy", "PA Renewal: Policy Number is required");
+      if (!d.renewalDetails?.policyDueDate) add("pa_renewalDueDate", "PA Renewal: Policy Due Date is required");
     }
-    if (!m.gender) add(p + "gender", w + "Gender is required");
-    if (!m.height) add(p + "height", w + "Height is required");
-    if (!m.weight) add(p + "weight", w + "Weight is required");
-    if (!validateAadhaar(m.aadhaarNumber)) add(p + "aadhaarNumber", w + "Aadhaar must be exactly 12 digits");
-    if (!hasFile(m.aadhaarFront)) add(p + "aadhaarFront", w + "Aadhaar front is required");
-    if (!hasFile(m.aadhaarBack)) add(p + "aadhaarBack", w + "Aadhaar back is required");
-    if (!validatePAN(m.panNumber)) add(p + "panNumber", w + "PAN format: ABCDE1234F");
-    if (!hasFile(m.panFile)) add(p + "panFile", w + "PAN upload is required");
-    if (!m.maritalStatus) add(p + "maritalStatus", w + "Marital status is required");
-    if (!m.qualification) add(p + "qualification", w + "Qualification is required");
-    if (!m.nomineeName?.trim()) add(p + "nomineeName", w + "Nominee name is required");
-    if (!m.nomineeDOB) add(p + "nomineeDOB", w + "Nominee DOB is required");
-    else if (m.nomineeDOB > todayStr()) add(p + "nomineeDOB", w + "Nominee DOB cannot be in the future");
-    if (!m.nomineeRelation) add(p + "nomineeRelation", w + "Nominee relation is required");
-    if (!m.hasPED) add(p + "hasPED", w + "Select Pre-Existing Disability Yes/No");
-    if (m.hasPED === "Yes" && !m.pedDetails?.trim()) add(p + "pedDetails", w + "Enter PED details");
+    if (d.previousPolicyCase === "Portability Case" && !(Number(d.experienceYears) > 0)) add("pa_experienceYears", "PA Portability: select how many years old the policy is");
+  }
+  if (!d.policyType) add("pa_policyType", "PA: Policy Type is required");
+  if (!formData.policyTenure) add("policyTenure", "PA: Policy Tenure is required");
+  if (!formData.sumInsured) add("sumInsured", "PA: Sum Insured is required");
+  if (!String(d.proposerName || "").trim()) add("pa_proposerName", "PA: Proposer Name is required");
+  if (!d.proposerDOB) add("pa_proposerDOB", "PA: Proposer DOB is required");
+  else if (d.proposerDOB > maxAdultDob()) add("pa_proposerDOB", "PA: Proposer must be at least 18 years old");
+  if (!(Number(d.familyIncome) > 0)) add("pa_familyIncome", "PA: Family Income is required");
+  if (!(Number(d.grossMonthlyIncome) > 0)) add("pa_grossMonthlyIncome", "PA: Gross Monthly Income is required");
+  if (!d.occupation) add("pa_occupation", "PA: Occupation is required");
+  [["deathSI", "Death"], ["ppdSI", "Permanent Partial Disability"], ["ptdSI", "Permanent Total Disability"]].forEach(([k, label]) => {
+    if (!d[k]) add(`pa_${k}`, `PA: ${label} Sum Insured is required`);
+    else if (!multipleOf1000(d[k])) add(`pa_${k}`, `PA: ${label} Sum Insured must be in multiples of 1000`);
   });
+  if (!d.wantAdditionalCover) add("pa_wantAdditionalCover", "PA: Do you want to add any additional cover? (Yes / No)");
+  if (d.wantAdditionalCover === "Yes") {
+    const picked = PA_COVERS.filter((c) => d.covers?.[c.key]?.selected);
+    if (!picked.length) add("pa_covers", "PA: Select at least one additional cover");
+    picked.filter(coverNeedsValue).forEach((c) => {
+      if (!d.covers[c.key].value) add(`pa_cover_${c.key}`, `PA: ${c.label} — Sum Insured is required`);
+    });
+  }
   return out;
 };
 
-export default function PersonalAccidentForm({ details, setDetails, errors = {}, insurerOptions = [] }) {
-  const [pinMsg, setPinMsg] = useState("");
+/** Policy Issuance module */
+export const validatePAIssuance = (d) => {
+  const out = [];
+  const add = (field, message) => out.push({ field, message });
+  if (!d.maritalStatus) add("pa_maritalStatus", "PA: Marital Status is required");
+  if (!String(d.height || "").trim()) add("pa_height", "PA: Height is required");
+  if (!(Number(d.weight) > 0)) add("pa_weight", "PA: Weight is required");
+  if (!d.qualification) add("pa_qualification", "PA: Qualification is required");
+  if (!d.occupation) add("pa_occupation", "PA: Occupation is required");
+  if (!d.aadhaarNumber) add("pa_aadhaarNumber", "PA: Aadhaar Number is required");
+  else if (!validateAadhaar(d.aadhaarNumber)) add("pa_aadhaarNumber", "PA: Aadhaar must be exactly 12 digits");
+  if (!hasFile(d.aadhaarFile)) add("pa_aadhaarFile", "PA: Upload Aadhaar (mandatory)");
+  if (!d.panNumber) add("pa_panNumber", "PA: Proposer PAN Number is required");
+  else if (!validatePAN(d.panNumber)) add("pa_panNumber", "PA: PAN format ABCDE1234F");
+  if (!hasFile(d.panFile)) add("pa_panFile", "PA: Upload PAN Card (mandatory)");
+  if (d.hasPreviousPolicy === "Yes" && d.previousPolicyCase === "Portability Case") {
+    (d.portabilityDetails || []).forEach((p, i) => {
+      const w = `PA Previous Policy ${i + 1}: `;
+      if (!p.insurerName) add(`pa_port_${i}_insurerName`, w + "Insurer Name is required");
+      if (!p.policyNumber) add(`pa_port_${i}_policyNumber`, w + "Policy Number is required");
+      if (!p.policyActiveFrom) add(`pa_port_${i}_policyActiveFrom`, w + "Active From is required");
+      if (!p.policyTillDate) add(`pa_port_${i}_policyTillDate`, w + "Till Date is required");
+      if (!p.sumAssured) add(`pa_port_${i}_sumAssured`, w + "Sum Insured is required");
+      if (!hasFile(p.uploadPYP)) add(`pa_port_${i}_uploadPYP`, w + "Upload PYP is mandatory");
+    });
+  }
+  return out;
+};
+
+// ============================================================
+// QUOTE MODULE
+// ============================================================
+export function PAQuoteSection({ details: d, setDetails, errors: err = {}, formData = {}, setFormData, insurerOptions = [] }) {
   const set = (patch) => setDetails((p) => ({ ...p, ...patch }));
-  const setMember = (i, patch) =>
-    setDetails((p) => ({ ...p, members: p.members.map((m, idx) => (idx === i ? { ...m, ...patch } : m)) }));
-
-  const setPolicy = (patch) =>
-    setDetails((p) => {
-      const n = { ...p, ...patch };
-      n.policyEndDate =
-        n.policyStartDate && n.policyTenure ? addYearsStr(n.policyStartDate, parseInt(n.policyTenure, 10)) : "";
-      return n;
-    });
-
-  const onPin = async (raw) => {
-    const val = raw.replace(/\D/g, "").slice(0, 6);
-    set({ pinCode: val, ...(val.length < 6 ? { city: "", state: "" } : {}) });
-    setPinMsg("");
-    if (val.length === 6) {
-      const info = await fetchPinInfo(val);
-      if (info) set(info);
-      else { set({ city: "", state: "" }); setPinMsg("Invalid PIN code"); }
-    }
-  };
-
-  const setCover = (i, c, patch) =>
-    setMember(i, {
-      covers: { ...details.members[i].covers, [c.key]: { ...(details.members[i].covers?.[c.key] || {}), ...patch } },
-    });
-
-  const f = (name) => ({ "data-field": name, className: inputCls(errors[name]) });
-
+  const setRenewal = (patch) => setDetails((p) => ({ ...p, renewalDetails: { ...(p.renewalDetails || {}), ...patch } }));
+  const setCover = (key, patch) => setDetails((p) => ({ ...p, covers: { ...(p.covers || {}), [key]: { ...(p.covers?.[key] || {}), ...patch } } }));
+  const setLead = (patch) => setFormData && setFormData((p) => ({ ...p, ...patch }));
+  const amount = (k, label) => (
+    <Field label={label} required error={err[`pa_${k}`]} hint="Enter the amount in multiples of 1000">
+      <input data-field={`pa_${k}`} type="text" inputMode="numeric" value={d[k]} onChange={(e) => set({ [k]: e.target.value.replace(/\D/g, "") })} className={inputCls(err[`pa_${k}`])} />
+    </Field>
+  );
   return (
-    <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-      <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaShieldAlt /> Personal Accident Details
-      </h3>
+    <div className="mb-6">
+      <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2"><FaShieldAlt /> Personal Accident — Quote Details</h4>
 
-      {/* Policy case */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Field label="Policy Type" required error={errors.pa_policyCase}>
-          <Select {...f("pa_policyCase")} value={details.policyCase} options={["New", "Portability", "Renew"]}
-            onChange={(e) => set({ policyCase: e.target.value })} />
+      <div className="bg-indigo-50 p-4 rounded-lg mb-4 border border-indigo-200 grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Field label="Active Policy?" required error={err.pa_hasPreviousPolicy}>
+          <Select
+            data-field="pa_hasPreviousPolicy" options={YES_NO} value={d.hasPreviousPolicy} className={inputCls(err.pa_hasPreviousPolicy)}
+            onChange={(e) => {
+              const v = e.target.value;
+              set(v === "Yes" ? { hasPreviousPolicy: v } : { hasPreviousPolicy: v, previousPolicyCase: "", experienceYears: "", portabilityDetails: [], renewalDetails: { insurerName: "", policyNumber: "", policyDueDate: "", uploadPolicy: null } });
+            }}
+          />
         </Field>
-
-        {details.policyCase === "New" && (
-          <>
-            <Field label="Insurer" required error={errors.pa_insurerName}>
-              <Select {...f("pa_insurerName")} value={details.insurerName} options={insurerOptions}
-                onChange={(e) => set({ insurerName: e.target.value })} />
-            </Field>
-            <Field label="Policy Start Date" required error={errors.pa_policyStartDate}>
-              <input {...f("pa_policyStartDate")} type="date" value={details.policyStartDate}
-                onChange={(e) => setPolicy({ policyStartDate: e.target.value })} />
-            </Field>
-            <Field label="Policy Tenure" required error={errors.pa_policyTenure}>
-              <Select {...f("pa_policyTenure")} value={details.policyTenure} options={TENURES}
-                onChange={(e) => setPolicy({ policyTenure: e.target.value })} />
-            </Field>
-            <Field label="Policy End Date (auto)">
-              <input type="date" readOnly value={details.policyEndDate} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-100" />
-            </Field>
-          </>
+        {d.hasPreviousPolicy === "Yes" && (
+          <Field label="Previous Policy Case" required error={err.pa_previousPolicyCase}>
+            <Select data-field="pa_previousPolicyCase" options={PREVIOUS_CASES} value={d.previousPolicyCase} onChange={(e) => set({ previousPolicyCase: e.target.value })} className={inputCls(err.pa_previousPolicyCase)} />
+          </Field>
         )}
-
-        {(details.policyCase === "Portability" || details.policyCase === "Renew") && (
-          <>
-            <Field label="Previous Insurer" required error={errors.pa_prevInsurerName}>
-              <Select {...f("pa_prevInsurerName")} value={details.prevInsurerName} options={insurerOptions}
-                onChange={(e) => set({ prevInsurerName: e.target.value })} />
-            </Field>
-            <Field label="Previous Policy No." required error={errors.pa_prevPolicyNumber}>
-              <input {...f("pa_prevPolicyNumber")} value={details.prevPolicyNumber}
-                onChange={(e) => set({ prevPolicyNumber: e.target.value })} />
-            </Field>
-            <Field label="Policy Due Date" required error={errors.pa_prevPolicyDueDate}>
-              <input {...f("pa_prevPolicyDueDate")} type="date" value={details.prevPolicyDueDate}
-                onChange={(e) => set({ prevPolicyDueDate: e.target.value })} />
-            </Field>
-            <FileInput label="Upload Previous Policy (Not Mandatory)" name="pa_prevPolicyFile"
-              value={details.prevPolicyFile} onChange={(file) => set({ prevPolicyFile: file })} accept=".pdf" />
-          </>
+        {d.hasPreviousPolicy === "Yes" && d.previousPolicyCase === "Portability Case" && (
+          <Field label="How many years Experience / Old is the Policy?" required error={err.pa_experienceYears} hint="Details for each year are filled at Policy Issuance">
+            <Select data-field="pa_experienceYears" options={EXPERIENCE_YEARS} value={d.experienceYears} onChange={(e) => set({ experienceYears: e.target.value })} className={inputCls(err.pa_experienceYears)} />
+          </Field>
         )}
-      </div>
-
-      {/* Area */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-        <Field label="Area PIN Code" required error={errors.pa_pinCode || pinMsg}>
-          <input {...f("pa_pinCode")} value={details.pinCode} maxLength={6} onChange={(e) => onPin(e.target.value)} placeholder="6 digit PIN" />
-        </Field>
-        <Field label="City"><input readOnly value={details.city} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-50" /></Field>
-        <Field label="State"><input readOnly value={details.state} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-50" /></Field>
-        <Field label="Complete Address (as per Aadhaar)" required error={errors.pa_address} className="lg:col-span-2">
-          <textarea {...f("pa_address")} rows={2} value={details.address} onChange={(e) => set({ address: e.target.value })} />
-        </Field>
-        <Field label="Family Income (₹)" required error={errors.pa_familyIncome}>
-          <input {...f("pa_familyIncome")} type="number" min="0" value={details.familyIncome}
-            onChange={(e) => set({ familyIncome: e.target.value })} />
-        </Field>
-      </div>
-
-      {/* Members */}
-      <h4 className="text-md font-semibold text-indigo-600 mt-6 mb-3">Members</h4>
-      {details.members.map((m, i) => {
-        const p = `pa_m${i}_`;
-        return (
-          <div key={i} className="border rounded-lg p-4 mb-4 bg-gray-50">
-            <div className="flex justify-between items-center mb-3">
-              <h5 className="font-medium text-gray-700">Member {i + 1}</h5>
-              {details.members.length > 1 && (
-                <button type="button" onClick={() => set({ members: details.members.filter((_, idx) => idx !== i) })}
-                  className="text-red-600 text-xs flex items-center gap-1"><FaTrash /> Remove</button>
-              )}
-            </div>
-
-            <p className="text-xs font-semibold text-gray-600 mb-2">Member Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Full Name (as per Aadhaar)" required error={errors[p + "fullName"]}>
-                <input {...f(p + "fullName")} className={inputCls(errors[p + "fullName"]) + " uppercase"} value={m.fullName}
-                  onChange={(e) => setMember(i, { fullName: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="DOB (min. 18 years)" required error={errors[p + "dob"]}>
-                <input {...f(p + "dob")} type="date" max={maxAdultDob()} value={m.dob} onChange={(e) => setMember(i, { dob: e.target.value })} />
-              </Field>
-              <Field label="Gross Monthly Income (₹)" required error={errors[p + "grossMonthlyIncome"]}>
-                <input {...f(p + "grossMonthlyIncome")} type="number" min="0" value={m.grossMonthlyIncome}
-                  onChange={(e) => setMember(i, { grossMonthlyIncome: e.target.value })} />
-              </Field>
-              <Field label="Occupation" required error={errors[p + "occupation"]}>
-                <Select {...f(p + "occupation")} value={m.occupation} options={OCCUPATIONS} onChange={(e) => setMember(i, { occupation: e.target.value })} />
-              </Field>
-              <Field label="Death Sum Insured (₹)" required error={errors[p + "deathSI"]}>
-                <input {...f(p + "deathSI")} type="number" min="0" value={m.deathSI} onChange={(e) => setMember(i, { deathSI: e.target.value })} />
-              </Field>
-              <Field label="Permanent Partial Disability SI (₹)" required error={errors[p + "ppdSI"]}>
-                <input {...f(p + "ppdSI")} type="number" min="0" value={m.ppdSI} onChange={(e) => setMember(i, { ppdSI: e.target.value })} />
-              </Field>
-              <Field label="Permanent Total Disability SI (₹)" required error={errors[p + "ptdSI"]}>
-                <input {...f(p + "ptdSI")} type="number" min="0" value={m.ptdSI} onChange={(e) => setMember(i, { ptdSI: e.target.value })} />
-              </Field>
-              <Field label="Do you want any additional cover?" required error={errors[p + "wantAdditionalCover"]}>
-                <Select {...f(p + "wantAdditionalCover")} value={m.wantAdditionalCover} options={YES_NO}
-                  onChange={(e) => setMember(i, { wantAdditionalCover: e.target.value, ...(e.target.value === "No" ? { covers: {} } : {}) })} />
-              </Field>
-            </div>
-
-            {m.wantAdditionalCover === "Yes" && (
-              <div data-field={p + "covers"} className="mt-3 border rounded-lg p-3 bg-white">
-                <p className="text-xs font-semibold text-pink-600 mb-2">Additional Covers</p>
-                {errors[p + "covers"] && <p className="text-red-500 text-xs mb-2">{errors[p + "covers"]}</p>}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {COVERS.map((c) => {
-                    const cv = m.covers?.[c.key] || {};
-                    return (
-                      <div key={c.key} className="border rounded p-2">
-                        <label className="flex items-center gap-2 text-xs font-medium text-gray-700">
-                          <input type="checkbox" checked={!!cv.selected}
-                            onChange={(e) =>
-                              setCover(i, c, {
-                                selected: e.target.checked,
-                                value: e.target.checked ? (c.type === "fixed" ? String(c.value) : cv.value || "") : "",
-                              })} />
-                          {c.label}
-                        </label>
-                        {cv.selected && c.type === "fixed" && <p className="text-xs text-green-700 mt-1">{inr(c.value)} (auto)</p>}
-                        {cv.selected && c.type === "number" && (
-                          <input type="number" min="0" placeholder="Enter amount (₹)" value={cv.value || ""}
-                            onChange={(e) => setCover(i, c, { value: e.target.value })} className={inputCls(false) + " mt-1"} />
-                        )}
-                        {cv.selected && c.type === "select" && (
-                          <Select value={cv.value || ""} options={c.options} onChange={(e) => setCover(i, c, { value: e.target.value })}
-                            className={inputCls(false) + " mt-1"} />
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            <p className="text-xs font-semibold text-gray-600 mt-4 mb-2">IP Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Gender" required error={errors[p + "gender"]}>
-                <Select {...f(p + "gender")} value={m.gender} options={GENDERS} onChange={(e) => setMember(i, { gender: e.target.value })} />
-              </Field>
-              <Field label="Height" required error={errors[p + "height"]}>
-                <input {...f(p + "height")} value={m.height} placeholder={`e.g. 5'8"`} onChange={(e) => setMember(i, { height: e.target.value })} />
-              </Field>
-              <Field label="Weight (kg)" required error={errors[p + "weight"]}>
-                <input {...f(p + "weight")} type="number" min="0" value={m.weight} onChange={(e) => setMember(i, { weight: e.target.value })} />
-              </Field>
-              <Field label="Aadhaar No." required error={errors[p + "aadhaarNumber"]}>
-                <input {...f(p + "aadhaarNumber")} value={m.aadhaarNumber} maxLength={12} placeholder="12 digits"
-                  onChange={(e) => setMember(i, { aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} />
-              </Field>
-              <FileInput label="Upload Aadhaar - Front" required name={p + "aadhaarFront"} error={errors[p + "aadhaarFront"]}
-                value={m.aadhaarFront} onChange={(file) => setMember(i, { aadhaarFront: file })} />
-              <FileInput label="Upload Aadhaar - Back" required name={p + "aadhaarBack"} error={errors[p + "aadhaarBack"]}
-                value={m.aadhaarBack} onChange={(file) => setMember(i, { aadhaarBack: file })} />
-              <Field label="PAN No." required error={errors[p + "panNumber"]}>
-                <input {...f(p + "panNumber")} className={inputCls(errors[p + "panNumber"]) + " uppercase"} value={m.panNumber} maxLength={10} placeholder="ABCDE1234F"
-                  onChange={(e) => setMember(i, { panNumber: e.target.value.toUpperCase().slice(0, 10) })} />
-              </Field>
-              <FileInput label="Upload PAN" required name={p + "panFile"} error={errors[p + "panFile"]}
-                value={m.panFile} onChange={(file) => setMember(i, { panFile: file })} />
-              <Field label="Marital Status" required error={errors[p + "maritalStatus"]}>
-                <Select {...f(p + "maritalStatus")} value={m.maritalStatus} options={MARITAL} onChange={(e) => setMember(i, { maritalStatus: e.target.value })} />
-              </Field>
-              <Field label="Educational Qualification" required error={errors[p + "qualification"]}>
-                <Select {...f(p + "qualification")} value={m.qualification} options={QUALIFICATIONS} onChange={(e) => setMember(i, { qualification: e.target.value })} />
-              </Field>
-            </div>
-
-            <p className="text-xs font-semibold text-gray-600 mt-4 mb-2">Nominee Details</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Nominee Full Name (as per Aadhaar)" required error={errors[p + "nomineeName"]}>
-                <input {...f(p + "nomineeName")} className={inputCls(errors[p + "nomineeName"]) + " uppercase"} value={m.nomineeName}
-                  onChange={(e) => setMember(i, { nomineeName: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="Nominee DOB" required error={errors[p + "nomineeDOB"]}>
-                <input {...f(p + "nomineeDOB")} type="date" max={todayStr()} value={m.nomineeDOB} onChange={(e) => setMember(i, { nomineeDOB: e.target.value })} />
-              </Field>
-              <Field label="Relation" required error={errors[p + "nomineeRelation"]}>
-                <Select {...f(p + "nomineeRelation")} value={m.nomineeRelation} options={NOMINEE_RELATIONS} onChange={(e) => setMember(i, { nomineeRelation: e.target.value })} />
-              </Field>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mt-4">
-              <Field label="Do you have any Pre-Existing Disability?" required error={errors[p + "hasPED"]}>
-                <Select {...f(p + "hasPED")} value={m.hasPED} options={YES_NO}
-                  onChange={(e) => setMember(i, { hasPED: e.target.value, ...(e.target.value === "No" ? { pedDetails: "" } : {}) })} />
-              </Field>
-              {m.hasPED === "Yes" && (
-                <Field label="PED Details" required error={errors[p + "pedDetails"]} className="lg:col-span-2">
-                  <textarea {...f(p + "pedDetails")} rows={2} value={m.pedDetails} onChange={(e) => setMember(i, { pedDetails: e.target.value })} />
-                </Field>
-              )}
-            </div>
+        {d.hasPreviousPolicy === "Yes" && d.previousPolicyCase === "Fresh Case" && <p className="text-sm text-green-700 self-end">Fresh Case — no previous policy details required.</p>}
+        {d.hasPreviousPolicy === "Yes" && d.previousPolicyCase === "Renew Case" && (
+          <div className="md:col-span-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Field label="Renewal — Insurer Name" required error={err.pa_renewalInsurer}>
+              <Select data-field="pa_renewalInsurer" options={insurerOptions} value={d.renewalDetails?.insurerName || ""} onChange={(e) => setRenewal({ insurerName: e.target.value })} className={inputCls(err.pa_renewalInsurer)} />
+            </Field>
+            <Field label="Policy No" required error={err.pa_renewalPolicy}>
+              <input data-field="pa_renewalPolicy" type="text" value={d.renewalDetails?.policyNumber || ""} onChange={(e) => setRenewal({ policyNumber: e.target.value })} className={inputCls(err.pa_renewalPolicy)} />
+            </Field>
+            <Field label="Policy Due Date" required error={err.pa_renewalDueDate}>
+              <input data-field="pa_renewalDueDate" type="date" value={d.renewalDetails?.policyDueDate || ""} onChange={(e) => setRenewal({ policyDueDate: e.target.value })} className={inputCls(err.pa_renewalDueDate)} />
+            </Field>
+            <FileInput label="Upload Policy (Not Mandatory)" name="pa_renewalUpload" value={d.renewalDetails?.uploadPolicy} onChange={(file) => setRenewal({ uploadPolicy: file })} />
           </div>
-        );
-      })}
+        )}
+      </div>
 
-      <button type="button" onClick={() => set({ members: [...details.members, emptyMember()] })}
-        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm flex items-center gap-2 hover:bg-indigo-100">
-        <FaPlus /> Add Member
-      </button>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Field label="Policy Type" required error={err.pa_policyType}>
+          <Select data-field="pa_policyType" options={PA_POLICY_TYPES} value={d.policyType} onChange={(e) => set({ policyType: e.target.value })} className={inputCls(err.pa_policyType)} />
+        </Field>
+        <Field label="Policy Tenure" required error={err.policyTenure}>
+          <Select data-field="policyTenure" options={PA_TENURES} value={formData.policyTenure || ""} onChange={(e) => setLead({ policyTenure: e.target.value })} className={inputCls(err.policyTenure)} />
+        </Field>
+        <Field label="Sum Insured" required error={err.sumInsured}>
+          <Select data-field="sumInsured" options={formData.sumInsured && !PA_SUM_INSURED.includes(formData.sumInsured) ? [formData.sumInsured, ...PA_SUM_INSURED] : PA_SUM_INSURED} value={formData.sumInsured || ""} onChange={(e) => setLead({ sumInsured: e.target.value })} className={inputCls(err.sumInsured)} />
+        </Field>
+        <Field label="Proposer Name" required error={err.pa_proposerName} hint="Taken from the lead — you can change it">
+          <input data-field="pa_proposerName" type="text" value={d.proposerName} onChange={(e) => set({ proposerName: e.target.value.toUpperCase() })} className={`${inputCls(err.pa_proposerName)} uppercase`} />
+        </Field>
+        <Field label="Proposer DOB" required error={err.pa_proposerDOB}>
+          <input data-field="pa_proposerDOB" type="date" max={maxAdultDob()} value={d.proposerDOB} onChange={(e) => set({ proposerDOB: e.target.value })} className={inputCls(err.pa_proposerDOB)} />
+        </Field>
+        <Field label="Occupation" required error={err.pa_occupation}>
+          <Select data-field="pa_occupation" options={OCCUPATIONS} value={d.occupation} onChange={(e) => set({ occupation: e.target.value })} className={inputCls(err.pa_occupation)} />
+        </Field>
+        <Field label="Family Income (₹, yearly)" required error={err.pa_familyIncome}>
+          <input data-field="pa_familyIncome" type="text" inputMode="numeric" value={d.familyIncome} onChange={(e) => set({ familyIncome: e.target.value.replace(/\D/g, "") })} className={inputCls(err.pa_familyIncome)} />
+        </Field>
+        <Field label="Gross Monthly Income (₹)" required error={err.pa_grossMonthlyIncome}>
+          <input data-field="pa_grossMonthlyIncome" type="text" inputMode="numeric" value={d.grossMonthlyIncome} onChange={(e) => set({ grossMonthlyIncome: e.target.value.replace(/\D/g, "") })} className={inputCls(err.pa_grossMonthlyIncome)} />
+        </Field>
+        <div />
+        {amount("deathSI", "Death Sum Insured (₹)")}
+        {amount("ppdSI", "Permanent Partial Disability Sum Insured (₹)")}
+        {amount("ptdSI", "Permanent Total Disability Sum Insured (₹)")}
+        <Field label="PED, If Any" className="sm:col-span-2 lg:col-span-3">
+          <textarea rows="2" value={d.pedRemarks} onChange={(e) => set({ pedRemarks: e.target.value })} className={inputCls()} placeholder="Pre-existing disease / disability details" />
+        </Field>
+        <Field label="Do you want to add any additional cover?" required error={err.pa_wantAdditionalCover}>
+          <Select data-field="pa_wantAdditionalCover" options={YES_NO} value={d.wantAdditionalCover} onChange={(e) => set(e.target.value === "No" ? { wantAdditionalCover: "No", covers: {} } : { wantAdditionalCover: e.target.value })} className={inputCls(err.pa_wantAdditionalCover)} />
+        </Field>
+      </div>
+
+      {d.wantAdditionalCover === "Yes" && (
+        <div data-field="pa_covers" className={`mt-3 border rounded-lg p-3 ${err.pa_covers ? "border-red-500" : "border-gray-200"}`}>
+          <p className="text-sm font-medium text-gray-700 mb-2">Additional Covers {err.pa_covers && <span className="text-red-500 text-xs ml-2">{err.pa_covers}</span>}</p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-x-6 gap-y-2">
+            {PA_COVERS.map((c) => {
+              const cv = d.covers?.[c.key] || {};
+              const e = err[`pa_cover_${c.key}`];
+              return (
+                <div key={c.key} className="flex flex-wrap items-center gap-2 py-1 border-b border-gray-100">
+                  <label className="flex items-center gap-2 text-sm flex-1 min-w-[220px]">
+                    <input type="checkbox" className="rounded text-indigo-600" checked={!!cv.selected} onChange={(ev) => setCover(c.key, { selected: ev.target.checked, value: ev.target.checked ? cv.value || "" : "" })} />
+                    {c.label}
+                  </label>
+                  {cv.selected && c.type === "select" && (
+                    <Select data-field={`pa_cover_${c.key}`} options={c.options} placeholder="Select SI" value={cv.value || ""} onChange={(ev) => setCover(c.key, { value: ev.target.value })} className={`${inputCls(e)} max-w-[180px]`} />
+                  )}
+                  {cv.selected && c.type === "number" && (
+                    <input data-field={`pa_cover_${c.key}`} type="text" inputMode="numeric" placeholder="Amount (₹)" value={cv.value || ""} onChange={(ev) => setCover(c.key, { value: ev.target.value.replace(/\D/g, "") })} className={`${inputCls(e)} max-w-[180px]`} />
+                  )}
+                  {cv.selected && c.type === "fixed" && <span className="text-xs text-gray-600">SI ₹{c.value.toLocaleString("en-IN")}</span>}
+                  {cv.selected && c.type === "na" && <span className="text-xs text-gray-500">SI not applicable</span>}
+                  {e && <span className="text-red-500 text-xs w-full">{e}</span>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
+// ============================================================
+// POLICY ISSUANCE MODULE
+// ============================================================
+export function PAIssuanceSection({ details: d, setDetails, errors: err = {}, insurerOptions = [], sumInsuredOptions = [] }) {
+  const set = (patch) => setDetails((p) => ({ ...p, ...patch }));
+  const setPort = (i, patch) => setDetails((p) => ({ ...p, portabilityDetails: (p.portabilityDetails || []).map((r, k) => (k === i ? { ...r, ...patch } : r)) }));
+  const portability = d.hasPreviousPolicy === "Yes" && d.previousPolicyCase === "Portability Case";
+  const years = parseInt(d.experienceYears, 10) || 0;
+  const rowCount = (d.portabilityDetails || []).length;
+
+  // one previous-policy row per year of experience (Portability)
+  useEffect(() => {
+    if (!portability || rowCount === years) return;
+    setDetails((p) => {
+      const cur = p.portabilityDetails || [];
+      return {
+        ...p,
+        portabilityDetails: Array.from({ length: years }, (_, i) => cur[i] || { insurerName: "", policyNumber: "", policyActiveFrom: "", policyTillDate: "", sumAssured: "", claimTaken: "", uploadPYP: null }),
+      };
+    });
+  }, [portability, years, rowCount, setDetails]);
+
+  // remarks start from the PED noted at the Quote
+  useEffect(() => {
+    if (!d.issuanceRemarks && d.pedRemarks) set({ issuanceRemarks: d.pedRemarks });
+  }, [d.pedRemarks]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const covers = describeCovers(d);
+  return (
+    <div className="space-y-5">
+      <div>
+        <h4 className="text-md font-semibold text-indigo-600 mb-3">Proposer Details</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Field label="Name" hint="From the Quote"><input type="text" readOnly value={d.proposerName} className={`${inputCls()} bg-gray-100`} /></Field>
+          <Field label="DOB" hint="From the Quote"><input type="date" readOnly value={d.proposerDOB} className={`${inputCls()} bg-gray-100`} /></Field>
+          <Field label="Relationship"><input type="text" readOnly value="Self" className={`${inputCls()} bg-gray-100`} /></Field>
+          <Field label="Marital Status" required error={err.pa_maritalStatus}>
+            <Select data-field="pa_maritalStatus" options={PA_MARITAL} value={d.maritalStatus} onChange={(e) => set({ maritalStatus: e.target.value })} className={inputCls(err.pa_maritalStatus)} />
+          </Field>
+          <Field label="Height (ft/in)" required error={err.pa_height}>
+            <input data-field="pa_height" type="text" value={d.height} onChange={(e) => set({ height: e.target.value })} className={inputCls(err.pa_height)} placeholder={`e.g., 5'8"`} />
+          </Field>
+          <Field label="Weight (kg)" required error={err.pa_weight}>
+            <input data-field="pa_weight" type="text" inputMode="numeric" value={d.weight} onChange={(e) => set({ weight: e.target.value.replace(/[^\d.]/g, "") })} className={inputCls(err.pa_weight)} />
+          </Field>
+          <Field label="Qualification" required error={err.pa_qualification}>
+            <Select data-field="pa_qualification" options={QUALIFICATIONS} value={d.qualification} onChange={(e) => set({ qualification: e.target.value })} className={inputCls(err.pa_qualification)} />
+          </Field>
+          <Field label="Occupation" required error={err.pa_occupation}>
+            <Select data-field="pa_occupation" options={OCCUPATIONS} value={d.occupation} onChange={(e) => set({ occupation: e.target.value })} className={inputCls(err.pa_occupation)} />
+          </Field>
+          <div />
+          <Field label="Aadhaar Number" required error={err.pa_aadhaarNumber}>
+            <input data-field="pa_aadhaarNumber" type="text" inputMode="numeric" maxLength="12" value={d.aadhaarNumber} onChange={(e) => set({ aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} className={inputCls(err.pa_aadhaarNumber)} />
+          </Field>
+          <FileInput label="Upload Aadhaar (Mandatory)" required name="pa_aadhaarFile" value={d.aadhaarFile} error={err.pa_aadhaarFile} onChange={(file) => set({ aadhaarFile: file })} />
+          <div />
+          <Field label="PAN Number" required error={err.pa_panNumber}>
+            <input data-field="pa_panNumber" type="text" maxLength="10" value={d.panNumber} onChange={(e) => set({ panNumber: e.target.value.toUpperCase().slice(0, 10) })} className={`${inputCls(err.pa_panNumber)} uppercase`} placeholder="ABCDE1234F" />
+          </Field>
+          <FileInput label="Upload PAN Card (Mandatory)" required name="pa_panFile" value={d.panFile} error={err.pa_panFile} onChange={(file) => set({ panFile: file })} />
+          <div />
+          <Field label="Any Additional Cover?" className="sm:col-span-2 lg:col-span-3">
+            <div className="p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700 min-h-[38px]">{covers || "—"}</div>
+          </Field>
+          <Field label="Remarks (PED / Treatment)" className="sm:col-span-2 lg:col-span-3">
+            <textarea rows="2" value={d.issuanceRemarks} onChange={(e) => set({ issuanceRemarks: e.target.value })} className={inputCls()} />
+          </Field>
+        </div>
+      </div>
+
+      {portability && (
+        <div>
+          <h4 className="text-md font-semibold text-indigo-600 mb-3">Previous Policy Details (Portability — {years} year{years === 1 ? "" : "s"})</h4>
+          {(d.portabilityDetails || []).map((p, i) => {
+            const k = (f) => `pa_port_${i}_${f}`;
+            return (
+              <div key={i} className="border rounded-lg p-4 mb-3 bg-gray-50">
+                <h5 className="font-medium text-gray-700 mb-3">Previous Policy {i + 1}</h5>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  <Field label="Insurer Name" required error={err[k("insurerName")]}>
+                    <Select data-field={k("insurerName")} options={insurerOptions} value={p.insurerName || ""} onChange={(e) => setPort(i, { insurerName: e.target.value })} className={inputCls(err[k("insurerName")])} />
+                  </Field>
+                  <Field label="Policy Number" required error={err[k("policyNumber")]}>
+                    <input data-field={k("policyNumber")} type="text" value={p.policyNumber || ""} onChange={(e) => setPort(i, { policyNumber: e.target.value })} className={inputCls(err[k("policyNumber")])} />
+                  </Field>
+                  <Field label="Active From" required error={err[k("policyActiveFrom")]}>
+                    <input data-field={k("policyActiveFrom")} type="date" max={todayStr()} value={p.policyActiveFrom || ""} onChange={(e) => setPort(i, { policyActiveFrom: e.target.value })} className={inputCls(err[k("policyActiveFrom")])} />
+                  </Field>
+                  <Field label="Till Date" required error={err[k("policyTillDate")]}>
+                    <input data-field={k("policyTillDate")} type="date" value={p.policyTillDate || ""} onChange={(e) => setPort(i, { policyTillDate: e.target.value })} className={inputCls(err[k("policyTillDate")])} />
+                  </Field>
+                  <Field label="Sum Insured" required error={err[k("sumAssured")]}>
+                    <Select data-field={k("sumAssured")} options={sumInsuredOptions.length ? sumInsuredOptions : PA_SUM_INSURED} value={p.sumAssured || ""} onChange={(e) => setPort(i, { sumAssured: e.target.value })} className={inputCls(err[k("sumAssured")])} />
+                  </Field>
+                  <Field label="Any Claim taken?">
+                    <Select options={YES_NO} value={p.claimTaken || ""} onChange={(e) => setPort(i, { claimTaken: e.target.value })} className={inputCls()} />
+                  </Field>
+                  <FileInput label="Upload PYP (Mandatory)" required name={k("uploadPYP")} value={p.uploadPYP} error={err[k("uploadPYP")]} onChange={(file) => setPort(i, { uploadPYP: file })} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default PAQuoteSection;
