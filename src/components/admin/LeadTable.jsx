@@ -7,7 +7,10 @@ import {
 import { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import LeadCaseForm from "../lob/LeadCaseForm";
+<<<<<<< HEAD
 import Pagination, { usePagination } from "../lob/Pagination";
+=======
+>>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
 import BulkUploadModal from "./BulkUploadModal";
 import { prepareUpload, uploadErrorMessage } from "../lob/uploadUtils";
 import useLeadCase from "../lob/useLeadCase";

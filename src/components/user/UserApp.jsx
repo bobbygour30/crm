@@ -18,7 +18,10 @@ import {
 } from "../../data/mockData";
 import EmployeeSalarySlipViewer from "./EmployeeSalarySlipViewer";
 import PolicyReports from "../reports/PolicyReports";
+<<<<<<< HEAD
 import MyHrSelf from "../hr/MyHrSelf";
+=======
+>>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
 
 function UserApp({ handleLogout }) {
   const [activeTab, setActiveTab] = useState("home");
@@ -184,7 +187,10 @@ function UserApp({ handleLogout }) {
             <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={currentUser} />} />
             <Route path="/quote" element={<Quote user={currentUser} />} />
             <Route path="/reports" element={<PolicyReports />} />
+<<<<<<< HEAD
             <Route path="/my-hr" element={<MyHrSelf />} />
+=======
+>>>>>>> e8d159dd0da9b49765fade1f41ca54b3120eaf93
           </Routes>
         </div>
       </div>
