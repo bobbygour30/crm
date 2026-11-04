@@ -7,13 +7,21 @@ import DocumentValidation from "./DocumentValidation";
 import Employees from "./Employees";
 import HrAttendance from "./HrAttendance";
 import { SalaryRegister, SalarySlips } from "./SalaryRegister";
+<<<<<<< HEAD
 import { Assets, Confirmations, Exits, Relieving, PromotionHike, HrDocuments, ManagerInbox } from "./HrPhase2";
+=======
+import Promotions from "./Promotions";
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 import HrSettings from "./HrSettings";
 
 export const HR_SECTIONS = [
   ["offers", "Offer Letters"], ["validation", "Document Validation"], ["employees", "Employees"], ["attendance", "HR Attendance"],
+<<<<<<< HEAD
   ["salary", "Salary Register"], ["slips", "HR Salary Slip"], ["promotions", "Promotion & Hike"], ["assets", "Assets"], ["confirmation", "Confirmation Letter"],
   ["exits", "Employee Exit"], ["relieving", "Relieving Letter"], ["documents", "Documents"], ["settings", "Settings"],
+=======
+  ["salary", "Salary Register"], ["slips", "HR Salary Slip"], ["promotions", "Promotions"], ["settings", "Settings"],
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 ];
 
 export default function MyHR({ section = "offers" }) {
@@ -43,12 +51,16 @@ export default function MyHR({ section = "offers" }) {
           {section === "attendance" && <HrAttendance />}
           {section === "salary" && <SalaryRegister />}
           {section === "slips" && <SalarySlips />}
+<<<<<<< HEAD
           {section === "promotions" && <><ManagerInbox /><PromotionHike {...common} /></>}
           {section === "assets" && <Assets {...common} />}
           {section === "confirmation" && <Confirmations />}
           {section === "exits" && <Exits />}
           {section === "relieving" && <Relieving />}
           {section === "documents" && <HrDocuments />}
+=======
+          {section === "promotions" && <Promotions {...common} />}
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
           {section === "settings" && <HrSettings settings={settings} setSettings={setSettings} reloadMasters={loadMasters} />}
         </>
       )}

@@ -1,10 +1,15 @@
 // src/components/hr/SalaryEditor.jsx — Offer Letter "Salary" tab (also used by Promotions)
 // Per Month <-> Per Annum (x12), deduction multi-select (NA zeroes + disables every line), live CTC / In-Hand.
+<<<<<<< HEAD
 import { computeSalary, autoEarnings, DEDUCTION_OPTIONS, EARNING_LINES, DEDUCTION_LINES } from "./hrSalary";
+=======
+import { computeSalary, DEDUCTION_OPTIONS, EARNING_LINES, DEDUCTION_LINES } from "./hrSalary";
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 import { inputCls, cx } from "./ui";
 
 const fmt = (v) => Math.round(Number(v) || 0).toLocaleString("en-IN");
 
+<<<<<<< HEAD
 export default function SalaryEditor({ value, onChange, settings, disabled, errors = {} }) {
   const v = value || { earnings: {}, deductions: [], insurance: {} };
   const calc = computeSalary(v, settings || {});
@@ -22,6 +27,12 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
     Object.keys(fresh).forEach((c) => { if (isAuto(c)) next[c] = monthly ? String(fresh[c]) : ""; });
     onChange({ ...v, earnings: next });
   };
+=======
+export default function SalaryEditor({ value, onChange, settings, disabled }) {
+  const v = value || { earnings: {}, deductions: [], insurance: {} };
+  const calc = computeSalary(v, settings || {});
+  const setEarning = (k, monthly) => onChange({ ...v, earnings: { ...v.earnings, [k]: monthly } });
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   const toggle = (opt) => {
     const cur = v.deductions || [];
     let next;
@@ -40,6 +51,7 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
           <tbody>
             {EARNING_LINES.map(([k, label]) => (
               <tr key={k}>
+<<<<<<< HEAD
                 <td className="py-1 pr-2">
                   {label}{k === "basic" && <span className="text-red-500"> *</span>}
                   {k !== "basic" && (isAuto(k)
@@ -47,6 +59,10 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
                     : <button type="button" disabled={disabled} onClick={() => setEarning(k, auto[k] ? String(auto[k]) : "")} className="ml-1 text-[10px] text-indigo-600 underline" data-edited={k}>edited · use auto</button>)}
                 </td>
                 <td className="py-1 pr-2"><input data-field={`earn_${k}_m`} aria-label={`${label} per month`} inputMode="decimal" disabled={disabled} value={v.earnings?.[k] ?? ""} onChange={(e) => setEarning(k, num(e.target.value))} className={inputCls(k === "basic" && errors["earnings.basic"], disabled)} />{k === "basic" && errors["earnings.basic"] && <p className="text-red-500 text-xs">{errors["earnings.basic"]}</p>}</td>
+=======
+                <td className="py-1 pr-2">{label}</td>
+                <td className="py-1 pr-2"><input data-field={`earn_${k}_m`} aria-label={`${label} per month`} inputMode="decimal" disabled={disabled} value={v.earnings?.[k] ?? ""} onChange={(e) => setEarning(k, num(e.target.value))} className={inputCls(false, disabled)} /></td>
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
                 <td className="py-1"><input data-field={`earn_${k}_a`} aria-label={`${label} per annum`} inputMode="decimal" disabled={disabled} value={v.earnings?.[k] ? Math.round(Number(v.earnings[k]) * 12) : ""} onChange={(e) => setEarning(k, num(e.target.value) ? String(Math.round((Number(num(e.target.value)) / 12) * 100) / 100) : "")} className={inputCls(false, disabled)} /></td>
               </tr>
             ))}
@@ -56,7 +72,10 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
       </div>
       <div>
         <h4 className="text-sm font-semibold text-gray-700 mb-2">Deductions <span className="text-xs font-normal text-gray-500">(select one or more)</span></h4>
+<<<<<<< HEAD
         {errors.deductions && <p className="text-red-500 text-xs mb-1">{errors.deductions}</p>}
+=======
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
         <div className="flex flex-wrap gap-2" data-field="deductions" role="group" aria-label="Deductions">
           {DEDUCTION_OPTIONS.map((o) => {
             const on = (v.deductions || []).includes(o);
@@ -69,8 +88,13 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
         </div>
         {(v.deductions || []).includes("GPA") || (v.deductions || []).includes("GMC") ? (
           <div className="grid grid-cols-2 gap-3 mt-3 max-w-md">
+<<<<<<< HEAD
             {(v.deductions || []).includes("GPA") && <label className="text-sm">GPA Premium / month (₹)<input data-field="ins_gpa" inputMode="decimal" disabled={disabled} value={v.insurance?.gpa ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gpa: num(e.target.value) } })} className={inputCls(errors["insurance.gpa"], disabled)} /></label>}
             {(v.deductions || []).includes("GMC") && <label className="text-sm">GMC Premium / month (₹)<input data-field="ins_gmc" inputMode="decimal" disabled={disabled} value={v.insurance?.gmc ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gmc: num(e.target.value) } })} className={inputCls(errors["insurance.gmc"], disabled)} /></label>}
+=======
+            {(v.deductions || []).includes("GPA") && <label className="text-sm">GPA Premium / month (₹)<input data-field="ins_gpa" inputMode="decimal" disabled={disabled} value={v.insurance?.gpa ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gpa: num(e.target.value) } })} className={inputCls(false, disabled)} /></label>}
+            {(v.deductions || []).includes("GMC") && <label className="text-sm">GMC Premium / month (₹)<input data-field="ins_gmc" inputMode="decimal" disabled={disabled} value={v.insurance?.gmc ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gmc: num(e.target.value) } })} className={inputCls(false, disabled)} /></label>}
+>>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
           </div>
         ) : null}
         <table className="w-full text-sm mt-3" data-table="deductions">
