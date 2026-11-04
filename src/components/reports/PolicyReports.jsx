@@ -42,16 +42,11 @@ const cx = (...c) => c.filter(Boolean).join(" ");
 
 // Which rows belong to which report, and which date the Date Range filter uses
 const REPORTS = [
-<<<<<<< HEAD
   // Leads = every lead; Quote Under Progress = after "Request for Quote" until the policy is issued; then Active Policy
   { key: "leads", label: "Leads", icon: FaUserClock, dateField: "createdAt", dateLabel: "Lead created", groups: CATEGORIES, groupOf: (r) => r.category,
     match: () => true },
   { key: "quoteProgress", label: "Quote Under Progress", icon: FaListUl, dateField: "createdAt", dateLabel: "Lead created", groups: CATEGORIES, groupOf: (r) => r.category,
     match: (r) => r.quoted && !r.issued && !r.cancelled },
-=======
-  { key: "leads", label: "Leads (Not Quoted)", icon: FaUserClock, dateField: "createdAt", dateLabel: "Lead created", groups: CATEGORIES, groupOf: (r) => r.category,
-    match: (r) => !r.quoted && !r.issued && !r.cancelled },
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   { key: "active", label: "Active Policies", icon: FaShieldAlt, dateField: "policyStartDate", dateLabel: "Policy start", groups: CATEGORIES, groupOf: (r) => r.category,
     match: (r) => r.policyStatus === "Active" },
   { key: "renewal", label: "Renewal Alerts", icon: FaBell, dateField: "policyExpiryDate", dateLabel: "Policy expiry", groups: CATEGORIES, groupOf: (r) => r.category,
@@ -217,20 +212,12 @@ export default function PolicyReports({ report: reportProp }) {
       </>
     );
   } };
-<<<<<<< HEAD
   const stageName = (r) => (r.issued ? "Policy issued" : r.cancelled ? "Closed" : r.quoted ? "Quote under progress" : r.stage === "Lead" ? "Lead" : "Quote (not requested)");
   const leadStage = { key: "stage", label: "Stage / Created", w: "w-[14%]", render: (r) => (<><div>{stageName(r)}</div>{sub(`Created ${fmtDate(r.createdAt)}`)}{sub(r.status)}</>) };
   const lobCell = { key: "lob", label: "LOB", w: "w-[18%]", render: (r) => (<><div className="font-medium text-gray-800">{r.lob}</div>{sub(r.sumInsured && `SI: ${r.sumInsured}`)}{sub(r.registrationNumber)}</>) };
 
   const columns =
     report === "leads" || report === "quoteProgress" ? [customer, lobCell, leadStage, source]
-=======
-  const leadStage = { key: "stage", label: "Stage / Created", w: "w-[14%]", render: (r) => (<><div>{r.stage === "Lead" ? "Lead" : "Quote (not requested)"}</div>{sub(`Created ${fmtDate(r.createdAt)}`)}{sub(r.status)}</>) };
-  const lobCell = { key: "lob", label: "LOB", w: "w-[18%]", render: (r) => (<><div className="font-medium text-gray-800">{r.lob}</div>{sub(r.sumInsured && `SI: ${r.sumInsured}`)}{sub(r.registrationNumber)}</>) };
-
-  const columns =
-    report === "leads" ? [customer, lobCell, leadStage, source]
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
     : report === "emi" ? [customer, { ...policyCell, w: "w-[20%]" }, emiCell, dueCell, source]
     : [customer, policyCell, period, cover, source];
 
@@ -283,11 +270,7 @@ export default function PolicyReports({ report: reportProp }) {
           <span className="text-sm text-gray-500">{loading ? "…" : `${counts[report]} records`}</span>
         </div>
       ) : (
-<<<<<<< HEAD
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2" role="tablist" aria-label="Report">
-=======
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2" role="tablist" aria-label="Report">
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
         {REPORTS.map((d) => {
           const Icon = d.icon;
           const on = d.key === report;

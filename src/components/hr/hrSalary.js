@@ -12,13 +12,9 @@
 //  In-Hand         = Gross - Total Deduction
 // ============================================================
 const DEDUCTION_OPTIONS = ["NA", "TDS", "EPFO", "EPFO & ESIC", "ESIC", "GPA", "GMC"];
-<<<<<<< HEAD
 const EARNING_LINES = [["basic", "Basic Pay"], ["hra", "HRA"], ["medical", "Medical Allowance"], ["bonus", "Statutory Bonus"], ["travel", "Travel Allowance"]];
 // Offer letter: Basic is entered; the other components are auto-calculated as % of Basic (HR can override)
 const AUTO_EARNINGS = [["hra", "hraPercentOfBasic"], ["medical", "medicalPercentOfBasic"], ["bonus", "bonusPercentOfBasic"], ["travel", "travelPercentOfBasic"]];
-=======
-const EARNING_LINES = [["basic", "Basic Pay"], ["hra", "HRA"], ["medical", "Medical Allowance"], ["bonus", "Statutory Bonus"]];
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 const DEDUCTION_LINES = [
   ["tds", "TDS"], ["pfEmployee", "Employee Share PF"], ["pfEmployer", "Employer Share PF"],
   ["esicEmployee", "Employee Share ESIC"], ["esicEmployer", "Employer Share ESIC"], ["gpa", "GPA Premium"], ["gmc", "GMC Premium"],
@@ -30,7 +26,6 @@ const DEFAULT_SETTINGS = {
   pfEmployeePercent: 12, pfEmployerPercent: 12, pfApplyWageCeiling: true, pfWageCeiling: 15000,
   esicEmployeePercent: 0.75, esicEmployerPercent: 3.25, esicWageCeiling: 21000,
   insuranceRecoveredFromEmployee: true, prorationBasis: "calendar", paidLeavesPerMonth: 1,
-<<<<<<< HEAD
   hraPercentOfBasic: 20, medicalPercentOfBasic: 5, bonusPercentOfBasic: 10, travelPercentOfBasic: 5,
 };
 
@@ -39,8 +34,6 @@ const autoEarnings = (basic, settings = {}) => {
   const S = { ...DEFAULT_SETTINGS, ...settings };
   const b = Number(basic) > 0 ? Number(basic) : 0;
   return Object.fromEntries(AUTO_EARNINGS.map(([k, s]) => [k, Math.round((b * (Number(S[s]) || 0)) / 100)]));
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 };
 
 const n = (v) => { const x = Number(v); return isFinite(x) && x > 0 ? x : 0; };
@@ -226,9 +219,5 @@ const rupeesInWords = (amount) => {
 };
 
 export {
-<<<<<<< HEAD
   DEDUCTION_OPTIONS, EARNING_LINES, DEDUCTION_LINES, EMPLOYER_LINES, DEFAULT_SETTINGS, AUTO_EARNINGS, autoEarnings, applicableLines, computeSalary, payableBreakdown, monthlySalary, structureOn, istYmd, daysInMonth, rupeesInWords,
-=======
-  DEDUCTION_OPTIONS, EARNING_LINES, DEDUCTION_LINES, EMPLOYER_LINES, DEFAULT_SETTINGS, applicableLines, computeSalary, payableBreakdown, monthlySalary, structureOn, istYmd, daysInMonth, rupeesInWords,
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 };

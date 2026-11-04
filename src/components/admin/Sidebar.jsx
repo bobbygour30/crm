@@ -14,20 +14,12 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
     {
       name: 'My HR', icon: FaIdBadge, key: 'hr',
-<<<<<<< HEAD
       children: [{ name: 'Offer Letters', key: 'hr-offers' }, { name: 'Document Validation', key: 'hr-validation' }, { name: 'Employees', key: 'hr-employees' }, { name: 'HR Attendance', key: 'hr-attendance' }, { name: 'Salary Register', key: 'hr-salary' }, { name: 'HR Salary Slip', key: 'hr-slips' }, { name: 'Promotion & Hike', key: 'hr-promotions' }, { name: 'Assets', key: 'hr-assets' }, { name: 'Confirmation Letter', key: 'hr-confirmation' }, { name: 'Employee Exit', key: 'hr-exits' }, { name: 'Relieving Letter', key: 'hr-relieving' }, { name: 'Documents', key: 'hr-documents' }, { name: 'Settings', key: 'hr-settings' }],
-=======
-      children: [{ name: 'Offer Letters', key: 'hr-offers' }, { name: 'Document Validation', key: 'hr-validation' }, { name: 'Employees', key: 'hr-employees' }, { name: 'HR Attendance', key: 'hr-attendance' }, { name: 'Salary Register', key: 'hr-salary' }, { name: 'HR Salary Slip', key: 'hr-slips' }, { name: 'Promotions', key: 'hr-promotions' }, { name: 'Settings', key: 'hr-settings' }],
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
     },
     {
       name: 'Reports', icon: FaChartBar, key: 'reports',
       // sub-modules open just below "Reports"
-<<<<<<< HEAD
       children: [{ name: 'Leads', key: 'reports-leads' }, { name: 'Quote Under Progress', key: 'reports-quoteProgress' }, { name: 'Active Policy', key: 'reports-active' }, { name: 'Expired Policy', key: 'reports-expired' }, { name: 'Renewal Alert', key: 'reports-renewal' }, { name: 'EMI Due', key: 'reports-emi' }, { name: 'All Data', key: 'reports-all' }],
-=======
-      children: [{ name: 'Leads', key: 'reports-leads' }, { name: 'Active Policy', key: 'reports-active' }, { name: 'Expired Policy', key: 'reports-expired' }, { name: 'Renewal Alert', key: 'reports-renewal' }, { name: 'EMI Due', key: 'reports-emi' }, { name: 'All Data', key: 'reports-all' }],
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
     },
     { name: 'Tasks', icon: FaClipboardList, key: 'tasks' },
     { name: 'Invoice', icon: FaFileInvoice, key: 'invoice' },
@@ -61,15 +53,12 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'hr-slips': '/admin/my-hr/slips',
     'hr-promotions': '/admin/my-hr/promotions',
     'hr-settings': '/admin/my-hr/settings',
-<<<<<<< HEAD
     'hr-assets': '/admin/my-hr/assets',
     'hr-confirmation': '/admin/my-hr/confirmation',
     'hr-exits': '/admin/my-hr/exits',
     'hr-relieving': '/admin/my-hr/relieving',
     'hr-documents': '/admin/my-hr/documents',
     'reports-quoteProgress': '/admin/reports/quote-progress',
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
     tasks: '/admin/tasks',
     analytics: '/admin/analytics',
     users: '/admin/users',

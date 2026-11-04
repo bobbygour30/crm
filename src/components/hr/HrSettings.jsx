@@ -4,11 +4,7 @@ import { FaUpload } from "react-icons/fa";
 import { hrApi, hrUpload } from "./hrApi";
 import { Field, Btn, Card, Notice, inputCls, cx } from "./ui";
 
-<<<<<<< HEAD
 const LISTS = [["designation", "Designation"], ["department", "Department"], ["reportingManager", "Reporting Manager"], ["rank", "Rank"], ["employmentType", "Employment Type"], ["workSchedule", "Working Hour / Schedule"], ["jobVenue", "Job Venue"], ["assetType", "Asset"], ["assetBrand", "Asset Brand"], ["assetModel", "Asset Model"]];
-=======
-const LISTS = [["designation", "Designation"], ["department", "Department"], ["reportingManager", "Reporting Manager"], ["rank", "Rank"], ["employmentType", "Employment Type"], ["workSchedule", "Working Hour / Schedule"], ["jobVenue", "Job Venue"]];
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 const DOCS = [["cv", "CV"], ["signedOffer", "Signed Offer Letter"], ["esicForm", "ESIC Form"], ["epfoForm", "EPFO Form"], ["gmcForm", "GMC Form"], ["gpaForm", "GPA Form"]];
 
 export default function HrSettings({ settings, setSettings, reloadMasters }) {
@@ -17,12 +13,9 @@ export default function HrSettings({ settings, setSettings, reloadMasters }) {
   const [draft, setDraft] = useState({ value: "", email: "" });
   const [rates, setRates] = useState(settings);
   const [msg, setMsg] = useState(null);
-<<<<<<< HEAD
   const [users, setUsers] = useState([]);
   useEffect(() => { hrApi("/users").then(setUsers).catch(() => {}); }, []);
   const uploadSign = async (id, file) => { try { await hrUpload(`/masters/${id}/signature`, file); await loadAll(); setMsg({ kind: "ok", text: "Department head signature uploaded (used on ID cards)." }); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   const loadAll = async () => setAll(await hrApi("/masters?all=1"));
   useEffect(() => { loadAll().catch((e) => setMsg({ kind: "error", text: e.message })); }, []);
   useEffect(() => { setRates(settings); }, [settings]);
@@ -46,7 +39,6 @@ export default function HrSettings({ settings, setSettings, reloadMasters }) {
           <div key={m._id} className={cx("flex flex-wrap items-center gap-2 py-1.5 border-b text-sm", !m.active && "opacity-50")}>
             <input aria-label="Value" defaultValue={m.value} onBlur={(e) => e.target.value !== m.value && upd(m._id, { value: e.target.value })} className={cx(inputCls(), "max-w-xs")} />
             {list === "reportingManager" && <input aria-label="Manager e-mail" defaultValue={m.email || ""} onBlur={(e) => e.target.value !== (m.email || "") && upd(m._id, { email: e.target.value })} placeholder="e-mail" className={cx(inputCls(), "max-w-xs")} />}
-<<<<<<< HEAD
             {list === "reportingManager" && (
               <select aria-label="Manager login" value={m.user || ""} onChange={(e) => upd(m._id, { user: e.target.value || null })} className={cx(inputCls(), "max-w-xs")} title="This login gets the Manager inbox (exits, letter approvals)">
                 <option value="">— link CRM login —</option>{users.map((u) => <option key={u._id} value={u._id}>{u.name} {u.email ? `(${u.email})` : ""}</option>)}
@@ -58,20 +50,15 @@ export default function HrSettings({ settings, setSettings, reloadMasters }) {
                 <label className="cursor-pointer px-2 py-1 border rounded flex items-center gap-1"><FaUpload /> Head signature<input type="file" accept=".jpg,.jpeg,.png" className="hidden" aria-label={`Head signature ${m.value}`} onChange={(e) => e.target.files[0] && uploadSign(m._id, e.target.files[0])} /></label>
               </span>
             )}
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
             <Btn kind="secondary" onClick={() => upd(m._id, { active: !m.active })}>{m.active ? "Deactivate" : "Reactivate"}</Btn>
           </div>
         ))}
       </Card>
       <Card title="Statutory rates & rules" actions={<Btn onClick={saveRates}>Save settings</Btn>}>
-<<<<<<< HEAD
         <p className="text-sm font-medium text-gray-700 mb-2">Offer letter: auto-calculated as % of Basic (HR can still edit each amount)</p>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
           {num("hraPercentOfBasic", "HRA % of Basic")}{num("medicalPercentOfBasic", "Medical Allowance % of Basic")}{num("bonusPercentOfBasic", "Statutory Bonus % of Basic")}{num("travelPercentOfBasic", "Travel Allowance % of Basic")}
         </div>
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {num("tdsPercent", "TDS %")}
           <Field label="TDS calculated on"><select aria-label="TDS base" value={r.tdsBase} onChange={(e) => setRates({ ...r, tdsBase: e.target.value })} className={inputCls()}><option value="gross">Gross monthly pay</option><option value="basic">Basic pay</option></select></Field>
@@ -82,10 +69,7 @@ export default function HrSettings({ settings, setSettings, reloadMasters }) {
           <Field label="GPA / GMC premium"><select aria-label="Insurance" value={r.insuranceRecoveredFromEmployee ? "employee" : "company"} onChange={(e) => setRates({ ...r, insuranceRecoveredFromEmployee: e.target.value === "employee" })} className={inputCls()}><option value="employee">Deducted from the employee</option><option value="company">Paid by the company (in CTC)</option></select></Field>
           <Field label="Salary proration"><select aria-label="Proration" value={r.prorationBasis} onChange={(e) => setRates({ ...r, prorationBasis: e.target.value })} className={inputCls()}><option value="calendar">Calendar days of the month</option><option value="30">30 days</option></select></Field>
           {num("paidLeavesPerMonth", "Paid leaves per month", "Beyond this, leave is unpaid (no carry-forward)")}
-<<<<<<< HEAD
           <Field label="MyHR mail (CC on exits)" hint="Blank = the company mailbox"><input data-field="hrEmail" type="email" value={r.hrEmail ?? ""} onChange={(e) => setRates({ ...r, hrEmail: e.target.value })} className={inputCls()} /></Field>
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
         </div>
       </Card>
       <Card title="Candidate document templates">

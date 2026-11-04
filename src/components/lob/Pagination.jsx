@@ -65,8 +65,4 @@ export default function Pagination({ p, label = "leads" }) {
       )}
     </nav>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e

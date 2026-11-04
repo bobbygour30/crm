@@ -63,7 +63,6 @@ export function SalarySlips() {
   const [emps, setEmps] = useState([]);
   const [emp, setEmp] = useState("");
   const [msg, setMsg] = useState(null);
-<<<<<<< HEAD
   const blank = () => ({ has: "", amount: "", monthFor: "", yearFor: "" });
   const [adj, setAdj] = useState({ arrear: blank(), incentive: blank() });
   useEffect(() => { hrApi("/employees").then((l) => setEmps(l.filter((e) => e.status === "Active"))).catch((e) => setMsg({ kind: "error", text: e.message })); }, []);
@@ -99,10 +98,6 @@ export function SalarySlips() {
       )}
     </div>
   );
-=======
-  useEffect(() => { hrApi("/employees").then((l) => setEmps(l.filter((e) => e.status === "Active"))).catch((e) => setMsg({ kind: "error", text: e.message })); }, []);
-  const open = () => openHrPdf(`/salary-slip/${emp}?month=${mm.month}&year=${mm.year}`).catch((e) => setMsg({ kind: "error", text: e.message }));
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   return (
     <Card title="Salary Slip">
       {msg && <div className="mb-3"><Notice kind={msg.kind}>{msg.text}</Notice></div>}
@@ -111,10 +106,7 @@ export function SalarySlips() {
         <Field label="Month / Year"><MonthPicker {...mm} onChange={setMm} /></Field>
         <Btn onClick={open} disabled={!emp}><FaFilePdf /> View / Download Slip</Btn>
       </div>
-<<<<<<< HEAD
       {emp && <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">{Q("arrear", "Is there any arrear?")}{Q("incentive", "Is there any incentive?")}</div>}
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       <p className="text-xs text-gray-500 mt-3">Generated from the attendance register for the chosen month, in the company's salary slip format.</p>
     </Card>
   );

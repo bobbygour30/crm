@@ -62,7 +62,6 @@ export default function CandidateOnboarding() {
     }
   };
 
-<<<<<<< HEAD
   const PHOTO_PATHS = ["personal.photo", "personal.signature"]; // JPG/JPEG under 100 KB (not compressed — must already be small)
   const upload = async (path, file) => {
     if (!file) return;
@@ -75,15 +74,6 @@ export default function CandidateOnboarding() {
     try {
       const small = PHOTO_PATHS.includes(path) ? file : await compressImage(file);
       const r = await hrUpload(`/public/onboarding/${token}/file`, small, { path }, { public: true });
-=======
-  const upload = async (path, file) => {
-    if (!file) return;
-    if (!/\.(pdf|jpe?g)$/i.test(file.name)) { setErrors((m) => ({ ...m, [path]: "Only PDF, JPG or JPEG files" })); return; }
-    setUploading((u) => ({ ...u, [path]: true }));
-    try {
-      const small = await compressImage(file);
-      const r = await hrUpload(`/public/onboarding/${token}/file`, small, {}, { public: true });
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       const next = setIn(docRef.current, path, r.url);
       setDoc(next);
       setErrors((m) => { const c = { ...m }; delete c[path]; return c; });
@@ -252,11 +242,8 @@ export default function CandidateOnboarding() {
           {T("personal.motherName", "Mother's Name", { section: "personal" })}
           {T("personal.brothers", "No. of Brothers", { digits: true, max: 2, section: "personal" })}{T("personal.sisters", "No. of Sisters", { digits: true, max: 2, section: "personal" })}
           {S("personal.maritalStatus", "Marital Status", opt.marital, { section: "personal" })}{T("personal.hobbies", "Hobbies", { section: "personal" })}
-<<<<<<< HEAD
           {T("personal.dob", "Date of Birth", { type: "date", section: "personal" })}{S("personal.bloodGroup", "Blood Group", opt.bloodGroups || ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "Other"], { section: "personal" })}<div />
           {FileBox("personal.photo", "Passport size photo (JPG/JPEG, under 100 KB)", { section: "personal" })}{FileBox("personal.signature", "Signature in English (JPG/JPEG, under 100 KB)", { section: "personal" })}
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
         </div></>)}
         {renderSection("nominee", <><div className={g}>
           {T("nominee.name", "Nominee Name", { section: "nominee" })}{T("nominee.dob", "Nominee DOB", { type: "date", section: "nominee" })}

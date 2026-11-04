@@ -50,15 +50,12 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
-<<<<<<< HEAD
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
       'hr-exits': '/admin/my-hr/exits',
       'hr-relieving': '/admin/my-hr/relieving',
       'hr-documents': '/admin/my-hr/documents',
       'reports-quoteProgress': '/admin/reports/quote-progress',
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -109,15 +106,12 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
-<<<<<<< HEAD
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
       'hr-exits': '/admin/my-hr/exits',
       'hr-relieving': '/admin/my-hr/relieving',
       'hr-documents': '/admin/my-hr/documents',
       'reports-quoteProgress': '/admin/reports/quote-progress',
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',

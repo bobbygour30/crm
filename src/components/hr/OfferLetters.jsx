@@ -7,7 +7,6 @@ import MasterSelect from "./MasterSelect";
 import SalaryEditor from "./SalaryEditor";
 
 const blankOffer = () => ({
-<<<<<<< HEAD
   issuedDate: todayYmd(), name: "", fatherName: "", relationPrefix: "S/O", address: "", designation: "", department: "", reportingManager: "", rank: "",
   dateOfJoining: "", employmentType: "", workSchedule: "", jobVenue: "", candidateEmail: "", candidateMobile: "",
   earnings: { basic: "", hra: "", medical: "", bonus: "", travel: "" }, deductions: [], insurance: { gpa: "", gmc: "" }, additionalTerms: [],
@@ -34,13 +33,6 @@ export const validateForSend = (o) => {
   return errors;
 };
 
-=======
-  issuedDate: todayYmd(), name: "", fatherName: "", address: "", designation: "", department: "", reportingManager: "", rank: "",
-  dateOfJoining: "", employmentType: "", workSchedule: "", jobVenue: "", candidateEmail: "", candidateMobile: "",
-  earnings: { basic: "", hra: "", medical: "", bonus: "" }, deductions: [], insurance: { gpa: "", gmc: "" }, additionalTerms: [],
-});
-const ymd = (v) => (v ? String(v).slice(0, 10) : "");
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 const DROPDOWNS = [
   ["designation", "Designation"], ["department", "Department"], ["reportingManager", "Reporting Manager and Designation"], ["rank", "Rank"],
   ["employmentType", "Employment Type"], ["workSchedule", "Working Hour / Schedule"], ["jobVenue", "Job Venue"],
@@ -86,7 +78,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
     } finally { setBusy(""); }
   };
   const preview = async () => { const s = editing._id ? editing : await save(); if (s) openHrPdf(`/offers/${s._id || editing._id}/letter`).catch((e) => setMsg({ kind: "error", text: e.message })); };
-<<<<<<< HEAD
   const showSendErrors = (list) => {
     const map = {}; list.forEach((x) => { if (!map[x.field]) map[x.field] = x.message; });
     setErrors(map);
@@ -100,12 +91,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
     if (!s) return;
     try { setMail({ ...(await hrApi(`/offers/${s._id}/email-draft`)), to: editing.candidateEmail || "" }); }
     catch (e) { if (e.errors?.length && e.errors[0].field) showSendErrors(e.errors); else setMsg({ kind: "error", text: e.message }); }
-=======
-  const openMail = async () => {
-    const s = await save();
-    if (!s) return;
-    try { setMail({ ...(await hrApi(`/offers/${s._id}/email-draft`)), to: editing.candidateEmail || "" }); } catch (e) { setMsg({ kind: "error", text: e.message }); }
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   };
   const sendMail = async () => {
     setBusy("send");
@@ -162,13 +147,8 @@ export default function OfferLetters({ masters, setMasters, settings }) {
       {locked && <div className="mb-3"><Notice kind="ok">Documentation complete — employee code <b>{editing.employeeCode}</b>. Salary changes now go through Promotions.</Notice></div>}
       {editing.link && (
         <div className="mb-3 flex flex-wrap items-center gap-2 text-sm bg-gray-50 border rounded-lg p-2" data-link>
-<<<<<<< HEAD
           <FaLink className="text-indigo-600" /> <a href={fullLink(editing.link)} target="_blank" rel="noopener noreferrer" className="break-all flex-1 text-indigo-700 underline">{fullLink(editing.link)}</a>
           <Btn kind="secondary" onClick={() => navigator.clipboard && navigator.clipboard.writeText(fullLink(editing.link))}><FaCopy /> Copy</Btn>
-=======
-          <FaLink className="text-indigo-600" /> <span className="break-all flex-1">{editing.link}</span>
-          <Btn kind="secondary" onClick={() => navigator.clipboard && navigator.clipboard.writeText(editing.link)}><FaCopy /> Copy</Btn>
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
           {!locked && <Btn kind="secondary" onClick={newLink}>New link</Btn>}
         </div>
       )}
@@ -180,7 +160,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
       <fieldset disabled={locked}>
         {tab === "basic" && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-<<<<<<< HEAD
             <Field label="Issued Date" required error={errors.issuedDate}><input type="date" data-field="issuedDate" value={editing.issuedDate} onChange={(e) => set({ issuedDate: e.target.value })} className={inputCls()} /></Field>
             <Field label="Name" required error={errors.name}><input data-field="name" value={editing.name} onChange={(e) => set({ name: e.target.value.toUpperCase() })} className={cx(inputCls(errors.name), "uppercase")} /></Field>
             <Field label="Father's / Husband's Name" required error={errors.fatherName}>
@@ -205,27 +184,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
         {tab === "terms" && (
           <div className="space-y-2" data-section="terms">
             <p className="text-sm text-gray-600">Optional. Terms added here appear in the letter after the standard terms (a)–(h), in this order.</p>
-=======
-            <Field label="Issued Date"><input type="date" data-field="issuedDate" value={editing.issuedDate} onChange={(e) => set({ issuedDate: e.target.value })} className={inputCls()} /></Field>
-            <Field label="Name" required error={errors.name}><input data-field="name" value={editing.name} onChange={(e) => set({ name: e.target.value.toUpperCase() })} className={cx(inputCls(errors.name), "uppercase")} /></Field>
-            <Field label="Father's / Husband's Name" required error={errors.fatherName}><input data-field="fatherName" value={editing.fatherName} onChange={(e) => set({ fatherName: e.target.value })} className={inputCls(errors.fatherName)} /></Field>
-            <Field label="Address" required error={errors.address} className="sm:col-span-2 lg:col-span-3"><textarea data-field="address" rows="2" value={editing.address} onChange={(e) => set({ address: e.target.value })} className={inputCls(errors.address)} /></Field>
-            {DROPDOWNS.slice(0, 4).map(([k, l]) => (
-              <Field key={k} label={l}><MasterSelect type={k} label={l} value={editing[k]} onChange={(v) => set({ [k]: v })} masters={masters} setMasters={setMasters} withEmail={k === "reportingManager"} /></Field>
-            ))}
-            <Field label="Date of Joining" required error={errors.dateOfJoining}><input type="date" data-field="dateOfJoining" value={editing.dateOfJoining} onChange={(e) => set({ dateOfJoining: e.target.value })} className={inputCls(errors.dateOfJoining)} /></Field>
-            {DROPDOWNS.slice(4).map(([k, l]) => (
-              <Field key={k} label={l}><MasterSelect type={k} label={l} value={editing[k]} onChange={(v) => set({ [k]: v })} masters={masters} setMasters={setMasters} /></Field>
-            ))}
-            <Field label="Candidate e-mail" error={errors.candidateEmail} hint="The offer and documentation link go here"><input data-field="candidateEmail" type="email" value={editing.candidateEmail} onChange={(e) => set({ candidateEmail: e.target.value })} className={inputCls(errors.candidateEmail)} /></Field>
-            <Field label="Candidate mobile"><input data-field="candidateMobile" inputMode="numeric" maxLength="10" value={editing.candidateMobile} onChange={(e) => set({ candidateMobile: e.target.value.replace(/\D/g, "") })} className={inputCls()} /></Field>
-          </div>
-        )}
-        {tab === "salary" && <SalaryEditor value={editing} onChange={(v) => set({ earnings: v.earnings, deductions: v.deductions, insurance: v.insurance })} settings={settings} disabled={locked} />}
-        {tab === "terms" && (
-          <div className="space-y-2" data-section="terms">
-            <p className="text-sm text-gray-600">Terms added here appear in the letter after the standard terms (a)–(h), in this order.</p>
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
             {(editing.additionalTerms || []).map((t, i) => (
               <div key={i} className="flex gap-2 items-start">
                 <span className="text-sm text-gray-500 pt-2 w-8">({String.fromCharCode(105 + i)})</span>

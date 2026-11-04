@@ -4,10 +4,7 @@ import { FaCheckCircle, FaFilePdf, FaCalendarCheck } from "react-icons/fa";
 import { hrApi, openHrPdf, fmtDate, todayYmd, MONTHS } from "./hrApi";
 import { Field, Btn, Card, Notice, Badge, inputCls, cx } from "./ui";
 import { DAY_STYLE, MonthPicker } from "./HrAttendance";
-<<<<<<< HEAD
 import { ManagerInbox } from "./HrPhase2";
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
 
 export default function MyHrSelf() {
   const now = new Date();
@@ -20,7 +17,6 @@ export default function MyHrSelf() {
   const [form, setForm] = useState({ leaveType: "Approved Leave", from: todayYmd(), to: todayYmd(), reason: "" });
   const [slip, setSlip] = useState(() => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() - 1); return { month: d.getMonth() + 1, year: d.getFullYear() }; });
 
-<<<<<<< HEAD
   const [profile, setProfile] = useState(null);
   const [exits, setExits] = useState([]);
   const [exitForm, setExitForm] = useState({ exitDate: "", reason: "" });
@@ -31,9 +27,6 @@ export default function MyHrSelf() {
     catch (e) { setMsg({ kind: "error", text: e.message }); }
   };
   const loadMe = () => { loadProfile(); return hrApi("/me").then(setMe).catch((e) => setError(e.message)); };
-=======
-  const loadMe = () => hrApi("/me").then(setMe).catch((e) => setError(e.message));
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   const loadLeaves = () => hrApi("/me/leaves").then(setLeaves).catch(() => {});
   useEffect(() => { loadMe(); loadLeaves(); }, []);
   useEffect(() => { if (me) hrApi(`/me/attendance?month=${mm.month}&year=${mm.year}`).then(setMonth).catch((e) => setMsg({ kind: "error", text: e.message })); }, [me, mm.month, mm.year]);
@@ -41,12 +34,8 @@ export default function MyHrSelf() {
   const markToday = async () => { try { await hrApi("/me/attendance", { method: "POST" }); setMsg({ kind: "ok", text: "Attendance marked for today." }); loadMe(); setMm({ ...mm }); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
   const apply = async () => { try { await hrApi("/me/leaves", { method: "POST", body: form }); setMsg({ kind: "ok", text: "Leave applied — waiting for approval." }); setForm({ ...form, reason: "" }); loadLeaves(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
 
-<<<<<<< HEAD
   // a reporting manager may not have an employee record of their own — they still get the Manager inbox
   if (error) return <div className="p-4 space-y-4 max-w-5xl mx-auto"><ManagerInbox /><Notice kind="warn">{error}</Notice></div>;
-=======
-  if (error) return <div className="p-4"><Notice kind="warn">{error}</Notice></div>;
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
   if (!me) return <div className="p-4 text-sm text-gray-500">Loading…</div>;
   const t = me.today;
   const todayNote = t.status ? `Marked: ${t.status}` : t.weeklyOff ? "Sunday — weekly off" : t.holiday ? "Holiday" : t.beforeJoining ? "Before your joining date" : null;
@@ -54,7 +43,6 @@ export default function MyHrSelf() {
     <div className="p-4 space-y-4 max-w-5xl mx-auto">
       <div><h1 className="text-2xl font-bold text-gray-800">My HR</h1><p className="text-sm text-gray-500">{me.employee.employeeCode} · {me.employee.name} · {me.employee.designation}</p></div>
       {msg && <Notice kind={msg.kind}>{msg.text}</Notice>}
-<<<<<<< HEAD
       {profile?.isManager && <ManagerInbox />}
       {profile && (
         <Card title="Profile" actions={<Btn kind="outline" onClick={() => openHrPdf("/me/id-card").catch((e) => setMsg({ kind: "error", text: e.message }))}><FaFilePdf /> View ID Card</Btn>}>
@@ -68,8 +56,6 @@ export default function MyHrSelf() {
           {profile.letters.length > 0 && <div className="mt-2 flex flex-wrap gap-2 text-sm">{profile.letters.map((l) => <button key={l._id} type="button" className="text-indigo-600 underline" onClick={() => openHrPdf(`/requests/${l._id}/letter`)}>{l.label} ({fmtDate(l.date)})</button>)}</div>}
         </Card>
       )}
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       <Card title={`Today — ${fmtDate(t.date)}`}>
         <div className="flex flex-wrap items-center gap-4" data-today>
           {todayNote ? <span className="flex items-center gap-2 text-emerald-700"><FaCheckCircle /> {todayNote}</span> : <Btn kind="success" onClick={markToday}><FaCalendarCheck /> Mark Present</Btn>}
@@ -98,7 +84,6 @@ export default function MyHrSelf() {
         <div className="flex items-center justify-between mt-3"><span className="text-xs text-gray-500">{me.paidLeavesPerMonth} paid leave per month; more is unpaid. Leave needs approval before the date.</span><Btn onClick={apply} disabled={!form.reason.trim()}>Apply</Btn></div>
         {leaves.length > 0 && <table className="w-full text-sm mt-4"><tbody>{leaves.map((l) => <tr key={l._id} className="border-t"><td className="p-2">{l.leaveType}</td><td className="p-2">{fmtDate(l.from)}{l.to !== l.from ? ` – ${fmtDate(l.to)}` : ""}</td><td className="p-2"><Badge s={l.status} /></td><td className="p-2 text-xs text-gray-500">{l.approverRemarks}</td></tr>)}</tbody></table>}
       </Card>
-<<<<<<< HEAD
       <Card title="Exit / Paper Submit">
         {exits.length > 0 && exits.map((x) => <p key={x._id} className="text-sm mb-1" data-my-exit>Exit date {fmtDate(x.exitDate)} — <Badge s={x.status === "Auto-Approved" ? "Approved" : x.status === "On Hold" ? "Pending" : x.status} /> {x.status}{x.remarks ? ` · ${x.remarks}` : ""}</p>)}
         {!exits.some((x) => ["Pending", "On Hold"].includes(x.status)) && (
@@ -111,8 +96,6 @@ export default function MyHrSelf() {
           </div>
         )}
       </Card>
-=======
->>>>>>> 5d13cd44b411a586f5e28353e0498f39984a697e
       <Card title="Salary slips">
         <div className="flex flex-wrap gap-3 items-end">
           <MonthPicker {...slip} onChange={setSlip} />
