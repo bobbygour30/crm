@@ -4,7 +4,6 @@ import { FaArrowLeft, FaUserPlus, FaLink, FaFilePdf } from "react-icons/fa";
 import { hrApi, openHrPdf, inr, fmtDate } from "./hrApi";
 import { computeSalary } from "./hrSalary";
 import { Field, Btn, Card, Notice, Badge, inputCls } from "./ui";
-<<<<<<< HEAD
 import MasterSelect from "./MasterSelect";
 import SalaryEditor from "./SalaryEditor";
 import { todayYmd } from "./hrApi";
@@ -13,21 +12,14 @@ const ymd = (v) => (v ? String(v).slice(0, 10) : "");
 const JOB_DROPDOWNS = [["designation", "Designation"], ["department", "Department"], ["reportingManager", "Reporting Manager"], ["rank", "Rank"], ["employmentType", "Employment Type"], ["workSchedule", "Working Hour / Schedule"], ["jobVenue", "Job Venue"]];
 
 export default function Employees({ settings, reloadKey, masters, setMasters }) {
-=======
-
-export default function Employees({ settings, reloadKey }) {
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
   const [list, setList] = useState([]);
   const [emp, setEmp] = useState(null);
   const [users, setUsers] = useState([]);
   const [msg, setMsg] = useState(null);
   const [login, setLogin] = useState({ email: "" });
   const [created, setCreated] = useState(null);
-<<<<<<< HEAD
   const [details, setDetails] = useState(null); // edit form
   const [salary, setSalary] = useState(null);   // salary structure form
-=======
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
 
   const load = async () => { try { setList(await hrApi("/employees")); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
   useEffect(() => { load(); }, [reloadKey]);
@@ -37,11 +29,8 @@ export default function Employees({ settings, reloadKey }) {
     try {
       const [e, u] = await Promise.all([hrApi(`/employees/${id}`), hrApi("/users")]);
       setEmp(e); setUsers(u); setLogin({ email: e.email || "" });
-<<<<<<< HEAD
       setDetails(null);
       setSalary(e.salary?.earnings ? null : { effectiveFrom: ymd(e.dateOfJoining) || todayYmd(), earnings: {}, deductions: [], insurance: {} });
-=======
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
     } catch (e) { setMsg({ kind: "error", text: e.message }); }
   };
   const update = async (body, okText) => { try { setEmp(await hrApi(`/employees/${emp._id}`, { method: "PUT", body })); setMsg({ kind: "ok", text: okText }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
@@ -70,7 +59,6 @@ export default function Employees({ settings, reloadKey }) {
   }
 
   const calc = computeSalary(emp.salary || {}, settings || {});
-<<<<<<< HEAD
   const openDetails = () => setDetails({
     designation: emp.designation || "", department: emp.department || "", reportingManager: emp.reportingManager || "", rank: emp.rank || "",
     employmentType: emp.employmentType || "", workSchedule: emp.workSchedule || "", jobVenue: emp.jobVenue || "", dateOfJoining: ymd(emp.dateOfJoining),
@@ -82,8 +70,6 @@ export default function Employees({ settings, reloadKey }) {
   const openSalary = () => setSalary({ effectiveFrom: todayYmd(), earnings: { ...(emp.salary?.earnings || {}) }, deductions: [...(emp.salary?.deductions || [])], insurance: { ...(emp.salary?.insurance || {}) } });
   const saveSalary = async () => { try { setEmp(await hrApi(`/employees/${emp._id}/salary`, { method: "PUT", body: salary })); setSalary(null); setMsg({ kind: "ok", text: "Salary structure saved — the employee is now in the salary register." }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
   const dt = (k, label, props = {}) => <Field label={label}><input aria-label={label} value={details[k]} onChange={(ev) => setDetails({ ...details, [k]: ev.target.value })} className={inputCls()} {...props} /></Field>;
-=======
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
   const row = (l, v) => <div className="flex justify-between gap-3 py-1 border-b border-gray-100 text-sm"><span className="text-gray-500">{l}</span><span className="text-right break-all">{v || "—"}</span></div>;
   return (
     <Card title={<span className="flex items-center gap-2"><button type="button" aria-label="Back" onClick={() => { setEmp(null); load(); }} className="text-gray-500 hover:text-gray-800"><FaArrowLeft /></button>{emp.employeeCode} — {emp.name} <Badge s={emp.status} /></span>}
@@ -100,7 +86,6 @@ export default function Employees({ settings, reloadKey }) {
           {row("Gross", inr(calc.gross.m))}{row("Total Deduction", inr(calc.totalDeduction.m))}{row("CTC", inr(calc.ctc.m))}{row("In-Hand", inr(calc.inHand.m))}{row("Deductions", (emp.salary?.deductions || []).join(", "))}
         </div>
       </div>
-<<<<<<< HEAD
       <div className="mt-4 flex flex-wrap gap-2">
         {!details && <Btn kind="outline" onClick={openDetails}>Edit details</Btn>}
         {!salary && <Btn kind="outline" onClick={openSalary}>{emp.salary?.earnings ? "Revise salary structure" : "Set salary structure"}</Btn>}
@@ -131,8 +116,6 @@ export default function Employees({ settings, reloadKey }) {
           <div className="flex justify-end gap-2 mt-3">{emp.salary?.earnings && <Btn kind="secondary" onClick={() => setSalary(null)}>Cancel</Btn>}<Btn onClick={saveSalary}>Save salary structure</Btn></div>
         </div>
       )}
-=======
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
       <div className="mt-5 border-t pt-4" data-section="login">
         <h4 className="font-semibold text-sm text-gray-700 mb-2">CRM login (for attendance and leave)</h4>
         {created && <div className="mb-3"><Notice kind="ok">Login created — username <b>{created.username}</b> or {created.email}, password <b>{created.password}</b>. Share it once; the employee should change it after the first login.</Notice></div>}

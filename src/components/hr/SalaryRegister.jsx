@@ -31,10 +31,7 @@ export function SalaryRegister() {
     <Card title="Salary Register" actions={<><MonthPicker {...mm} onChange={setMm} /><Btn kind="success" onClick={exportExcel} disabled={!data?.rows.length}><FaFileExcel /> Excel</Btn></>}>
       {msg && <div className="mb-3"><Notice kind={msg.kind}>{msg.text}</Notice></div>}
       {provisional && <div className="mb-3"><Notice kind="warn">This month isn't over — upcoming days are counted as paid (provisional).</Notice></div>}
-<<<<<<< HEAD
       {data?.withoutSalary?.length > 0 && <div className="mb-3"><Notice kind="warn">{data.withoutSalary.length} employee(s) have no salary structure yet and are not in this register: {data.withoutSalary.slice(0, 8).join(", ")}{data.withoutSalary.length > 8 ? "…" : ""}. Set it in My HR › Employees.</Notice></div>}
-=======
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
       {!data ? <p className="text-sm text-gray-500">Loading…</p> : !data.rows.length ? <p className="text-sm text-gray-500">No employees on payroll for {data.monthName} {data.year}.</p> : (
         <div className="overflow-x-auto">
           <table className="w-full text-xs" data-table="register">
@@ -108,15 +105,9 @@ export function SalarySlips() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
         <Field label="Employee"><select aria-label="Employee" value={emp} onChange={(e) => setEmp(e.target.value)} className={inputCls()}><option value="">Select</option>{emps.map((e) => <option key={e._id} value={e._id}>{e.employeeCode} — {e.name}</option>)}</select></Field>
         <Field label="Month / Year"><MonthPicker {...mm} onChange={setMm} /></Field>
-<<<<<<< HEAD
         <Btn onClick={() => (emp ? open() : setMsg({ kind: "warn", text: "Choose the employee first." }))}><FaFilePdf /> View / Download Slip</Btn>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4" data-questions>{Q("arrear", "Is there any arrear?")}{Q("incentive", "Is there any incentive?")}</div>
-=======
-        <Btn onClick={open} disabled={!emp}><FaFilePdf /> View / Download Slip</Btn>
-      </div>
-      {emp && <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 mt-4">{Q("arrear", "Is there any arrear?")}{Q("incentive", "Is there any incentive?")}</div>}
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
       <p className="text-xs text-gray-500 mt-3">Generated from the attendance register for the chosen month, in the company's salary slip format.</p>
     </Card>
   );

@@ -39,11 +39,7 @@ export default function MyHR({ section = "offers" }) {
         <>
           {section === "offers" && <OfferLetters {...common} />}
           {section === "validation" && <DocumentValidation onEmployeeCreated={() => setReloadKey((k) => k + 1)} />}
-<<<<<<< HEAD
           {section === "employees" && <Employees settings={settings} reloadKey={reloadKey} masters={masters} setMasters={setMasters} />}
-=======
-          {section === "employees" && <Employees settings={settings} reloadKey={reloadKey} />}
->>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
           {section === "attendance" && <HrAttendance />}
           {section === "salary" && <SalaryRegister />}
           {section === "slips" && <SalarySlips />}
