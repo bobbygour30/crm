@@ -67,6 +67,7 @@ const statusBadge = (s) =>
 
 const PAGE_SIZE = 50;
 
+<<<<<<< HEAD
 // Edit from a report: remember which lead to open, then go to its lead page (that page opens it once loaded)
 export const OPEN_LEAD_KEY = "crm-open-lead";
 const openLead = (row, isAdmin) => {
@@ -76,6 +77,8 @@ const openLead = (row, isAdmin) => {
   window.dispatchEvent(new PopStateEvent("popstate"));
 };
 
+=======
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
 // `report` comes from the Admin sidebar sub-menu (Reports › Leads / Active Policy / ...);
 // without it (employee app) the page shows its own report tabs.
 export default function PolicyReports({ report: reportProp }) {
@@ -202,7 +205,10 @@ export default function PolicyReports({ report: reportProp }) {
       <div className="font-medium text-gray-800">{r.leadOf || "—"}</div>
       {r.source && r.source !== r.leadOf && sub(r.source)}
       {r.submittedBy && sub(`Submitted by ${r.submittedBy}`)}
+<<<<<<< HEAD
       <button type="button" onClick={() => openLead(r, isAdmin)} className="mt-1 text-xs px-2 py-0.5 rounded border border-indigo-300 text-indigo-700 hover:bg-indigo-50" data-edit-lead={r.id}>Edit</button>
+=======
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
     </>
   ) };
   const emiCell = { key: "emi", label: "EMI", w: "w-[17%]", render: (r) => (

@@ -200,12 +200,20 @@ export function PromotionHike({ masters, setMasters, settings }) {
   const pick = async (id) => { const e = await hrApi(`/employees/${id}`); setEmp(e); setForm((f) => ({ ...f, newDepartment: e.department, newRm: e.reportingManager })); };
   const set = (p) => setForm((f) => ({ ...f, ...p }));
   const rmEmail = (v) => (masters?.reportingManager || []).find((m) => m.value === v)?.email || "—";
+<<<<<<< HEAD
   const cur = computeSalary(emp?.salary || {}, settings || {});
+=======
+  const cur = emp ? computeSalary(emp.salary || {}, settings || {}) : null;
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
   const pct = Number(form.hikePercent) || 0;
   const hiked = emp ? computeSalary({ ...(emp.salary || {}), earnings: Object.fromEntries(Object.entries(emp.salary?.earnings || {}).map(([k, v]) => [k, Math.round((Number(v) || 0) * (1 + pct / 100))])) }, settings || {}) : null;
   const hike = form.kind !== "Promotion", promo = form.kind !== "Salary Hike";
   const submit = async () => {
+<<<<<<< HEAD
     try { await hrApi("/requests", { method: "POST", body: { ...form, employeeId: emp._id } }); setMsg({ kind: "ok", text: `Letter assigned to ${promo ? form.newRm : emp.reportingManager} for approval.` }); setEmp(null); set({ hikePercent: "", newDesignation: "", newRm: "" }); load(); }
+=======
+    try { await hrApi("/requests", { method: "POST", body: { ...form, employeeId: emp._id } }); setMsg({ kind: "ok", text: `Letter assigned to ${promo ? form.newRm : emp.reportingManager} for approval.` }); setEmp(null); set({ hikePercent: "", newDesignation: "" }); load(); }
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
     catch (e) { setMsg({ kind: "error", text: errText(e) }); }
   };
   return (
@@ -216,6 +224,7 @@ export function PromotionHike({ masters, setMasters, settings }) {
           <Field label="Type" required><select aria-label="Type" value={form.kind} onChange={(e) => set({ kind: e.target.value })} className={inputCls()}><option>Salary Hike</option><option>Promotion</option><option value="Salary and Promotion">Salary and Promotion Both</option></select></Field>
           <Field label="Employee Code - Name" required className="lg:col-span-2"><EmployeeSelect employees={emps} value={emp?._id} onChange={(id) => pick(id)} /></Field>
         </div>
+<<<<<<< HEAD
         {(
           <div className="mt-4 space-y-4" data-form="request">
             {emp && <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm bg-gray-50 rounded-lg p-3">
@@ -226,10 +235,23 @@ export function PromotionHike({ masters, setMasters, settings }) {
                 <Field label="Current CTC (per annum)"><input readOnly value={emp ? inr(cur.ctc.a) : "—"} className={inputCls(false, true)} /></Field>
                 <Field label="Hike %" required><input data-field="hikePercent" inputMode="decimal" value={form.hikePercent} onChange={(e) => set({ hikePercent: e.target.value.replace(/[^\d.]/g, "") })} className={inputCls()} /></Field>
                 <Field label="Hiked Salary CTC (calculated)" hint="Each salary component raised by the hike %"><input readOnly data-field="hikedCtc" value={pct && hiked ? `${inr(hiked.ctc.a)} / year (${inr(hiked.ctc.m)} / month)` : "—"} className={inputCls(false, true)} /></Field>
+=======
+        {emp && (
+          <div className="mt-4 space-y-4" data-form="request">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm bg-gray-50 rounded-lg p-3">
+              {[["Employee Code", emp.employeeCode], ["Name", emp.name], ["Department", emp.department], ["Position", emp.designation], ["Employee Email ID", emp.email], ["Reporting Manager", emp.reportingManager], ["RM Email ID", rmEmail(emp.reportingManager)]].map(([l, v]) => <div key={l}><div className="text-xs text-gray-500">{l}</div>{v || "—"}</div>)}
+            </div>
+            {hike && (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4" data-section="hike">
+                <Field label="Current CTC (per annum)"><input readOnly value={inr(cur.ctc.a)} className={inputCls(false, true)} /></Field>
+                <Field label="Hike %" required><input data-field="hikePercent" inputMode="decimal" value={form.hikePercent} onChange={(e) => set({ hikePercent: e.target.value.replace(/[^\d.]/g, "") })} className={inputCls()} /></Field>
+                <Field label="Hiked Salary CTC (calculated)" hint="Each salary component raised by the hike %"><input readOnly data-field="hikedCtc" value={pct ? `${inr(hiked.ctc.a)} / year (${inr(hiked.ctc.m)} / month)` : "—"} className={inputCls(false, true)} /></Field>
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
               </div>
             )}
             {promo && (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4" data-section="promotion">
+<<<<<<< HEAD
                 <Field label="Current Position"><input readOnly value={emp?.designation || ""} className={inputCls(false, true)} /></Field>
                 <Field label="Promoted To Position" required><MasterSelect type="designation" label="Promoted To Position" value={form.newDesignation} onChange={(v) => set({ newDesignation: v })} masters={masters} setMasters={setMasters} /></Field>
                 <Field label="Reporting Manager"><input readOnly value={emp?.reportingManager || ""} className={inputCls(false, true)} /></Field>
@@ -237,6 +259,15 @@ export function PromotionHike({ masters, setMasters, settings }) {
               </div>
             )}
             <div className="flex justify-end"><Btn onClick={() => (emp ? submit() : setMsg({ kind: "warn", text: "Choose the employee first." }))}>Letter Assigned</Btn></div>
+=======
+                <Field label="Current Position"><input readOnly value={emp.designation || ""} className={inputCls(false, true)} /></Field>
+                <Field label="Promoted To Position" required><MasterSelect type="designation" label="Promoted To Position" value={form.newDesignation} onChange={(v) => set({ newDesignation: v })} masters={masters} setMasters={setMasters} /></Field>
+                <Field label="Reporting Manager"><input readOnly value={emp.reportingManager || ""} className={inputCls(false, true)} /></Field>
+                <Field label="New Reporting Manager" required><MasterSelect type="reportingManager" label="New Reporting Manager" value={form.newRm} onChange={(v) => set({ newRm: v })} masters={masters} setMasters={setMasters} withEmail /></Field>
+              </div>
+            )}
+            <div className="flex justify-end"><Btn onClick={submit}>Letter Assigned</Btn></div>
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
           </div>
         )}
       </Card>

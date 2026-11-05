@@ -126,6 +126,7 @@ function LeadTable() {
     setFilteredLeads(list);
   }, [leads, globalSearch, sourceFilters, statusFilter]);
 
+<<<<<<< HEAD
   // opened from Reports › Edit: open that lead once the list has loaded
   useEffect(() => {
     let store = null;
@@ -140,6 +141,8 @@ function LeadTable() {
     } catch { store.removeItem("crm-open-lead"); }
   }, [leads]); // eslint-disable-line react-hooks/exhaustive-deps
 
+=======
+>>>>>>> 81cb897ccc1ce715d5f4389393077eacc0b2a77e
   // pagination: back to page 1 when the search / filters change (not when a lead is edited)
   const pager = usePagination(filteredLeads, { resetKeys: [globalSearch, JSON.stringify(sourceFilters), statusFilter] });
 
