@@ -9,11 +9,7 @@ import SalaryEditor from "./SalaryEditor";
 const blankOffer = () => ({
   issuedDate: todayYmd(), name: "", fatherName: "", relationPrefix: "S/O", address: "", designation: "", department: "", reportingManager: "", rank: "",
   dateOfJoining: "", employmentType: "", workSchedule: "", jobVenue: "", candidateEmail: "", candidateMobile: "",
-<<<<<<< HEAD
   earnings: { basic: "", hra: "", medical: "", bonus: "", travel: "" }, deductions: [], insurance: { gpa: "", gmc: "" }, deductionAmounts: {}, additionalTerms: [],
-=======
-  earnings: { basic: "", hra: "", medical: "", bonus: "", travel: "" }, deductions: [], insurance: { gpa: "", gmc: "" }, additionalTerms: [],
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
 });
 const ymd = (v) => (v ? String(v).slice(0, 10) : "");
 // links saved before the server knew the site address ("/onboarding/…") are completed here
@@ -34,14 +30,11 @@ export const validateForSend = (o) => {
   if (!(o.deductions || []).length) errors.push({ field: "deductions", tab: "salary", message: "Select the deductions (or NA)" });
   if ((o.deductions || []).includes("GPA") && !(Number(o.insurance?.gpa) > 0)) errors.push({ field: "insurance.gpa", tab: "salary", message: "Enter the GPA premium" });
   if ((o.deductions || []).includes("GMC") && !(Number(o.insurance?.gmc) > 0)) errors.push({ field: "insurance.gmc", tab: "salary", message: "Enter the GMC premium" });
-<<<<<<< HEAD
   if (o.deductionAmounts) {
     const d = new Set(o.deductions || []);
     if ((d.has("EPFO") || d.has("EPFO & ESIC")) && !(Number(o.deductionAmounts.pfEmployee) > 0)) errors.push({ field: "deductionAmounts.pfEmployee", tab: "salary", message: "Enter the Employee Share PF" });
     if ((d.has("ESIC") || d.has("EPFO & ESIC")) && !(Number(o.deductionAmounts.esicEmployee) > 0)) errors.push({ field: "deductionAmounts.esicEmployee", tab: "salary", message: "Enter the Employee Share ESIC" });
   }
-=======
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
   return errors;
 };
 
@@ -146,7 +139,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
   }
 
   const tabs = [["basic", "Basic Details"], ["salary", "Salary"], ["terms", "Additional Terms"]];
-<<<<<<< HEAD
   const readyToSend = validateForSend(editing).length === 0;
   const saveAndNext = async () => {
     const s = await save();
@@ -161,16 +153,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
     <Card
       title={<span className="flex items-center gap-2"><button type="button" onClick={() => { setEditing(null); load(); }} aria-label="Back" className="text-gray-500 hover:text-gray-800"><FaArrowLeft /></button>{editing.refId ? `Offer ${editing.refId}` : "New Offer Letter"} {editing.status && <Badge s={editing.status} />}</span>}
       actions={<Btn kind="secondary" onClick={preview} disabled={!!busy}><FaFilePdf /> Preview PDF</Btn>}
-=======
-  return (
-    <Card
-      title={<span className="flex items-center gap-2"><button type="button" onClick={() => { setEditing(null); load(); }} aria-label="Back" className="text-gray-500 hover:text-gray-800"><FaArrowLeft /></button>{editing.refId ? `Offer ${editing.refId}` : "New Offer Letter"} {editing.status && <Badge s={editing.status} />}</span>}
-      actions={<>
-        <Btn kind="secondary" onClick={preview} disabled={!!busy}><FaFilePdf /> Preview PDF</Btn>
-        {!locked && <Btn kind="secondary" onClick={save} disabled={!!busy}><FaSave /> {busy === "save" ? "Saving…" : "Save"}</Btn>}
-        {!locked && <Btn onClick={openMail} disabled={!!busy}><FaEnvelope /> {editing.status && editing.status !== "Draft" ? "Send again" : "Send to Candidate"}</Btn>}
-      </>}
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
     >
       {msg && <div className="mb-3"><Notice kind={msg.kind}>{msg.text}</Notice></div>}
       {locked && <div className="mb-3"><Notice kind="ok">Documentation complete — employee code <b>{editing.employeeCode}</b>. Salary changes now go through Promotions.</Notice></div>}
@@ -209,11 +191,7 @@ export default function OfferLetters({ masters, setMasters, settings }) {
             <Field label="Candidate mobile"><input data-field="candidateMobile" inputMode="numeric" maxLength="10" value={editing.candidateMobile} onChange={(e) => set({ candidateMobile: e.target.value.replace(/\D/g, "") })} className={inputCls()} /></Field>
           </div>
         )}
-<<<<<<< HEAD
         {tab === "salary" && <SalaryEditor value={editing} onChange={(v) => set({ earnings: v.earnings, deductions: v.deductions, insurance: v.insurance, deductionAmounts: v.deductionAmounts })} settings={settings} disabled={locked} errors={errors} />}
-=======
-        {tab === "salary" && <SalaryEditor value={editing} onChange={(v) => set({ earnings: v.earnings, deductions: v.deductions, insurance: v.insurance })} settings={settings} disabled={locked} errors={errors} />}
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
         {tab === "terms" && (
           <div className="space-y-2" data-section="terms">
             <p className="text-sm text-gray-600">Optional. Terms added here appear in the letter after the standard terms (a)–(h), in this order.</p>
@@ -229,7 +207,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
         )}
       </fieldset>
 
-<<<<<<< HEAD
       {!locked && (
         <div className="mt-6 pt-4 border-t flex flex-wrap items-center justify-end gap-2" data-bottom-bar>
           {readyToSend
@@ -242,8 +219,6 @@ export default function OfferLetters({ masters, setMasters, settings }) {
         </div>
       )}
 
-=======
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
       {mail && (
         <Modal title="Send offer letter" onClose={() => setMail(null)}>
           <div className="space-y-3">

@@ -25,7 +25,6 @@ export default function DocumentValidation({ onEmployeeCreated }) {
     try {
       const r = await hrApi(`/offers/${current.offer._id}/validation`, { method: "POST", body: { decisions: list } });
       setDecisions({});
-<<<<<<< HEAD
       if (r.employeeCode) {
         const l = r.login || {};
         const login = l.created ? ` CRM login created — username ${l.email} (or ${l.username}), temporary password ${l.password}${l.mailed ? " (e-mailed to the employee)" : " — share it with the employee"}.`
@@ -33,9 +32,6 @@ export default function DocumentValidation({ onEmployeeCreated }) {
         setMsg({ kind: "ok", text: `All documents approved — employee code ${r.employeeCode} generated.${login}` });
         onEmployeeCreated && onEmployeeCreated();
       }
-=======
-      if (r.employeeCode) { setMsg({ kind: "ok", text: `All documents approved — employee code ${r.employeeCode} generated.` }); onEmployeeCreated && onEmployeeCreated(); }
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
       else setMsg({ kind: r.rejected ? "warn" : "ok", text: r.rejected ? `${r.rejected} item(s) rejected — send the rejection e-mail so the candidate can re-submit.` : "Saved." });
       await open(current.offer._id, true); load();
     } catch (e) { setMsg({ kind: "error", text: [e.message, ...(e.errors || [])].join(" — ") }); } finally { setBusy(""); }

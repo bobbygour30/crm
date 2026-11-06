@@ -14,11 +14,7 @@ const setIn = (o, path, v) => {
   cur[k] = rest.length ? setIn(cur[k] ?? (/^\d+$/.test(rest[0]) ? [] : {}), rest.join("."), v) : v;
   return cur;
 };
-<<<<<<< HEAD
 const emptyEdu = () => ({ qualification: "", otherQualification: "", state: "", university: "", rollNo: "", passingYear: "", stream: "", subjects: "", marksheet: "", certificate: "" });
-=======
-const emptyEdu = () => ({ qualification: "", otherQualification: "", state: "", university: "", rollNo: "", passingYear: "", stream: "", subjects: "" });
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
 const emptyExp = () => ({ organization: "", dateOfJoining: "", dateOfRelieving: "", lastInHand: "", lastCtc: "", relievingLetter: "", experienceLetter: "" });
 const emptyRef = () => ({ name: "", designation: "", contact: "", email: "", organization: "" });
 const SECTION_TITLES = { epfo: "EPFO", esic: "ESIC", bank: "Bank details", kyc: "KYC", education: "Education", experience: "Experience", references: "References", personal: "Personal details", nominee: "Nominee", contact: "Contact details", documents: "Documents" };
@@ -151,10 +147,7 @@ export default function CandidateOnboarding() {
     ["UAN Card", "epfo.uanCard"], ["ESIC e-Pehchan", "esic.card"], ["Bank Passbook / Cheque", "bank.passbook"], ["Aadhaar front", "kyc.aadhaarFront"], ["Aadhaar back", "kyc.aadhaarBack"],
     ["PAN Card", "kyc.panCard"], ["Passport front", "kyc.passportFront"], ["Passport back", "kyc.passportBack"], ["Voter ID front", "kyc.voterFront"], ["Voter ID back", "kyc.voterBack"],
     ["DL front", "kyc.dlFront"], ["DL back", "kyc.dlBack"], ["Nominee Aadhaar", "nominee.aadhaarFile"],
-<<<<<<< HEAD
     ...(doc.education || []).flatMap((q, i) => [[`Marksheet ${i + 1}`, `education.${i}.marksheet`], [`Certificate ${i + 1}`, `education.${i}.certificate`]]),
-=======
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
     ...(get(doc, "experience.items") || []).flatMap((x, i) => [[`Relieving Letter ${i + 1}`, `experience.items.${i}.relievingLetter`], [`Experience Letter ${i + 1}`, `experience.items.${i}.experienceLetter`]]),
   ].filter(([, p]) => get(doc, p));
 
@@ -205,10 +198,7 @@ export default function CandidateOnboarding() {
                 {S(`education.${i}.state`, "State qualified from", opt.states, { section: "education" })}
                 {T(`education.${i}.university`, "University / Board", { section: "education" })}{T(`education.${i}.rollNo`, "Roll No.", { section: "education" })}
                 {T(`education.${i}.passingYear`, "Passing Year", { digits: true, max: 4, section: "education" })}{T(`education.${i}.stream`, "Stream", { section: "education" })}{T(`education.${i}.subjects`, "Subjects in the course", { section: "education" })}
-<<<<<<< HEAD
                 {FileBox(`education.${i}.marksheet`, "Upload Marksheet", { section: "education" })}{FileBox(`education.${i}.certificate`, "Upload Certificate / Provisional", { section: "education" })}
-=======
->>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
               </div>
             </div>
           ))}
