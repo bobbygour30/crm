@@ -30,7 +30,11 @@ export default function Employees({ settings, reloadKey, masters, setMasters }) 
       const [e, u] = await Promise.all([hrApi(`/employees/${id}`), hrApi("/users")]);
       setEmp(e); setUsers(u); setLogin({ email: e.email || "" });
       setDetails(null);
+<<<<<<< HEAD
       setSalary(e.salary?.earnings ? null : { effectiveFrom: ymd(e.dateOfJoining) || todayYmd(), earnings: {}, deductions: [], insurance: {}, deductionAmounts: {} });
+=======
+      setSalary(e.salary?.earnings ? null : { effectiveFrom: ymd(e.dateOfJoining) || todayYmd(), earnings: {}, deductions: [], insurance: {} });
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
     } catch (e) { setMsg({ kind: "error", text: e.message }); }
   };
   const update = async (body, okText) => { try { setEmp(await hrApi(`/employees/${emp._id}`, { method: "PUT", body })); setMsg({ kind: "ok", text: okText }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
@@ -67,7 +71,11 @@ export default function Employees({ settings, reloadKey, masters, setMasters }) 
     pan: emp.pan || "", aadhaar: emp.aadhaar || "", uan: emp.uan || "", esicNo: emp.esicNo || "",
   });
   const saveDetails = async () => { try { setEmp(await hrApi(`/employees/${emp._id}/details`, { method: "PUT", body: details })); setDetails(null); setMsg({ kind: "ok", text: "Details saved." }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
+<<<<<<< HEAD
   const openSalary = () => setSalary({ effectiveFrom: todayYmd(), earnings: { ...(emp.salary?.earnings || {}) }, deductions: [...(emp.salary?.deductions || [])], insurance: { ...(emp.salary?.insurance || {}) }, deductionAmounts: emp.salary?.deductionAmounts ? { ...emp.salary.deductionAmounts } : undefined });
+=======
+  const openSalary = () => setSalary({ effectiveFrom: todayYmd(), earnings: { ...(emp.salary?.earnings || {}) }, deductions: [...(emp.salary?.deductions || [])], insurance: { ...(emp.salary?.insurance || {}) } });
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
   const saveSalary = async () => { try { setEmp(await hrApi(`/employees/${emp._id}/salary`, { method: "PUT", body: salary })); setSalary(null); setMsg({ kind: "ok", text: "Salary structure saved — the employee is now in the salary register." }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
   const dt = (k, label, props = {}) => <Field label={label}><input aria-label={label} value={details[k]} onChange={(ev) => setDetails({ ...details, [k]: ev.target.value })} className={inputCls()} {...props} /></Field>;
   const row = (l, v) => <div className="flex justify-between gap-3 py-1 border-b border-gray-100 text-sm"><span className="text-gray-500">{l}</span><span className="text-right break-all">{v || "—"}</span></div>;
@@ -112,7 +120,11 @@ export default function Employees({ settings, reloadKey, masters, setMasters }) 
             <h4 className="font-semibold text-sm text-gray-700">Salary structure</h4>
             <Field label="Effective from" required><input type="date" aria-label="Effective from" value={salary.effectiveFrom} onChange={(ev) => setSalary({ ...salary, effectiveFrom: ev.target.value })} className={inputCls()} /></Field>
           </div>
+<<<<<<< HEAD
           <SalaryEditor value={salary} onChange={(v) => setSalary({ ...salary, earnings: v.earnings, deductions: v.deductions, insurance: v.insurance, deductionAmounts: v.deductionAmounts })} settings={settings} />
+=======
+          <SalaryEditor value={salary} onChange={(v) => setSalary({ ...salary, earnings: v.earnings, deductions: v.deductions, insurance: v.insurance })} settings={settings} />
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
           <div className="flex justify-end gap-2 mt-3">{emp.salary?.earnings && <Btn kind="secondary" onClick={() => setSalary(null)}>Cancel</Btn>}<Btn onClick={saveSalary}>Save salary structure</Btn></div>
         </div>
       )}

@@ -30,12 +30,15 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
     onChange({ ...v, deductions: next });
   };
   const na = (v.deductions || []).includes("NA");
+<<<<<<< HEAD
   const setAmount = (k, val) => {
     if (k === "gpa" || k === "gmc") return onChange({ ...v, insurance: { ...v.insurance, [k]: val } });
     // older records had automatic PF / ESIC: start from what they showed, then take the typed value
     const base = v.deductionAmounts || { pfEmployee: calc.lines.pfEmployee.m, pfEmployer: calc.lines.pfEmployer.m, esicEmployee: calc.lines.esicEmployee.m, esicEmployer: calc.lines.esicEmployer.m };
     onChange({ ...v, deductionAmounts: { ...base, [k]: val } });
   };
+=======
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
   const num = (s) => String(s).replace(/[^\d.]/g, "");
   return (
     <div className="space-y-4" data-editor="salary">
@@ -73,12 +76,22 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
             );
           })}
         </div>
+<<<<<<< HEAD
+=======
+        {(v.deductions || []).includes("GPA") || (v.deductions || []).includes("GMC") ? (
+          <div className="grid grid-cols-2 gap-3 mt-3 max-w-md">
+            {(v.deductions || []).includes("GPA") && <label className="text-sm">GPA Premium / month (₹)<input data-field="ins_gpa" inputMode="decimal" disabled={disabled} value={v.insurance?.gpa ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gpa: num(e.target.value) } })} className={inputCls(errors["insurance.gpa"], disabled)} /></label>}
+            {(v.deductions || []).includes("GMC") && <label className="text-sm">GMC Premium / month (₹)<input data-field="ins_gmc" inputMode="decimal" disabled={disabled} value={v.insurance?.gmc ?? ""} onChange={(e) => onChange({ ...v, insurance: { ...v.insurance, gmc: num(e.target.value) } })} className={inputCls(errors["insurance.gmc"], disabled)} /></label>}
+          </div>
+        ) : null}
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
         <table className="w-full text-sm mt-3" data-table="deductions">
           <thead><tr className="text-left text-xs text-gray-500"><th className="py-1">Line</th><th className="py-1">Per Month (₹)</th><th className="py-1">Per Annum (₹)</th></tr></thead>
           <tbody>
             {DEDUCTION_LINES.map(([k, label]) => {
               const l = calc.lines[k];
               const employer = k === "pfEmployer" || k === "esicEmployer";
+<<<<<<< HEAD
               // only TDS is calculated; PF / ESIC / GPA / GMC are typed once their deduction is selected
               const typed = k !== "tds" && l.applicable && !disabled;
               const field = k === "gpa" || k === "gmc" ? `ins_${k}` : `amt_${k}`;
@@ -89,6 +102,12 @@ export default function SalaryEditor({ value, onChange, settings, disabled, erro
                   <td className="py-1">{typed
                     ? <><input data-field={field} aria-label={`${label} per month`} inputMode="decimal" value={k === "gpa" || k === "gmc" ? v.insurance?.[k] ?? "" : (v.deductionAmounts ? v.deductionAmounts[k] ?? "" : String(l.m || ""))} onChange={(e) => setAmount(k, num(e.target.value))} className={inputCls(errors[errKey])} />{errors[errKey] && <p className="text-red-500 text-xs">{errors[errKey]}</p>}</>
                     : <input readOnly disabled aria-label={`${label} per month`} value={fmt(l.m)} className={inputCls(false, true)} />}</td>
+=======
+              return (
+                <tr key={k} className={cx(!l.applicable && "text-gray-400")} data-line={k}>
+                  <td className="py-1">{k === "tds" ? `TDS @ ${settings?.tdsPercent ?? 10}%` : label}{employer && <span className="ml-1 text-xs text-gray-400">(employer — part of CTC)</span>}</td>
+                  <td className="py-1"><input readOnly disabled aria-label={`${label} per month`} value={fmt(l.m)} className={inputCls(false, true)} /></td>
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
                   <td className="py-1"><input readOnly disabled aria-label={`${label} per annum`} value={fmt(l.a)} className={inputCls(false, true)} /></td>
                 </tr>
               );

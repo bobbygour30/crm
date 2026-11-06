@@ -2,8 +2,11 @@
 // ============================================================
 //  Offer letter (Salary tab):   Per Annum = Per Month x 12
 //  Deductions (multi-select):   NA / TDS / EPFO / EPFO & ESIC / ESIC / GPA / GMC
+<<<<<<< HEAD
 //     Only TDS is calculated. PF, ESIC, GPA and GMC amounts are typed by HR (deductionAmounts / insurance).
 //     Records saved before this rule (no deductionAmounts) keep the old automatic PF / ESIC, so they don't change.
+=======
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
 //     NA            -> every deduction line is 0
 //     TDS           -> TDS @ tdsPercent of gross (or basic)
 //     EPFO          -> Employee + Employer PF @ % of Basic (wage ceiling optional)
@@ -60,7 +63,11 @@ const applicableLines = (selected = []) => {
  * @param deductions ["TDS", "EPFO & ESIC", ...]
  * @param insurance  { gpa, gmc }  monthly premiums
  */
+<<<<<<< HEAD
 const computeSalary = ({ earnings = {}, deductions = [], insurance = {}, deductionAmounts }, settings = {}) => {
+=======
+const computeSalary = ({ earnings = {}, deductions = [], insurance = {} }, settings = {}) => {
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
   const S = { ...DEFAULT_SETTINGS, ...settings };
   const e = {};
   EARNING_LINES.forEach(([k]) => { e[k] = pa(earnings[k]); });
@@ -70,6 +77,7 @@ const computeSalary = ({ earnings = {}, deductions = [], insurance = {}, deducti
   const pfBase = S.pfApplyWageCeiling ? Math.min(e.basic.m, n(S.pfWageCeiling)) : e.basic.m;
   const esicEligible = gross <= n(S.esicWageCeiling);
   if ((apply.has("esicEmployee")) && !esicEligible) warnings.push(`ESIC not applicable: gross ₹${gross} is above the ESIC ceiling ₹${S.esicWageCeiling}`);
+<<<<<<< HEAD
   const manual = deductionAmounts && typeof deductionAmounts === "object"; // new records: PF / ESIC typed by HR
   if (manual) warnings.length = 0; // no ESIC-ceiling rule when amounts are typed
   const raw = {
@@ -78,6 +86,14 @@ const computeSalary = ({ earnings = {}, deductions = [], insurance = {}, deducti
     pfEmployer: manual ? n(deductionAmounts.pfEmployer) : (pfBase * n(S.pfEmployerPercent)) / 100,
     esicEmployee: manual ? n(deductionAmounts.esicEmployee) : esicEligible ? (gross * n(S.esicEmployeePercent)) / 100 : 0,
     esicEmployer: manual ? n(deductionAmounts.esicEmployer) : esicEligible ? (gross * n(S.esicEmployerPercent)) / 100 : 0,
+=======
+  const raw = {
+    tds: ((S.tdsBase === "basic" ? e.basic.m : gross) * n(S.tdsPercent)) / 100,
+    pfEmployee: (pfBase * n(S.pfEmployeePercent)) / 100,
+    pfEmployer: (pfBase * n(S.pfEmployerPercent)) / 100,
+    esicEmployee: esicEligible ? (gross * n(S.esicEmployeePercent)) / 100 : 0,
+    esicEmployer: esicEligible ? (gross * n(S.esicEmployerPercent)) / 100 : 0,
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
     gpa: n(insurance.gpa),
     gmc: n(insurance.gmc),
   };
@@ -90,7 +106,10 @@ const computeSalary = ({ earnings = {}, deductions = [], insurance = {}, deducti
   const totalDeduction = sum(employeeKeys);
   const employerContribution = sum(employerKeys);
   return {
+<<<<<<< HEAD
     manual,
+=======
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
     earnings: e,
     gross: pa(gross),
     lines,

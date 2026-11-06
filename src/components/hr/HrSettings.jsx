@@ -62,7 +62,14 @@ export default function HrSettings({ settings, setSettings, reloadMasters }) {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {num("tdsPercent", "TDS %")}
           <Field label="TDS calculated on"><select aria-label="TDS base" value={r.tdsBase} onChange={(e) => setRates({ ...r, tdsBase: e.target.value })} className={inputCls()}><option value="gross">Gross monthly pay</option><option value="basic">Basic pay</option></select></Field>
+<<<<<<< HEAD
           <p className="sm:col-span-2 lg:col-span-3 text-xs text-gray-500 self-end">Only TDS is calculated. PF, ESIC, GPA and GMC amounts are entered on each offer / salary structure.</p>
+=======
+          {num("pfEmployeePercent", "PF — employee %")}{num("pfEmployerPercent", "PF — employer %")}
+          <Field label="PF wage ceiling"><label className="flex items-center gap-2 text-sm mt-2"><input type="checkbox" checked={!!r.pfApplyWageCeiling} onChange={(e) => setRates({ ...r, pfApplyWageCeiling: e.target.checked })} /> Cap PF wages at</label></Field>
+          {num("pfWageCeiling", "PF wage ceiling (₹ basic)")}
+          {num("esicEmployeePercent", "ESIC — employee %")}{num("esicEmployerPercent", "ESIC — employer %")}{num("esicWageCeiling", "ESIC eligibility ceiling (₹ gross)", "No ESIC above this gross")}
+>>>>>>> 70a4b6161ece9dd17ac0ef14308afd543c13c5ff
           <Field label="GPA / GMC premium"><select aria-label="Insurance" value={r.insuranceRecoveredFromEmployee ? "employee" : "company"} onChange={(e) => setRates({ ...r, insuranceRecoveredFromEmployee: e.target.value === "employee" })} className={inputCls()}><option value="employee">Deducted from the employee</option><option value="company">Paid by the company (in CTC)</option></select></Field>
           <Field label="Salary proration"><select aria-label="Proration" value={r.prorationBasis} onChange={(e) => setRates({ ...r, prorationBasis: e.target.value })} className={inputCls()}><option value="calendar">Calendar days of the month</option><option value="30">30 days</option></select></Field>
           {num("paidLeavesPerMonth", "Paid leaves per month", "Beyond this, leave is unpaid (no carry-forward)")}
