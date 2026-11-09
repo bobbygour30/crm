@@ -5,8 +5,8 @@
 // so both pages always behave the same.
 // ============================================================
 import { useState, useEffect, useMemo } from "react";
-import { emptyPA, hydratePA, validatePA, appendPA } from "./PersonalAccidentForm";
-import { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "./TravelInsuranceForm";
+import { emptyPA, hydratePA, validatePA, validatePAIssuance, appendPA } from "./PersonalAccidentForm";
+import { emptyTravel, hydrateTravel, validateTravel, validateTravelIssuance, appendTravel } from "./TravelInsuranceForm";
 import {
   emptyMotorDetails, isAdminUser, OTHER_MANUFACTURER, motorDefaultsFromLob, insuranceTypeForPolicy,
 } from "./motorInsurance";
@@ -142,10 +142,11 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     if (code !== (motorDetails.autoRtoCode || "")) setMotorDetails((prev) => ({ ...prev, autoRtoCode: code }));
   }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
 
-  // Motor + Mobile premium is paid once (no EMI module)
+  // Motor / Mobile / PA / Travel premium is paid once (no EMI module)
+  const oneTime = sections.motor || sections.electronic || sections.pa || sections.travel;
   useEffect(() => {
-    if ((sections.motor || sections.electronic) && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
-  }, [sections.motor, sections.electronic, formData.paymentTerm]);
+    if (oneTime && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
+  }, [oneTime, formData.paymentTerm]);
 
   // Mobile: quote premiums come from the premium chart (invoice value + tenure), GST 18%.
   // A quote Admin marked "manual" (value outside the chart) keeps its typed premium.
@@ -198,7 +199,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       if (!prev.ownerDOB && prev.proposerDOB) patch.ownerDOB = prev.proposerDOB;
       if (!(prev.finalAddOns || []).length) {
         const accepted = acceptedQuote?.acceptedAddOns || [];
-        const fallback = (prev.selectedAddOns || []).filter((a) => a !== "Not Required");
+        const fallback = (prev.selectedAddOns || []).filter((a) => a !== "Not Required" && a !== "No Add-on Required");
         const pick = accepted.length ? accepted : fallback;
         if (pick.length) patch.finalAddOns = pick;
       }
@@ -206,17 +207,19 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     });
   }, [sections.motor, stageIdx, formData.name, acceptedQuote?.insurerName, motorDetails.proposerDOB, loadKey]);
 
-  // Policy Expiry = Start + Tenure - 1 day
+  // Policy Expiry = Start + Tenure - 1 day   (Travel: Start + No. of Days - 1)
   useEffect(() => {
     if (!workflowDetails.policyStartDate) return;
     const start = new Date(workflowDetails.policyStartDate);
     if (isNaN(start.getTime())) return;
     const expiry = new Date(start);
-    expiry.setFullYear(expiry.getFullYear() + W.getTenureYears(formData.policyTenure));
+    const travelDays = parseInt(travelDetails.travelDays, 10);
+    if (sections.travel && travelDays > 0) expiry.setDate(expiry.getDate() + travelDays);
+    else expiry.setFullYear(expiry.getFullYear() + W.getTenureYears(formData.policyTenure));
     expiry.setDate(expiry.getDate() - 1);
     const iso = expiry.toISOString().split("T")[0];
     setWorkflowDetails((prev) => (prev.policyExpiryDate === iso ? prev : { ...prev, policyExpiryDate: iso }));
-  }, [workflowDetails.policyStartDate, formData.policyTenure]);
+  }, [workflowDetails.policyStartDate, formData.policyTenure, sections.travel, travelDetails.travelDays]);
 
   // Health: build member rows at Policy Issuance from the Quote answers (keeps typed data)
   useEffect(() => {
@@ -482,8 +485,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
         : W.emptyElectronicDetails()
     );
 
-    setPaDetails(hydratePA(lead.paDetails));
-    setTravelDetails(hydrateTravel(lead.travelDetails));
+    setPaDetails(hydratePA(lead.paDetails, lead.name || ""));
+    setTravelDetails(hydrateTravel(lead.travelDetails, lead.name || ""));
 
     // ---- Workflow (quotes normalized + legacy fields mapped) ----
     const wf = lead.workflowDetails || {};
@@ -541,6 +544,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setCashbackDetails({
       ...W.emptyCashback(),
       payoutTo: cb.payoutTo || "Customer",
+      payoutMode: str(cb.payoutMode),
       amountPerPayment: str(cb.amountPerPayment),
       status: cb.status || "Pending",
       settledAmount: str(cb.settledAmount),
@@ -572,7 +576,11 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
 
   // Used by the create form to open the next module without saving
   const goToStage = (stage) => {
-    if (stage === "Quote") setHealthDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+    if (stage === "Quote") {
+      setHealthDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+      setPaDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+      setTravelDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+    }
     setCaseStage(stage);
   };
 
@@ -581,7 +589,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   // ------------------------------------------------------------
   const buildCtx = (advancing) => ({
     formData, healthDetails, motorDetails, electronicDetails, workflowDetails, cashbackDetails, payoutDetails,
-    sections, paDetails, travelDetails, validatePA, validateTravel, advancing, stageIdx,
+    sections, paDetails, travelDetails, validatePA, validateTravel, validatePAIssuance, validateTravelIssuance, advancing, stageIdx, isAdmin,
   });
 
   const showErrors = (list) => {
