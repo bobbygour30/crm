@@ -14,7 +14,11 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     { name: 'Employee Leads', icon: FaUserTie, key: 'employee-leads' }, // ← ADDED
     {
       name: 'My HR', icon: FaIdBadge, key: 'hr',
+<<<<<<< HEAD
       children: [{ name: 'Offer Letters', key: 'hr-offers' }, { name: 'Document Validation', key: 'hr-validation' }, { name: 'Employees', key: 'hr-employees' }, { name: 'HR Attendance', key: 'hr-attendance' }, { name: 'Holiday Calendar', key: 'hr-holidays' }, { name: 'Salary Register', key: 'hr-salary' }, { name: 'HR Salary Slip', key: 'hr-slips' }, { name: 'Promotion & Hike', key: 'hr-promotions' }, { name: 'Assets', key: 'hr-assets' }, { name: 'Confirmation Letter', key: 'hr-confirmation' }, { name: 'Employee Exit', key: 'hr-exits' }, { name: 'Relieving Letter', key: 'hr-relieving' }, { name: 'Documents', key: 'hr-documents' }, { name: 'Settings', key: 'hr-settings' }],
+=======
+      children: [{ name: 'Offer Letters', key: 'hr-offers' }, { name: 'Document Validation', key: 'hr-validation' }, { name: 'Employees', key: 'hr-employees' }, { name: 'HR Attendance', key: 'hr-attendance' }, { name: 'Salary Register', key: 'hr-salary' }, { name: 'HR Salary Slip', key: 'hr-slips' }, { name: 'Promotion & Hike', key: 'hr-promotions' }, { name: 'Assets', key: 'hr-assets' }, { name: 'Confirmation Letter', key: 'hr-confirmation' }, { name: 'Employee Exit', key: 'hr-exits' }, { name: 'Relieving Letter', key: 'hr-relieving' }, { name: 'Documents', key: 'hr-documents' }, { name: 'Settings', key: 'hr-settings' }],
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
     },
     {
       name: 'Reports', icon: FaChartBar, key: 'reports',
@@ -53,7 +57,10 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'hr-slips': '/admin/my-hr/slips',
     'hr-promotions': '/admin/my-hr/promotions',
     'hr-settings': '/admin/my-hr/settings',
+<<<<<<< HEAD
     'hr-holidays': '/admin/my-hr/holidays',
+=======
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
     'hr-assets': '/admin/my-hr/assets',
     'hr-confirmation': '/admin/my-hr/confirmation',
     'hr-exits': '/admin/my-hr/exits',

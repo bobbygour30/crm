@@ -26,6 +26,10 @@ export default function HrAttendance() {
   const [reg, setReg] = useState(null);
   const [holidays, setHolidays] = useState([]);
   const [leaves, setLeaves] = useState([]);
+<<<<<<< HEAD
+=======
+  const [hForm, setHForm] = useState({ date: "", name: "" });
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
   const [remarks, setRemarks] = useState({});
   const [msg, setMsg] = useState(null);
   const [cell, setCell] = useState(null);
@@ -41,6 +45,11 @@ export default function HrAttendance() {
   const mark = async (status) => {
     try { await hrApi("/attendance", { method: "POST", body: { employeeId: cell.employeeId, date: cell.date, status } }); setCell(null); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); setCell(null); }
   };
+<<<<<<< HEAD
+=======
+  const addHoliday = async () => { try { await hrApi("/holidays", { method: "POST", body: hForm }); setHForm({ date: "", name: "" }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
+  const delHoliday = async (id) => { if (window.confirm("Delete this holiday?")) { await hrApi(`/holidays/${id}`, { method: "DELETE" }); load(); } };
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
   const decide = async (id, status) => {
     try { await hrApi(`/leaves/${id}`, { method: "PUT", body: { status, remarks: remarks[id] || "" } }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); }
   };
@@ -86,7 +95,19 @@ export default function HrAttendance() {
           </div>
         )}
       </Card>
+<<<<<<< HEAD
       <p className="text-xs text-gray-500">Holidays ({holidays.length} in {mm.year}) are managed in My HR › Holiday Calendar.</p>
+=======
+      <Card title={`Holiday calendar ${mm.year}`}>
+        <div className="flex flex-wrap gap-2 mb-3">
+          <input type="date" aria-label="Holiday date" value={hForm.date} onChange={(e) => setHForm({ ...hForm, date: e.target.value })} className={cx(inputCls(), "max-w-[180px]")} />
+          <input aria-label="Holiday name" value={hForm.name} onChange={(e) => setHForm({ ...hForm, name: e.target.value })} placeholder="Holiday name" className={cx(inputCls(), "max-w-xs")} />
+          <Btn onClick={addHoliday} disabled={!hForm.date}>Add holiday</Btn>
+        </div>
+        <p className="text-xs text-gray-500 mb-2">Holidays are paid and can't be marked. Sundays are weekly offs.</p>
+        {holidays.map((h) => <div key={h._id} className="flex justify-between items-center text-sm py-1 border-b"><span>{fmtDate(h.date)} — {h.name}</span><button type="button" aria-label={`Delete ${h.name}`} onClick={() => delHoliday(h._id)} className="text-red-500"><FaTrash /></button></div>)}
+      </Card>
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
       <Card title="Leave history">
         <table className="w-full text-xs"><tbody>{leaves.filter((l) => l.status !== "Pending").slice(0, 50).map((l) => (
           <tr key={l._id} className="border-t"><td className="p-1">{l.employeeCode} {l.name}</td><td className="p-1">{l.leaveType}</td><td className="p-1">{fmtDate(l.from)}{l.to !== l.from ? ` – ${fmtDate(l.to)}` : ""}</td><td className="p-1"><Badge s={l.status} /></td><td className="p-1 text-gray-500">{l.approverRemarks}</td></tr>

@@ -50,7 +50,10 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
+<<<<<<< HEAD
       'hr-holidays': '/admin/my-hr/holidays',
+=======
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
       'hr-exits': '/admin/my-hr/exits',
@@ -107,7 +110,10 @@ function AdminApp({ handleLogout }) {
       'hr-slips': '/admin/my-hr/slips',
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
+<<<<<<< HEAD
       'hr-holidays': '/admin/my-hr/holidays',
+=======
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
       'hr-exits': '/admin/my-hr/exits',

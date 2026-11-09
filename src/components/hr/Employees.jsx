@@ -118,7 +118,11 @@ export default function Employees({ settings, reloadKey, masters, setMasters }) 
       )}
       <div className="mt-5 border-t pt-4" data-section="login">
         <h4 className="font-semibold text-sm text-gray-700 mb-2">CRM login (for attendance and leave)</h4>
+<<<<<<< HEAD
         {created && <div className="mb-3"><Notice kind="ok">Login created — User ID <b>{created.username}</b>, password <b>{created.password}</b>. Share it once; the employee should change it after the first login.</Notice></div>}
+=======
+        {created && <div className="mb-3"><Notice kind="ok">Login created — username <b>{created.username}</b> or {created.email}, password <b>{created.password}</b>. Share it once; the employee should change it after the first login.</Notice></div>}
+>>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Field label="Link an existing CRM user">
             <div className="flex gap-2">
