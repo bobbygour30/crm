@@ -8,18 +8,11 @@ import Employees from "./Employees";
 import HrAttendance from "./HrAttendance";
 import { SalaryRegister, SalarySlips } from "./SalaryRegister";
 import { Assets, Confirmations, Exits, Relieving, PromotionHike, HrDocuments, ManagerInbox } from "./HrPhase2";
-<<<<<<< HEAD
 import HrHolidays from "./HrHolidays";
 import HrSettings from "./HrSettings";
 
 export const HR_SECTIONS = [
   ["offers", "Offer Letters"], ["validation", "Document Validation"], ["employees", "Employees"], ["attendance", "HR Attendance"], ["holidays", "Holiday Calendar"],
-=======
-import HrSettings from "./HrSettings";
-
-export const HR_SECTIONS = [
-  ["offers", "Offer Letters"], ["validation", "Document Validation"], ["employees", "Employees"], ["attendance", "HR Attendance"],
->>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
   ["salary", "Salary Register"], ["slips", "HR Salary Slip"], ["promotions", "Promotion & Hike"], ["assets", "Assets"], ["confirmation", "Confirmation Letter"],
   ["exits", "Employee Exit"], ["relieving", "Relieving Letter"], ["documents", "Documents"], ["settings", "Settings"],
 ];
@@ -49,10 +42,7 @@ export default function MyHR({ section = "offers" }) {
           {section === "validation" && <DocumentValidation onEmployeeCreated={() => setReloadKey((k) => k + 1)} />}
           {section === "employees" && <Employees settings={settings} reloadKey={reloadKey} masters={masters} setMasters={setMasters} />}
           {section === "attendance" && <HrAttendance />}
-<<<<<<< HEAD
           {section === "holidays" && <HrHolidays />}
-=======
->>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
           {section === "salary" && <SalaryRegister />}
           {section === "slips" && <SalarySlips />}
           {section === "promotions" && <><ManagerInbox /><PromotionHike {...common} /></>}

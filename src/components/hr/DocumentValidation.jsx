@@ -27,11 +27,7 @@ export default function DocumentValidation({ onEmployeeCreated }) {
       setDecisions({});
       if (r.employeeCode) {
         const l = r.login || {};
-<<<<<<< HEAD
         const login = l.created ? ` CRM login created — User ID ${l.username}, temporary password ${l.password}${l.mailed ? " (e-mailed to the employee)" : " — share it with the employee"}.`
-=======
-        const login = l.created ? ` CRM login created — username ${l.email} (or ${l.username}), temporary password ${l.password}${l.mailed ? " (e-mailed to the employee)" : " — share it with the employee"}.`
->>>>>>> 0b47f97254cd368a419cc13ae9687f7da1eff482
           : l.linked ? " Linked to the existing CRM user with this e-mail." : l.reason ? ` CRM login not created: ${l.reason}.` : "";
         setMsg({ kind: "ok", text: `All documents approved — employee code ${r.employeeCode} generated.${login}` });
         onEmployeeCreated && onEmployeeCreated();
