@@ -1,15 +1,10 @@
 // src/components/hr/HrAttendance.jsx — My HR › Attendance (register, holidays, leave approvals)
 import { useEffect, useState } from "react";
-<<<<<<< HEAD
 import * as XLSX from "xlsx";
 import { FaFileExcel, FaCalendarCheck } from "react-icons/fa";
 import EmployeeSelect from "./EmployeeSelect";
 import { FaTrash, FaCheck, FaTimes } from "react-icons/fa";
 import { hrApi, MONTHS, fmtDate, todayYmd } from "./hrApi";
-=======
-import { FaTrash, FaCheck, FaTimes } from "react-icons/fa";
-import { hrApi, MONTHS, fmtDate } from "./hrApi";
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
 import { Field, Btn, Card, Notice, Badge, inputCls, cx } from "./ui";
 
 export const DAY_STYLE = {
@@ -37,12 +32,9 @@ export default function HrAttendance() {
   const [remarks, setRemarks] = useState({});
   const [msg, setMsg] = useState(null);
   const [cell, setCell] = useState(null);
-<<<<<<< HEAD
   const [emps, setEmps] = useState([]);
   const [mark, setMark] = useState({ employeeId: "", date: todayYmd(), status: "Present" });
   useEffect(() => { hrApi("/employees").then(setEmps).catch(() => {}); }, []);
-=======
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
 
   const load = async () => {
     try {
@@ -52,7 +44,6 @@ export default function HrAttendance() {
   };
   useEffect(() => { load(); }, [mm.month, mm.year]);
 
-<<<<<<< HEAD
   const setDay = async (status) => {
     try { await hrApi("/attendance", { method: "POST", body: { employeeId: cell.employeeId, date: cell.date, status } }); setCell(null); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); setCell(null); }
   };
@@ -84,11 +75,6 @@ export default function HrAttendance() {
     XLSX.utils.book_append_sheet(wb, legend, "Legend");
     XLSX.writeFile(wb, `Attendance_Register_${MONTHS[reg.month - 1]}_${reg.year}.xlsx`);
   };
-=======
-  const mark = async (status) => {
-    try { await hrApi("/attendance", { method: "POST", body: { employeeId: cell.employeeId, date: cell.date, status } }); setCell(null); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); setCell(null); }
-  };
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
   const decide = async (id, status) => {
     try { await hrApi(`/leaves/${id}`, { method: "PUT", body: { status, remarks: remarks[id] || "" } }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); }
   };
@@ -107,7 +93,6 @@ export default function HrAttendance() {
           </div>
         ))}
       </Card>
-<<<<<<< HEAD
       <Card title="Mark Attendance">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-end" data-form="mark-attendance">
           <Field label="Employee" required><EmployeeSelect employees={emps} value={mark.employeeId} onChange={(id) => setMark({ ...mark, employeeId: id })} /></Field>
@@ -118,9 +103,6 @@ export default function HrAttendance() {
         {mark.date > todayYmd() && <p className="text-xs text-red-600 mt-2">Attendance can't be marked for a future date.</p>}
       </Card>
       <Card title="Attendance register" actions={<><MonthPicker {...mm} onChange={setMm} /><Btn kind="success" onClick={exportExcel} disabled={!reg?.rows?.length}><FaFileExcel /> Excel</Btn></>}>
-=======
-      <Card title="Attendance register" actions={<MonthPicker {...mm} onChange={setMm} />}>
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
         <div className="flex flex-wrap gap-3 text-xs mb-3">{Object.entries(DAY_STYLE).map(([k, [c, cls, l]]) => <span key={k} className="flex items-center gap-1"><span className={cx("inline-flex w-5 h-5 items-center justify-center rounded", cls)}>{c}</span>{l}</span>)}</div>
         {!reg ? <p className="text-sm text-gray-500">Loading…</p> : !reg.rows.length ? <p className="text-sm text-gray-500">No employees for this month.</p> : (
           <div className="overflow-x-auto">
@@ -131,11 +113,7 @@ export default function HrAttendance() {
                   <td className="p-1 sticky left-0 bg-white whitespace-nowrap"><b>{r.employeeCode}</b> {r.name}{!r.linked && <span className="text-amber-700" title="No CRM login linked"> ⚠</span>}</td>
                   {r.days.map((d) => {
                     const [c, cls, l] = DAY_STYLE[d.kind];
-<<<<<<< HEAD
                     const editable = r.linked && !["weeklyOff", "holiday", "notJoined", "future"].includes(d.kind) && d.date <= todayYmd();
-=======
-                    const editable = r.linked && !["weeklyOff", "holiday", "notJoined"].includes(d.kind);
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
                     return <td key={d.date} className="p-0.5"><button type="button" disabled={!editable} title={`${d.date}: ${l}`} onClick={() => setCell({ employeeId: r.employeeId, date: d.date, name: r.name })} className={cx("w-6 h-6 rounded", cls, editable && "hover:ring-2 hover:ring-indigo-400")}>{c}</button></td>;
                   })}
                   <td className="p-1 text-center font-medium">{r.payableDays}</td><td className="p-1 text-center text-red-600">{r.lopDays}</td>
@@ -147,11 +125,7 @@ export default function HrAttendance() {
         {cell && (
           <div className="mt-3 flex flex-wrap items-center gap-2 text-sm bg-gray-50 border rounded-lg p-2" data-cell>
             <span>{cell.name} — {fmtDate(cell.date)}:</span>
-<<<<<<< HEAD
             <Btn kind="success" onClick={() => setDay("Present")}>Present</Btn><Btn kind="danger" onClick={() => setDay("Absent")}>Absent</Btn><Btn kind="secondary" onClick={() => setDay("Clear")}>Clear</Btn><Btn kind="secondary" onClick={() => setCell(null)}>Cancel</Btn>
-=======
-            <Btn kind="success" onClick={() => mark("Present")}>Present</Btn><Btn kind="danger" onClick={() => mark("Absent")}>Absent</Btn><Btn kind="secondary" onClick={() => mark("Clear")}>Clear</Btn><Btn kind="secondary" onClick={() => setCell(null)}>Cancel</Btn>
->>>>>>> f2ace547a80d7cc04be54117a19f8c600d1c7edb
           </div>
         )}
       </Card>
