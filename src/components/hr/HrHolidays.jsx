@@ -1,9 +1,10 @@
 // src/components/hr/HrHolidays.jsx — My HR › Holiday Calendar (Admin): manual marking with remarks + bulk upload
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { FaTrash, FaDownload, FaUpload, FaPlus } from "react-icons/fa";
 import { hrApi, fmtDate } from "./hrApi";
 import { Field, Btn, Card, Notice, inputCls, cx } from "./ui";
+import Pagination, { usePagination } from "../lob/Pagination";
 
 const pad = (n) => String(n).padStart(2, "0");
 /** Excel cell → "YYYY-MM-DD" (accepts real Excel dates, DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD) */
@@ -33,13 +34,21 @@ export default function HrHolidays() {
   const [form, setForm] = useState({ date: "", name: "", remarks: "" });
   const [preview, setPreview] = useState(null); // { rows, problems }
   const [msg, setMsg] = useState(null);
+  const [busy, setBusy] = useState(""); // "mark" | "upload" — the button shows progress and can't be pressed again
+  const lock = useRef(false);            // blocks a fast double-click before the screen re-renders
+  const once = async (kind, fn) => {
+    if (lock.current) return;
+    lock.current = true; setBusy(kind);
+    try { await fn(); } finally { lock.current = false; setBusy(""); }
+  };
+  const pager = usePagination(list, { resetKeys: [year] });
   const load = () => hrApi(`/holidays?year=${year}`).then(setList).catch((e) => setMsg({ kind: "error", text: e.message }));
   useEffect(() => { load(); }, [year]);
 
-  const add = async () => {
+  const add = () => once("mark", async () => {
     try { await hrApi("/holidays", { method: "POST", body: form }); setMsg({ kind: "ok", text: `Holiday marked on ${fmtDate(form.date)}.` }); setForm({ date: "", name: "", remarks: "" }); if (form.date.startsWith(String(year))) load(); else setYear(Number(form.date.slice(0, 4))); }
     catch (e) { setMsg({ kind: "error", text: e.message }); }
-  };
+  });
   const del = async (h) => { if (!window.confirm(`Delete the holiday "${h.name}" on ${fmtDate(h.date)}?`)) return; try { await hrApi(`/holidays/${h._id}`, { method: "DELETE" }); load(); } catch (e) { setMsg({ kind: "error", text: e.message }); } };
 
   const downloadTemplate = () => {
@@ -86,13 +95,13 @@ export default function HrHolidays() {
       setPreview({ rows, problems, combined, fileName: file.name });
     } catch (e) { setMsg({ kind: "error", text: `Could not read the file — use the downloaded template (.xlsx).${e && e.message ? ` (${e.message})` : ""}` }); }
   };
-  const upload = async () => {
+  const upload = () => once("upload", async () => {
     try {
       const r = await hrApi("/holidays/bulk", { method: "POST", body: { rows: preview.rows } });
       setMsg({ kind: r.skipped.length ? "warn" : "ok", text: `${r.added} holiday(s) added.${r.skipped.length ? ` Skipped: ${r.skipped.map((s) => `row ${s.row} (${s.reason})`).join("; ")}.` : ""}` });
       setPreview(null); load();
     } catch (e) { setMsg({ kind: "error", text: e.message }); }
-  };
+  });
 
   return (
     <div className="space-y-4">
@@ -102,14 +111,14 @@ export default function HrHolidays() {
           <Field label="Date" required><input type="date" aria-label="Holiday date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} className={inputCls()} /></Field>
           <Field label="Holiday Name" required><input aria-label="Holiday name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={inputCls()} /></Field>
           <Field label="Remarks"><input aria-label="Holiday remarks" value={form.remarks} onChange={(e) => setForm({ ...form, remarks: e.target.value })} className={inputCls()} placeholder="Optional" /></Field>
-          <Btn onClick={add} disabled={!form.date || !form.name.trim()}><FaPlus /> Mark Holiday</Btn>
+          <Btn onClick={add} disabled={!!busy || !form.date || !form.name.trim()}><FaPlus /> {busy === "mark" ? "Saving…" : "Mark Holiday"}</Btn>
         </div>
       </Card>
       <Card title="Bulk upload">
         <div className="flex flex-wrap items-center gap-3" data-bulk>
           <Btn kind="secondary" onClick={downloadTemplate}><FaDownload /> Download Template</Btn>
-          <label className="px-3 py-2 rounded-lg text-sm border border-indigo-300 text-indigo-700 hover:bg-indigo-50 cursor-pointer flex items-center gap-2"><FaUpload /> Choose Filled File
-            <input type="file" accept=".xlsx,.xls" className="hidden" aria-label="Holiday file" onChange={(e) => { if (e.target.files[0]) readFile(e.target.files[0]); e.target.value = ""; }} />
+          <label className={cx("px-3 py-2 rounded-lg text-sm border border-indigo-300 text-indigo-700 flex items-center gap-2", busy ? "opacity-50 cursor-not-allowed" : "hover:bg-indigo-50 cursor-pointer")}><FaUpload /> Choose Filled File
+            <input type="file" accept=".xlsx,.xls" className="hidden" aria-label="Holiday file" disabled={!!busy} onChange={(e) => { if (e.target.files[0]) readFile(e.target.files[0]); e.target.value = ""; }} />
           </label>
           <span className="text-xs text-gray-500">Columns: Date (DD-MM-YYYY), Holiday Name, Remarks</span>
         </div>
@@ -125,7 +134,12 @@ export default function HrHolidays() {
             {preview.rows.length > 0 && (
               <table className="w-full text-xs mt-2"><tbody>{preview.rows.map((r) => <tr key={r.row} className="border-t"><td className="p-1">{fmtDate(r.date)}</td><td className="p-1">{r.name}</td><td className="p-1 text-gray-500">{r.remarks}</td></tr>)}</tbody></table>
             )}
-            <div className="flex justify-end gap-2 mt-3"><Btn kind="secondary" onClick={() => setPreview(null)}>Cancel</Btn><Btn onClick={upload} disabled={!preview.rows.length}>Upload {preview.rows.length} holiday(s)</Btn></div>
+            <div className="flex justify-end gap-2 mt-3">
+              <Btn kind="secondary" onClick={() => setPreview(null)} disabled={busy === "upload"}>Cancel</Btn>
+              <Btn onClick={upload} disabled={!!busy || !preview.rows.length} aria-busy={busy === "upload"}>
+                {busy === "upload" ? <><span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" /> Uploading…</> : `Upload ${preview.rows.length} holiday(s)`}
+              </Btn>
+            </div>
           </div>
         )}
       </Card>
@@ -134,12 +148,13 @@ export default function HrHolidays() {
       }>
         {!list.length ? <p className="text-sm text-gray-500">No holidays for {year}.</p> : (
           <table className="w-full text-sm" data-table="holidays"><thead className="text-left text-xs text-gray-500 bg-gray-50"><tr><th className="p-2">Date</th><th className="p-2">Day</th><th className="p-2">Holiday</th><th className="p-2">Remarks</th><th className="p-2"></th></tr></thead>
-            <tbody>{list.map((h) => (
+            <tbody>{pager.pageItems.map((h) => (
               <tr key={h._id} className="border-t"><td className="p-2">{fmtDate(h.date)}</td><td className="p-2">{new Date(`${h.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long" })}</td><td className="p-2 font-medium">{h.name}</td><td className="p-2 text-gray-600">{h.remarks || "—"}</td>
                 <td className="p-2"><button type="button" aria-label={`Delete ${h.name}`} onClick={() => del(h)} className="text-red-500 hover:text-red-700"><FaTrash /></button></td></tr>
             ))}</tbody>
           </table>
         )}
+        {list.length > 0 && <div className="-mx-4 mt-2"><Pagination p={pager} label="holidays" /></div>}
         <p className="text-xs text-gray-500 mt-3">Holidays are paid and need no attendance. Employees see this calendar (read-only) in their My HR.</p>
       </Card>
     </div>
