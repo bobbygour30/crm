@@ -42,6 +42,24 @@ export default function HrHolidays() {
     try { await fn(); } finally { lock.current = false; setBusy(""); }
   };
   const pager = usePagination(list, { resetKeys: [year] });
+  // multi-select (kept across pages; cleared when the year changes)
+  const [selected, setSelected] = useState(() => new Set());
+  useEffect(() => { setSelected(new Set()); }, [year]);
+  useEffect(() => { setSelected((s) => { const ids = new Set(list.map((h) => h._id)); const n = new Set([...s].filter((id) => ids.has(id))); return n.size === s.size ? s : n; }); }, [list]);
+  const pageIds = pager.pageItems.map((h) => h._id);
+  const allPage = pageIds.length > 0 && pageIds.every((id) => selected.has(id));
+  const somePage = pageIds.some((id) => selected.has(id));
+  const toggle = (id) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const togglePage = () => setSelected((s) => { const n = new Set(s); pageIds.forEach((id) => (allPage ? n.delete(id) : n.add(id))); return n; });
+  const deleteSelected = () => once("delete", async () => {
+    const ids = [...selected];
+    if (!ids.length || !window.confirm(`Delete ${ids.length} selected holiday(s)? This can't be undone.`)) return;
+    try {
+      const r = await hrApi("/holidays/bulk-delete", { method: "POST", body: { ids } });
+      setMsg({ kind: "ok", text: `${r.deleted} holiday(s) deleted.` });
+      setSelected(new Set()); await load();
+    } catch (e) { setMsg({ kind: "error", text: e.message }); }
+  });
   const load = () => hrApi(`/holidays?year=${year}`).then(setList).catch((e) => setMsg({ kind: "error", text: e.message }));
   useEffect(() => { load(); }, [year]);
 
@@ -146,10 +164,25 @@ export default function HrHolidays() {
       <Card title={`Holiday Calendar ${year}`} actions={
         <select aria-label="Year" value={year} onChange={(e) => setYear(Number(e.target.value))} className={cx(inputCls(), "w-28")}>{[thisYear - 1, thisYear, thisYear + 1].map((y) => <option key={y}>{y}</option>)}</select>
       }>
+        {selected.size > 0 && (
+          <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm" data-selection-bar>
+            <span><b>{selected.size}</b> selected</span>
+            {allPage && selected.size < list.length && <button type="button" className="text-indigo-700 underline" onClick={() => setSelected(new Set(list.map((h) => h._id)))} disabled={!!busy}>Select all {list.length} holidays in {year}</button>}
+            {selected.size === list.length && list.length > pageIds.length && <span className="text-gray-600">All {list.length} holidays in {year} are selected.</span>}
+            <button type="button" className="text-gray-600 underline" onClick={() => setSelected(new Set())} disabled={!!busy}>Clear selection</button>
+            <Btn kind="danger" className="ml-auto" onClick={deleteSelected} disabled={!!busy} aria-busy={busy === "delete"}>
+              {busy === "delete" ? <><span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" aria-hidden="true" /> Deleting…</> : <><FaTrash /> Delete selected ({selected.size})</>}
+            </Btn>
+          </div>
+        )}
         {!list.length ? <p className="text-sm text-gray-500">No holidays for {year}.</p> : (
-          <table className="w-full text-sm" data-table="holidays"><thead className="text-left text-xs text-gray-500 bg-gray-50"><tr><th className="p-2">Date</th><th className="p-2">Day</th><th className="p-2">Holiday</th><th className="p-2">Remarks</th><th className="p-2"></th></tr></thead>
+          <table className="w-full text-sm" data-table="holidays"><thead className="text-left text-xs text-gray-500 bg-gray-50"><tr>
+            <th className="p-2 w-8"><input type="checkbox" aria-label="Select all on this page" checked={allPage} disabled={!!busy} onChange={togglePage} ref={(el) => { if (el) el.indeterminate = somePage && !allPage; }} /></th>
+            <th className="p-2">Date</th><th className="p-2">Day</th><th className="p-2">Holiday</th><th className="p-2">Remarks</th><th className="p-2"></th></tr></thead>
             <tbody>{pager.pageItems.map((h) => (
-              <tr key={h._id} className="border-t"><td className="p-2">{fmtDate(h.date)}</td><td className="p-2">{new Date(`${h.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long" })}</td><td className="p-2 font-medium">{h.name}</td><td className="p-2 text-gray-600">{h.remarks || "—"}</td>
+              <tr key={h._id} className={cx("border-t", selected.has(h._id) && "bg-indigo-50")} data-row={h._id}>
+                <td className="p-2"><input type="checkbox" aria-label={`Select ${h.name}`} checked={selected.has(h._id)} disabled={!!busy} onChange={() => toggle(h._id)} /></td>
+                <td className="p-2">{fmtDate(h.date)}</td><td className="p-2">{new Date(`${h.date}T00:00:00`).toLocaleDateString("en-IN", { weekday: "long" })}</td><td className="p-2 font-medium">{h.name}</td><td className="p-2 text-gray-600">{h.remarks || "—"}</td>
                 <td className="p-2"><button type="button" aria-label={`Delete ${h.name}`} onClick={() => del(h)} className="text-red-500 hover:text-red-700"><FaTrash /></button></td></tr>
             ))}</tbody>
           </table>
