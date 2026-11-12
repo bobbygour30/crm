@@ -22,7 +22,9 @@ export const toYmd = (v) => {
 const readBuffer = (file) => (typeof file.arrayBuffer === "function" ? file.arrayBuffer() : new Promise((resolve, reject) => {
   const r = new FileReader(); r.onload = () => resolve(r.result); r.onerror = () => reject(r.error); r.readAsArrayBuffer(file);
 }));
-const validYmd = (s) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false; const d = new Date(`${s}T00:00:00`); return !isNaN(d) && d.toISOString().slice(0, 10) === s; };
+// checked in UTC so the result is the same in every time zone (local midnight in India is the previous day in UTC)
+const validYmd = (s) => { if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false; const d = new Date(`${s}T00:00:00Z`); return !isNaN(d) && d.toISOString().slice(0, 10) === s; };
+const shown = (v, ymd) => (ymd ? ymd.split("-").reverse().join("-") : String(v)); // error messages: 01-01-2026, not Excel's 46023
 
 export default function HrHolidays() {
   const thisYear = new Date().getFullYear();
@@ -63,18 +65,25 @@ export default function HrHolidays() {
       const wb = XLSX.read(new Uint8Array(await readBuffer(file)), { type: "array", cellDates: false });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: "" }).slice(1);
-      const rows = [], problems = [];
-      const seen = new Set();
+      const rows = [], problems = [], combined = [];
+      const byDate = new Map(); // one holiday per date: festivals on the same day are combined
       raw.forEach((r, i) => {
         if (!r.some((c) => String(c).trim())) return; // blank row
         const row = i + 2, date = toYmd(r[0]), name = String(r[1] || "").trim(), remarks = String(r[2] || "").trim();
-        if (!validYmd(date)) problems.push(`Row ${row}: date "${r[0]}" is not valid (use DD-MM-YYYY)`);
-        else if (!name) problems.push(`Row ${row}: Holiday Name is missing`);
-        else if (seen.has(date)) problems.push(`Row ${row}: ${date} appears twice in the file`);
-        else { seen.add(date); rows.push({ row, date, name, remarks }); }
+        if (!validYmd(date)) { problems.push(`Row ${row}: date "${shown(r[0], date)}" is not valid (use DD-MM-YYYY)`); return; }
+        if (!name) { problems.push(`Row ${row}: Holiday Name is missing`); return; }
+        const first = byDate.get(date);
+        if (first) {
+          if (!first.name.split(" / ").includes(name)) first.name = `${first.name} / ${name}`;
+          if (remarks && !first.remarks.split("; ").includes(remarks)) first.remarks = first.remarks ? `${first.remarks}; ${remarks}` : remarks;
+          combined.push(`Row ${row} is on the same date as row ${first.row} — combined as "${first.name}"`);
+          return;
+        }
+        const h = { row, date, name, remarks };
+        byDate.set(date, h); rows.push(h);
       });
       if (!rows.length && !problems.length) problems.push("The file has no holidays");
-      setPreview({ rows, problems, fileName: file.name });
+      setPreview({ rows, problems, combined, fileName: file.name });
     } catch (e) { setMsg({ kind: "error", text: `Could not read the file — use the downloaded template (.xlsx).${e && e.message ? ` (${e.message})` : ""}` }); }
   };
   const upload = async () => {
@@ -106,8 +115,13 @@ export default function HrHolidays() {
         </div>
         {preview && (
           <div className="mt-4 border rounded-lg p-3" data-preview>
-            <p className="text-sm"><b>{preview.fileName}</b>: {preview.rows.length} holiday(s) ready{preview.problems.length ? `, ${preview.problems.length} problem(s)` : ""}.</p>
+            <p className="text-sm"><b>{preview.fileName}</b>: {preview.rows.length} holiday(s) ready{preview.combined.length ? `, ${preview.combined.length} row(s) combined with another holiday on the same date` : ""}{preview.problems.length ? `, ${preview.problems.length} problem(s)` : ""}.</p>
             {preview.problems.length > 0 && <ul className="text-xs text-red-600 mt-2 list-disc pl-5">{preview.problems.map((p) => <li key={p}>{p}</li>)}</ul>}
+            {preview.combined.length > 0 && (
+              <details className="text-xs text-amber-700 mt-2"><summary className="cursor-pointer">Same-date rows combined ({preview.combined.length})</summary>
+                <ul className="list-disc pl-5 mt-1">{preview.combined.map((p) => <li key={p}>{p}</li>)}</ul>
+              </details>
+            )}
             {preview.rows.length > 0 && (
               <table className="w-full text-xs mt-2"><tbody>{preview.rows.map((r) => <tr key={r.row} className="border-t"><td className="p-1">{fmtDate(r.date)}</td><td className="p-1">{r.name}</td><td className="p-1 text-gray-500">{r.remarks}</td></tr>)}</tbody></table>
             )}
