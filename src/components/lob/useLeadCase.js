@@ -5,8 +5,9 @@
 // so both pages always behave the same.
 // ============================================================
 import { useState, useEffect, useMemo } from "react";
-import { emptyPA, hydratePA, validatePA, appendPA } from "./PersonalAccidentForm";
-import { emptyTravel, hydrateTravel, validateTravel, appendTravel } from "./TravelInsuranceForm";
+import { emptyPA, hydratePA, validatePA, validatePAIssuance, appendPA } from "./PersonalAccidentForm";
+import { emptyTravel, hydrateTravel, validateTravel, validateTravelIssuance, appendTravel } from "./TravelInsuranceForm";
+import { emptyTerm, hydrateTerm, validateTerm, validateTermIssuance, appendTerm, termExpiryDate } from "./termInsurance";
 import {
   emptyMotorDetails, isAdminUser, OTHER_MANUFACTURER, motorDefaultsFromLob, insuranceTypeForPolicy,
 } from "./motorInsurance";
@@ -35,6 +36,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   const [electronicDetails, setElectronicDetails] = useState(W.emptyElectronicDetails());
   const [paDetails, setPaDetails] = useState(emptyPA());
   const [travelDetails, setTravelDetails] = useState(emptyTravel());
+  const [termDetails, setTermDetails] = useState(emptyTerm());
   const [workflowDetails, setWorkflowDetails] = useState(W.emptyWorkflow());
   const [cashbackDetails, setCashbackDetails] = useState(W.emptyCashback());
   const [payoutDetails, setPayoutDetails] = useState(W.emptyPayout());
@@ -142,10 +144,11 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     if (code !== (motorDetails.autoRtoCode || "")) setMotorDetails((prev) => ({ ...prev, autoRtoCode: code }));
   }, [motorDetails.registrationNumber, motorDetails.previousInsuranceStatus]);
 
-  // Motor + Mobile premium is paid once (no EMI module)
+  // Motor / Mobile / PA / Travel premium is paid once (no EMI module)
+  const oneTime = sections.motor || sections.electronic || sections.pa || sections.travel;
   useEffect(() => {
-    if ((sections.motor || sections.electronic) && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
-  }, [sections.motor, sections.electronic, formData.paymentTerm]);
+    if (oneTime && formData.paymentTerm !== "One Time") setFormData((prev) => ({ ...prev, paymentTerm: "One Time" }));
+  }, [oneTime, formData.paymentTerm]);
 
   // Mobile: quote premiums come from the premium chart (invoice value + tenure), GST 18%.
   // A quote Admin marked "manual" (value outside the chart) keeps its typed premium.
@@ -198,7 +201,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       if (!prev.ownerDOB && prev.proposerDOB) patch.ownerDOB = prev.proposerDOB;
       if (!(prev.finalAddOns || []).length) {
         const accepted = acceptedQuote?.acceptedAddOns || [];
-        const fallback = (prev.selectedAddOns || []).filter((a) => a !== "Not Required");
+        const fallback = (prev.selectedAddOns || []).filter((a) => a !== "Not Required" && a !== "No Add-on Required");
         const pick = accepted.length ? accepted : fallback;
         if (pick.length) patch.finalAddOns = pick;
       }
@@ -206,17 +209,24 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     });
   }, [sections.motor, stageIdx, formData.name, acceptedQuote?.insurerName, motorDetails.proposerDOB, loadKey]);
 
-  // Policy Expiry = Start + Tenure - 1 day
+  // Policy Expiry = Start + Tenure - 1 day   (Travel: Start + No. of Days - 1; Term: Start + Covered years - 1)
   useEffect(() => {
     if (!workflowDetails.policyStartDate) return;
+    if (sections.term) {
+      const iso = termExpiryDate(workflowDetails.policyStartDate, termDetails);
+      if (iso) setWorkflowDetails((prev) => (prev.policyExpiryDate === iso ? prev : { ...prev, policyExpiryDate: iso }));
+      return;
+    }
     const start = new Date(workflowDetails.policyStartDate);
     if (isNaN(start.getTime())) return;
     const expiry = new Date(start);
-    expiry.setFullYear(expiry.getFullYear() + W.getTenureYears(formData.policyTenure));
+    const travelDays = parseInt(travelDetails.travelDays, 10);
+    if (sections.travel && travelDays > 0) expiry.setDate(expiry.getDate() + travelDays);
+    else expiry.setFullYear(expiry.getFullYear() + W.getTenureYears(formData.policyTenure));
     expiry.setDate(expiry.getDate() - 1);
     const iso = expiry.toISOString().split("T")[0];
     setWorkflowDetails((prev) => (prev.policyExpiryDate === iso ? prev : { ...prev, policyExpiryDate: iso }));
-  }, [workflowDetails.policyStartDate, formData.policyTenure]);
+  }, [workflowDetails.policyStartDate, formData.policyTenure, sections.travel, travelDetails.travelDays, sections.term, termDetails.proposerDOB, termDetails.coverTillAge]); // eslint-disable-line react-hooks/exhaustive-deps -- Term expiry depends only on DOB + Cover Till Age
 
   // Health: build member rows at Policy Issuance from the Quote answers (keeps typed data)
   useEffect(() => {
@@ -374,6 +384,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setElectronicDetails(W.emptyElectronicDetails());
     setPaDetails(emptyPA());
     setTravelDetails(emptyTravel());
+    setTermDetails(emptyTerm());
     setWorkflowDetails(W.emptyWorkflow());
     setCashbackDetails(W.emptyCashback());
     setPayoutDetails(W.emptyPayout());
@@ -482,8 +493,9 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
         : W.emptyElectronicDetails()
     );
 
-    setPaDetails(hydratePA(lead.paDetails));
-    setTravelDetails(hydrateTravel(lead.travelDetails));
+    setPaDetails(hydratePA(lead.paDetails, lead.name || ""));
+    setTravelDetails(hydrateTravel(lead.travelDetails, lead.name || ""));
+    setTermDetails(hydrateTerm(lead.termDetails, lead.name || ""));
 
     // ---- Workflow (quotes normalized + legacy fields mapped) ----
     const wf = lead.workflowDetails || {};
@@ -522,6 +534,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       paymentQr: wf.paymentQr || null,
       insurerPolicyCopy: wf.insurerPolicyCopy || null,
       utrNumber: str(wf.utrNumber),
+      paymentDate: W.formatDateForInput(wf.paymentDate),
       paymentSnapshot: wf.paymentSnapshot || null,
       issuanceStatus,
       notIssuedRemarks: str(wf.notIssuedRemarks),
@@ -541,6 +554,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     setCashbackDetails({
       ...W.emptyCashback(),
       payoutTo: cb.payoutTo || "Customer",
+      payoutMode: str(cb.payoutMode),
       amountPerPayment: str(cb.amountPerPayment),
       status: cb.status || "Pending",
       settledAmount: str(cb.settledAmount),
@@ -572,7 +586,12 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
 
   // Used by the create form to open the next module without saving
   const goToStage = (stage) => {
-    if (stage === "Quote") setHealthDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+    if (stage === "Quote") {
+      setHealthDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+      setPaDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+      setTravelDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+      setTermDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
+    }
     setCaseStage(stage);
   };
 
@@ -581,7 +600,8 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   // ------------------------------------------------------------
   const buildCtx = (advancing) => ({
     formData, healthDetails, motorDetails, electronicDetails, workflowDetails, cashbackDetails, payoutDetails,
-    sections, paDetails, travelDetails, validatePA, validateTravel, advancing, stageIdx,
+    sections, paDetails, travelDetails, validatePA, validateTravel, validatePAIssuance, validateTravelIssuance, advancing, stageIdx, isAdmin,
+    termDetails, validateTerm, validateTermIssuance,
   });
 
   const showErrors = (list) => {
@@ -758,6 +778,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     // ---- PA / Travel ----
     if (lobVisible && sections.pa) appendPA(fd, paDetails);
     if (lobVisible && sections.travel) appendTravel(fd, travelDetails);
+    if (lobVisible && sections.term) appendTerm(fd, termDetails);
 
     // ---- Workflow ----
     fd.append("workflowDetails", JSON.stringify(wf));
@@ -794,6 +815,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
     // state
     formData, setFormData, healthDetails, setHealthDetails, motorDetails, setMotorDetails,
     electronicDetails, setElectronicDetails, paDetails, setPaDetails, travelDetails, setTravelDetails,
+    termDetails, setTermDetails,
     workflowDetails, setWorkflowDetails, cashbackDetails, setCashbackDetails, payoutDetails, setPayoutDetails,
     caseStage, savedLead, quoteFiles, setQuoteFiles, validationErrors, validationPopup, setValidationPopup,
     showAddOnModal, setShowAddOnModal, isFetchingPin, pinFetchError,

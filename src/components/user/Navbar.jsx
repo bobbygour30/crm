@@ -11,6 +11,8 @@ import {
   FaMoneyCheckAlt,
   FaSignOutAlt,
   FaChartBar,
+  FaChartLine,
+  FaIdBadge,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,6 +25,8 @@ function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
   const tabs = [
     { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
+    { name: "Reports", icon: FaChartLine, path: "/reports" },
+    { name: "My HR", icon: FaIdBadge, path: "/my-hr" },
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
     { name: "Salary Slip", icon: FaMoneyCheckAlt, path: "/salary-slip" },
     { name: "Quote", icon: FaBullhorn, path: "/quote" },
