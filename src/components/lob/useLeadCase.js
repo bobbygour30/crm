@@ -590,10 +590,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
       setHealthDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
       setPaDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
       setTravelDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
-<<<<<<< HEAD
       setTermDetails((prev) => (prev.proposerName ? prev : { ...prev, proposerName: formData.name }));
-=======
->>>>>>> a91ae2389304f0d2ff0fe178e643eb3b42aaefce
     }
     setCaseStage(stage);
   };
@@ -604,10 +601,7 @@ export default function useLeadCase({ quoteFilePrefix = "quoteFile_", role = "au
   const buildCtx = (advancing) => ({
     formData, healthDetails, motorDetails, electronicDetails, workflowDetails, cashbackDetails, payoutDetails,
     sections, paDetails, travelDetails, validatePA, validateTravel, validatePAIssuance, validateTravelIssuance, advancing, stageIdx, isAdmin,
-<<<<<<< HEAD
     termDetails, validateTerm, validateTermIssuance,
-=======
->>>>>>> a91ae2389304f0d2ff0fe178e643eb3b42aaefce
   });
 
   const showErrors = (list) => {
