@@ -69,7 +69,7 @@ export const inputCls = (err) =>
 
 export const Field = ({ label, required, error, hint, className = "", children }) => (
   <div className={className}>
-    <label className="text-xs font-medium text-gray-700">
+    <label className="text-sm font-medium text-gray-700">
       {label}
       {required && <span className="text-red-500"> *</span>}
     </label>
