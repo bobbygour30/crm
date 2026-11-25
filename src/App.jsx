@@ -5,6 +5,8 @@ import SignUp from './components/SignUp';
 import AdminApp from './components/admin/AdminApp';
 import UserApp from './components/user/UserApp';
 import ForgotPassword from './components/ForgotPassword';
+import CandidateOnboarding from './components/hr/CandidateOnboarding';
+import CpDocumentation from './components/cp/CpDocumentation';
 import { useState, useEffect } from 'react';
 
 function App() {
@@ -56,6 +58,10 @@ function App() {
           }
         />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+        {/* My HR: candidate documentation link (public — the token in the link is the key) */}
+        <Route path="/onboarding/:token" element={<CandidateOnboarding />} />
+        {/* Channel Partner onboarding link (public — the token in the link is the key) */}
+        <Route path="/cp-onboarding/:token" element={<CpDocumentation />} />
         <Route
           path="/admin/*"
           element={

@@ -21,7 +21,7 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
     const trimmedPassword = password.trim();
 
     if (!trimmedEmail || !trimmedPassword) {
-      setError('Please enter both email and password');
+      setError('Please enter your User ID (Employee Code) or email, and your password');
       setIsLoading(false);
       return;
     }
@@ -104,15 +104,17 @@ function Login({ setIsAuthenticated, setIsAdmin }) {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">User ID (Employee Code) / Email</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
-                type="email"
+                type="text"
+                autoComplete="username"
+                autoCapitalize="none"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                placeholder="Enter your email"
+                placeholder="e.g. AIM00010 or your email"
                 required
               />
             </div>
