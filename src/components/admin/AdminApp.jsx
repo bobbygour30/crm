@@ -6,11 +6,8 @@ import axios from 'axios';
 import Sidebar from './Sidebar';
 import BrdDashboard from '../dashboard/BrdDashboard'; // TERM LOB & Dashboard BRD
 import CpOnboardingAdmin from '../cp/CpOnboardingAdmin'; // Channel Partner Onboarding BRD
-<<<<<<< HEAD
 import AssignedAccess from '../access/AssignedAccess';
 import { useMyAccess } from '../access/myAccess';
-=======
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
 import LeadTable from './LeadTable';
 import TaskList from './TaskList';
 import Analytics from './Analytics';
@@ -57,10 +54,7 @@ function AdminApp({ handleLogout }) {
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
       'cp-onboarding': '/admin/cp-onboarding',
-<<<<<<< HEAD
       'access': '/admin/assigned-access',
-=======
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
       'hr-holidays': '/admin/my-hr/holidays',
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
@@ -120,10 +114,7 @@ function AdminApp({ handleLogout }) {
       'hr-promotions': '/admin/my-hr/promotions',
       'hr-settings': '/admin/my-hr/settings',
       'cp-onboarding': '/admin/cp-onboarding',
-<<<<<<< HEAD
       'access': '/admin/assigned-access',
-=======
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
       'hr-holidays': '/admin/my-hr/holidays',
       'hr-assets': '/admin/my-hr/assets',
       'hr-confirmation': '/admin/my-hr/confirmation',
@@ -369,11 +360,8 @@ function AdminApp({ handleLogout }) {
                 transition={{ duration: 0.3 }}
                 className="min-h-[calc(100vh-200px)]"
               >
-<<<<<<< HEAD
                 {accessReady && !can(activeTab) ? <div className="p-8 text-center" data-no-access><h2 className="text-lg font-semibold text-gray-700">You don't have access to this module</h2><p className="text-sm text-gray-500 mt-1">Ask your Admin to assign it in Assigned Access.</p></div> : <>
                 {activeTab === 'access' && <AssignedAccess />}
-=======
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
                 {activeTab === 'dashboard' && <BrdDashboard />}
                 {activeTab === 'cp-onboarding' && <CpOnboardingAdmin />}
                 {activeTab === 'leads' && (

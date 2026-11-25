@@ -188,11 +188,7 @@ function UserApp({ handleLogout }) {
             <Route path="/quote" element={<Quote user={currentUser} />} />
             <Route path="/reports" element={<PolicyReports />} />
             <Route path="/my-hr" element={<MyHrSelf />} />
-<<<<<<< HEAD
           </Routes>}
-=======
-          </Routes>
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
         </div>
       </div>
     </div>

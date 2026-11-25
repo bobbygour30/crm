@@ -591,11 +591,7 @@ export const emptyWorkflow = () => ({
   workflowRemarks: "",
 });
 // shown at the bottom of the case form so you can tell which build a site is running
-<<<<<<< HEAD
 export const APP_BUILD = "Build 2026-11-25 (Assigned Access)";
-=======
-export const APP_BUILD = "Build 2026-11-24 (CP Onboarding)";
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
 export const PAYOUT_MODE_OPTIONS = ["One Time", "On Each Payment"];
 /** PayOut Mode choices: a One Time premium can only be paid out once */
 export const payoutModeOptions = (paymentTerm) => (isInstalment(paymentTerm) ? PAYOUT_MODE_OPTIONS : ["One Time"]);

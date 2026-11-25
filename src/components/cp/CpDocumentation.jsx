@@ -102,11 +102,7 @@ export default function CpDocumentation() {
     ["Name", `${b.salutation || ""} ${b.name}`], ["Father's / Husband's Name", b.fatherName], ["DOB", b.dob], ["Mobile", b.mobile], ["E-mail", b.email], ["Address", b.address], ["LOBs", (b.lobs || []).join(", ")],
     ["Ownership", get(d, "basic.ownership")], ["GST holding entity", get(d, "basic.gstHolder")], ["Aadhaar No.", get(d, "kyc.aadhaar")], ["PAN", get(d, "kyc.pan")], ...(gst ? [["GST No.", get(d, "kyc.gstNo")]] : []),
     ["Account Holder", get(d, "account.holderName")], ["Bank", get(d, "account.bankName")], ["Branch", get(d, "account.branch")], ["Account No.", get(d, "account.accountNo")], ["IFSC", get(d, "account.ifsc")],
-<<<<<<< HEAD
     ["Documents uploaded", ["signedWelcomeLetter", "aadhaarFront", "aadhaarBack", "panCard", "gstCertificate", "cheque", "photo", "signature"].filter((k) => get(d, `documents.${k}`)).length + shops.filter(Boolean).length],
-=======
-    ["Documents uploaded", ["aadhaarFront", "aadhaarBack", "panCard", "gstCertificate", "cheque", "photo", "signature"].filter((k) => get(d, `documents.${k}`)).length + shops.filter(Boolean).length],
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
   ];
 
   return (
@@ -165,14 +161,9 @@ export default function CpDocumentation() {
             <table className="w-full" data-table="cp-docs">
               <thead className="text-left text-xs text-gray-500 bg-gray-50"><tr><th className="p-2">Entity</th><th className="p-2">Upload Doc</th><th className="p-2">View Uploaded Doc</th></tr></thead>
               <tbody>
-<<<<<<< HEAD
                 <tr className="border-t"><td className="p-2 text-sm">Welcome Letter<div className="text-[11px] text-gray-500">Auto generated on the letter head — download, sign each page, upload below</div></td><td className="p-2 text-xs text-gray-500">Auto</td>
                   <td className="p-2 text-xs"><a href={`${API}/api/cp-onboarding/public/${token}/welcome-letter`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 flex items-center gap-1" data-welcome-letter><FaFilePdf /> View / Download</a></td></tr>
                 {FileRow("documents.signedWelcomeLetter", "Welcome Letter (signed on each page)")}
-=======
-                <tr className="border-t"><td className="p-2 text-sm">Welcome Letter<div className="text-[11px] text-gray-500">Auto generated on the letter head</div></td><td className="p-2 text-xs text-gray-500">Auto</td>
-                  <td className="p-2 text-xs"><a href={`${API}/api/cp-onboarding/public/${token}/welcome-letter`} target="_blank" rel="noopener noreferrer" className="text-indigo-600 flex items-center gap-1" data-welcome-letter><FaFilePdf /> View</a></td></tr>
->>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
                 {FileRow("documents.aadhaarFront", "Aadhaar Card Front", { required: !gst })}
                 {FileRow("documents.aadhaarBack", "Aadhaar Card Back", { required: !gst })}
                 {FileRow("documents.panCard", "PAN Card")}
