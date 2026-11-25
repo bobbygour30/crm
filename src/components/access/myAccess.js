@@ -1,4 +1,4 @@
-a// src/components/access/myAccess.js — the signed-in user's assigned modules (Assigned Access)
+// src/components/access/myAccess.js — the signed-in user's assigned modules (Assigned Access)
 // Until Admin customises a user, the server returns every module of their app, so nothing changes.
 import { useEffect, useState } from "react";
 
