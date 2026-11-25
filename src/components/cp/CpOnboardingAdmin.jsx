@@ -5,7 +5,10 @@ import { cpApi, openCpPdf } from "./cpApi";
 import { LOB_OPTIONS } from "../lob/caseWorkflow";
 import { Field, Btn, Card, Modal, Notice, Badge, inputCls, cx } from "../hr/ui";
 import Pagination, { usePagination } from "../lob/Pagination";
+<<<<<<< HEAD
 import LobMultiSelect from "./LobMultiSelect";
+=======
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
 
 const blank = () => ({ salutation: "Mr.", name: "", fatherName: "", address: "", dob: "", mobile: "", email: "", lobs: [] });
 const fmt = (v) => (v ? new Date(String(v).length === 10 ? `${v}T00:00:00` : v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
@@ -45,6 +48,10 @@ export default function CpOnboardingAdmin() {
   // ---------------- new CP: Basic Information ----------------
   if (form) {
     const set = (p) => setForm((f) => ({ ...f, ...p }));
+<<<<<<< HEAD
+=======
+    const toggleLob = (l) => set({ lobs: form.lobs.includes(l) ? form.lobs.filter((x) => x !== l) : [...form.lobs, l] });
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
     return (
       <div className="p-4"><Card title={<span className="flex items-center gap-2"><button type="button" aria-label="Back" onClick={() => setForm(null)} className="text-gray-500"><FaArrowLeft /></button>New Channel Partner — Basic Information</span>}>
         {msg && <div className="mb-3"><Notice kind={msg.kind}>{msg.text}</Notice></div>}
@@ -62,10 +69,20 @@ export default function CpOnboardingAdmin() {
           <Field label="e-Mail Id" required error={errors.email}><input data-field="email" type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} className={inputCls(errors.email)} /></Field>
           <Field label="Ref. No" hint="Generated on save (AIM_CP00016 onwards)"><input readOnly disabled value="Auto" className={inputCls(false, true)} /></Field>
           <Field label="LOB (Interested for)" required error={errors.lobs} className="sm:col-span-2 lg:col-span-3">
+<<<<<<< HEAD
             <div className="mt-1 max-w-xl" data-field="lobs">
               <LobMultiSelect label="LOB (Interested for)" options={LOB_OPTIONS} value={form.lobs} onChange={(lobs) => set({ lobs })} error={errors.lobs} />
             </div>
             {form.lobs.length > 0 && <div className="flex flex-wrap gap-1 mt-2">{form.lobs.map((l) => <span key={l} className="text-xs px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700">{l}</span>)}</div>}
+=======
+            <div className="flex flex-wrap gap-2 mt-1" data-field="lobs" role="group" aria-label="LOB (Interested for)">
+              {LOB_OPTIONS.map((l) => (
+                <label key={l} className={cx("px-3 py-1.5 rounded-full border text-sm cursor-pointer select-none", form.lobs.includes(l) ? "bg-indigo-600 border-indigo-600 text-white" : "bg-white border-gray-300 text-gray-700")}>
+                  <input type="checkbox" className="sr-only" checked={form.lobs.includes(l)} onChange={() => toggleLob(l)} /> {l}
+                </label>
+              ))}
+            </div>
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
             <p className="text-xs text-gray-500 mt-1">The Channel Partner's login will show only these LOBs.</p>
           </Field>
         </div>

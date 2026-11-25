@@ -2,7 +2,11 @@
 import { motion } from 'framer-motion';
 import { 
   FaHome, FaUsers, FaClipboardList, FaFileInvoice, 
+<<<<<<< HEAD
   FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar, FaIdBadge, FaHandshake, FaUserShield
+=======
+  FaMoneyCheckAlt, FaCarSide, FaUserCog, FaClock, FaSignOutAlt, FaFileUpload, FaEnvelopeOpenText, FaUserTie, FaChartBar, FaIdBadge, FaHandshake
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
 } from 'react-icons/fa';
 import { useMyAccess } from '../access/myAccess';
 import { useCallback } from 'react';
@@ -61,7 +65,10 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
     'hr-promotions': '/admin/my-hr/promotions',
     'hr-settings': '/admin/my-hr/settings',
     'cp-onboarding': '/admin/cp-onboarding',
+<<<<<<< HEAD
     'access': '/admin/assigned-access',
+=======
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
     'hr-holidays': '/admin/my-hr/holidays',
     'hr-assets': '/admin/my-hr/assets',
     'hr-confirmation': '/admin/my-hr/confirmation',
@@ -126,7 +133,11 @@ function Sidebar({ activeTab, setActiveTab, isAdmin, isSidebarOpen, setIsSidebar
         </div>
         <nav className="flex flex-col space-y-2 p-2 h-[calc(100%-100px)] justify-between overflow-y-auto overscroll-contain" data-sidebar-nav>
           <div>
+<<<<<<< HEAD
             {visibleTabs.map((tab) => {
+=======
+            {tabs.map((tab) => {
+>>>>>>> fcbdc78e2a8842fc4a65a6f5728bfc913f1b6b4e
               const inGroup = !!tab.children && (activeTab === tab.key || activeTab.startsWith(`${tab.key}-`));
               return (
                 <div key={tab.key} className="flex flex-col">
