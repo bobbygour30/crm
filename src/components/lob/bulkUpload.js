@@ -41,6 +41,10 @@ const ONE_TIME = ["Motor", "Mobile", "Travel", "PA"]; // no EMI
 // p prefixes: health. motor. mobile. pa. travel. wf. cb. quote.(accepted quote) proposer.(Health proposer)
 // ============================================================
 const ALL = undefined;
+// Worked out on upload, the same way as in the case form — never typed in the sheet.
+// Older filled sheets that still have these columns are accepted; the values are recalculated.
+export const AUTO_CALCULATED = ["Policy Expiry Date", "Journey End Date", "GST Value", "Gross Premium", "Final GST Value", "Final Gross Premium",
+  "EMI Gross Premium", "EMI Total Count", "Next Due Date", "PayOut Count", "PayOut Amount", "Pending Amount", "Total PayOut", "Arshyan Profit", "Certificate No"];
 const insurerList = (lob) => (lob === "Mobile" ? MOBILE_INSURERS : INSURER_OPTIONS);
 const COLUMNS = {
   Lead: [
@@ -113,7 +117,6 @@ const COLUMNS = {
     { h: "Travel to", p: "travel.region", t: "list", o: TRAVEL_REGIONS, r: true, lobs: ["Travel"] },
     { h: "Journey Start Date", p: "travel.journeyStartDate", t: "date", r: true, lobs: ["Travel"] },
     { h: "No. of Days", p: "travel.travelDays", t: "num", r: true, lobs: ["Travel"] },
-    { h: "Journey End Date", p: "travel.journeyEndDate", t: "date", lobs: ["Travel"], note: "Blank = worked out from the days" },
     { h: "GST State", p: "travel.gstState", t: "list", o: GST_STATES, r: true, lobs: ["Travel"] },
     { h: "Proposer Name", p: "travel.proposerName", t: "text", lobs: ["Travel"] },
     { h: "Proposer DOB", p: "travel.proposerDOB", t: "date", r: true, lobs: ["Travel"] },
@@ -211,7 +214,6 @@ const COLUMNS = {
     { h: "Policy Number", p: "wf.policyNumber", t: "text" },
     { h: "Policy Issued On", p: "wf.policyIssuedOn", t: "date" },
     { h: "Policy Start Date", p: "wf.policyStartDate", t: "date" },
-    { h: "Policy Expiry Date", p: "wf.policyExpiryDate", t: "date", note: "Blank = start + tenure − 1 day" },
   ],
   EmiDues: [
     { h: "EMI Received Count", p: "wf.emiReceivedCount", t: "num", lobs: ["Health", "Other"] },
@@ -284,6 +286,8 @@ export const buildTemplate = (lob, section) => {
   const help = [
     [`Bulk upload template — LOB: ${lob}${LOB_VALUE[lob] ? ` (${LOB_VALUE[lob]})` : ""} — Section: ${BULK_SECTIONS.find((s) => s.key === section).label}`],
     ["Fill one row per lead on the 'Leads' sheet. Keep the header row as it is. Documents are links (OneDrive / Google Drive)."],
+    ["Worked out automatically (no columns needed): Policy Expiry Date, Journey End Date, GST value, Gross premium, EMI count and due dates, PayOut count and amount, pending amount, Arshyan profit."],
+    ["Amounts can be typed as you like: 500000, 5,00,000, 5L, 5 Lakh, 1 Cr. Lists ignore capitals and spaces (e.g. 'half-yearly', 'annual', '1' for 1 Year)."],
     [],
     ["Column", "Section", "Required", "Format", "Allowed values / notes"],
     ...cols.map((c) => [c.h, c.section, c.r ? "Yes" : "", TYPE_HELP[c.t] || c.t, [c.o ? c.o.join(", ") : "", c.note || ""].filter(Boolean).join(" — ")]),
@@ -314,8 +318,64 @@ export const toISODate = (v) => {
   if (m && +m[2] >= 1 && +m[2] <= 12 && +m[1] >= 1 && +m[1] <= 31) return `${m[3]}-${pad(m[2])}-${pad(m[1])}`;
   return null; // not a date
 };
-const canonical = (options, v) => options.find((o) => String(o).toLowerCase() === String(v).trim().toLowerCase());
+const norm = (v) => String(v ?? "").toLowerCase().replace(/[^a-z0-9.]/g, "");
+// common ways people write list values
+const SYNONYMS = {
+  annual: "Yearly", annually: "Yearly", yearly: "Yearly", year: "Yearly", "12months": "Yearly",
+  halfyearly: "Half Yearly", halfyear: "Half Yearly", semiannual: "Half Yearly", semiannually: "Half Yearly", "6months": "Half Yearly",
+  quarterly: "Quarterly", quarter: "Quarterly", "3months": "Quarterly", monthly: "Monthly", month: "Monthly",
+  onetime: "One Time", single: "One Time", singlepremium: "One Time", lumpsum: "One Time",
+  m: "Male", male: "Male", f: "Female", female: "Female", y: "Yes", n: "No",
+};
+const canonical = (options, v) => {
+  const exact = options.find((o) => String(o).toLowerCase() === String(v).trim().toLowerCase());
+  if (exact) return exact;
+  const k = norm(v);
+  return options.find((o) => norm(o) === k) || (SYNONYMS[k] && options.find((o) => o === SYNONYMS[k]));
+};
+// ---- amounts: 500000 / 5,00,000 / ₹5,00,000 / 5L / 5 Lakh / 7.5 lakhs / 1 Cr / 1 Crore ----
+const AMOUNT_LIST = (options) => options.length > 0 && options.every((o) => /^\d+(\.\d+)?\s*(Lakh|Crore)$/i.test(String(o)));
+export const toRupees = (raw) => {
+  if (typeof raw === "number") return isFinite(raw) && raw > 0 ? (raw < 1000 ? raw * 1e5 : raw) : null; // 5 -> 5 Lakh
+  const m = String(raw).trim().match(/^₹?\s*(\d[\d,]*(?:\.\d+)?)\s*(l|lac|lacs|lakh|lakhs|cr|crore|crores)?\.?$/i);
+  if (!m) return null;
+  const n = Number(m[1].replace(/,/g, ""));
+  if (!isFinite(n) || n <= 0) return null;
+  const unit = (m[2] || "").toLowerCase();
+  if (unit.startsWith("c")) return Math.round(n * 1e7);
+  if (unit) return Math.round(n * 1e5);
+  return n < 1000 ? Math.round(n * 1e5) : n; // a bare "5" means 5 Lakh (no SI is under ₹1,000)
+};
+export const amountLabel = (rupees) => (rupees >= 1e7 ? `${+(rupees / 1e7).toFixed(2)} Crore` : `${+(rupees / 1e5).toFixed(2)} Lakh`);
+// tenure lists ("1 Year", "2 Years") match on the number: "1", "1 yr", "1 years"
+const TENURE_LIST = (options) => options.length > 0 && options.every((o) => /^\d+\s*Years?$/i.test(String(o)));
+const matchList = (options, raw) => {
+  const hit = canonical(options, raw);
+  if (hit) return [hit, false];
+  if (AMOUNT_LIST(options)) {
+    const r = toRupees(raw);
+    if (r) return [options.find((o) => toRupees(o) === r) || amountLabel(r), true]; // real amounts outside the list are kept (older policies)
+  }
+  if (TENURE_LIST(options)) {
+    const m = String(raw).trim().match(/^(\d+)\s*(y|yr|yrs|year|years)?$/i);
+    if (m) { const o = options.find((x) => parseInt(x, 10) === Number(m[1])); if (o) return [o, false]; }
+  }
+  return [undefined, false];
+};
+const allowedHint = (options) => (options.length ? ` (allowed: ${options.slice(0, 8).join(", ")}${options.length > 8 ? ", …" : ""})` : "");
 const isUrl = (s) => /^https?:\/\/\S+$/i.test(String(s).trim());
+
+const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PLACEHOLDER = /^(0+|-+|\.+|na|n\/a|nil|none|null|not available)$/i;
+/** first 10-digit mobile in the cell: handles +91 / 0 prefixes, spaces, dashes and "98765 43210 / 91234 56789" */
+const pickMobile = (s) => {
+  for (const part of String(s).split(/[,;/|]+/)) {
+    const d = part.replace(/\D/g, "").replace(/^(?:91|0)(?=\d{10}$)/, "");
+    if (/^[6-9]\d{9}$/.test(d)) return d;
+  }
+  const all = String(s).replace(/\D/g, "").replace(/^(?:91|0)(?=\d{10}$)/, "");
+  return /^\d{10}$/.test(all) ? all : null;
+};
 
 /** One cell -> [value, error] */
 const readCell = (c, raw) => {
@@ -330,19 +390,23 @@ const readCell = (c, raw) => {
       return [n, null];
     }
     case "date": { const d = toISODate(raw); return d ? [d, null] : [undefined, `${c.h}: "${s}" is not a date (use DD-MM-YYYY)`]; }
-    case "mobile": { const d = s.replace(/\D/g, "").replace(/^91(?=\d{10}$)/, ""); return /^\d{10}$/.test(d) ? [d, null] : [undefined, `${c.h}: must be 10 digits`]; }
-    case "email": return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s) ? [s.toLowerCase(), null] : [undefined, `${c.h}: "${s}" is not a valid e-mail`];
+    case "mobile": { const d = pickMobile(s); return d ? [d, null] : [undefined, `${c.h}: "${s}" must be a 10-digit mobile number`]; }
+    case "email": {
+      if (PLACEHOLDER.test(s)) return [undefined, c.r ? `${c.h} is required` : null]; // "0", "-", "NA", "nil" = no e-mail
+      const first = s.split(/[\s,;/|]+/).find((x) => EMAIL_RX.test(x)); // "a@x.com / b@y.com" -> the first valid one
+      return first ? [first.toLowerCase(), null] : [undefined, `${c.h}: "${s}" is not a valid e-mail`];
+    }
     case "pin": return /^\d{6}$/.test(s) ? [s, null] : [undefined, `${c.h}: must be 6 digits`];
     case "aadhaar": { const d = s.replace(/\s/g, ""); return /^\d{12}$/.test(d) ? [d, null] : [undefined, `${c.h}: must be 12 digits`]; }
     case "pan": return /^[A-Z]{5}\d{4}[A-Z]$/.test(s.toUpperCase()) ? [s.toUpperCase(), null] : [undefined, `${c.h}: format ABCDE1234F`];
     case "passport": return /^[A-PR-WY][1-9]\d{5}[1-9]$/.test(s.toUpperCase()) ? [s.toUpperCase(), null] : [undefined, `${c.h}: not a valid passport number`];
     case "regno": return [s.toUpperCase().replace(/[^A-Z0-9]/g, ""), null];
     case "yesno": { const v = canonical(["Yes", "No"], s); return v ? [v, null] : [undefined, `${c.h}: use Yes or No`]; }
-    case "list": { const v = canonical(c.o || [], s); return v ? [v, null] : [undefined, `${c.h}: "${s}" is not an allowed value`]; }
+    case "list": { const [v] = matchList(c.o || [], raw); return v ? [v, null] : [undefined, `${c.h}: "${s}" is not an allowed value${allowedHint(c.o || [])}`]; }
     case "multi": {
-      const parts = s.split(",").map((x) => x.trim()).filter(Boolean);
+      const parts = s.split(/[,;]/).map((x) => x.trim()).filter(Boolean);
       const bad = parts.filter((p) => !canonical(c.o || [], p));
-      return bad.length ? [undefined, `${c.h}: not allowed — ${bad.join(", ")}`] : [parts.map((p) => canonical(c.o, p)), null];
+      return bad.length ? [undefined, `${c.h}: not allowed — ${bad.join(", ")}`] : [[...new Set(parts.map((p) => canonical(c.o, p)))], null];
     }
     case "url": return isUrl(s) ? [s, null] : [undefined, `${c.h}: must be a link starting with https://`];
     case "urls": {
@@ -401,14 +465,14 @@ const buildLead = (lob, section, values) => {
   }
   if (lob === "Travel" && lead.travelDetails) {
     const t = lead.travelDetails;
-    if (t.journeyStartDate && t.travelDays && !t.journeyEndDate) t.journeyEndDate = addDays(t.journeyStartDate, Number(t.travelDays) - 1);
+    if (t.journeyStartDate && Number(t.travelDays) > 0) t.journeyEndDate = addDays(t.journeyStartDate, Number(t.travelDays) - 1); // always calculated
   }
   if (lob === "Mobile" && lead.electronicDetails) {
     const e = lead.electronicDetails;
     e.makeModel = [e.deviceBrand, e.deviceModel, e.ram, e.storage].filter(Boolean).join("_");
   }
-  // expiry from tenure (Travel: from the journey days)
-  if (wf.policyStartDate && !wf.policyExpiryDate) {
+  // expiry from tenure (Travel: from the journey days) — always calculated
+  if (wf.policyStartDate) {
     const days = Number((lead.travelDetails || {}).travelDays);
     if (lob === "Travel" && days > 0) wf.policyExpiryDate = addDays(wf.policyStartDate, days - 1);
     else {
@@ -440,7 +504,7 @@ export const parseUpload = async (file, lob, section) => {
   const headers = (grid[0] || []).map((h) => String(h).trim());
   const cols = columnsFor(lob, section);
   const missingHeaders = cols.filter((c) => c.r && !headers.includes(c.h)).map((c) => c.h);
-  const unknownHeaders = headers.filter((h) => h && !cols.some((c) => c.h === h));
+  const unknownHeaders = headers.filter((h) => h && !cols.some((c) => c.h === h) && !AUTO_CALCULATED.includes(h)); // calculated columns from older sheets are recalculated, not flagged
   const rows = [];
   grid.slice(1).forEach((cells, i) => {
     if (!cells.some((v) => String(v).trim() !== "")) return; // empty row
