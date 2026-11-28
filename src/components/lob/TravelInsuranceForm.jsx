@@ -1,224 +1,332 @@
+// src/components/lob/TravelInsuranceForm.jsx
+// ============================================================
+// TRAVEL INSURANCE (Travel BRD) — staged like Health / Motor / Mobile:
+//   Quote module           -> <TravelQuoteSection>     (Admin + Employee)
+//   Policy Issuance module -> <TravelIssuanceSection>  (Admin + Employee)
+// The proposer travels; extra travellers go in `companions`.
+// Leads saved with the older single-page Travel form are converted on load.
+// ============================================================
+import { useEffect } from "react";
 import { FaPlane, FaPlus, FaTrash } from "react-icons/fa";
 import {
-  GENDERS, NOMINEE_RELATIONS, Field, FileInput, Select, inputCls, rupeeOptions,
-  validateAadhaar, validatePAN, validatePIN, validatePassport, validateMobile, validateEmail,
-  addDaysStr, todayStr, fmtDate, stripFiles, hasFile,
+  YES_NO, Field, FileInput, Select, inputCls,
+  validateAadhaar, validatePassport, addDaysStr, todayStr, fmtDate, stripFiles, hasFile,
 } from "./LobShared";
 
-const REGIONS = ["World Wide Including USA and Canada", "World Wide Excluding USA and Canada"];
-const SUM_INSURED = [50000, 100000, 200000, 500000, 750000, 1000000].map((n) => ({
-  label: `$ ${n.toLocaleString("en-US")}`,
-  value: String(n),
-}));
-const PRODUCTS = [
-  "Travel Ace Standard", "Travel Prime Individual Silver", "Travel Elite Silver",
-  "Travel Assist Classic", "Travel Companion Care",
+// ---- option lists (Travel BRD) ----
+export const TRAVEL_REGIONS = [
+  "Worldwide Including USA and Canada",
+  "Worldwide Excluding USA and Canada",
+  "Asia Excluding Japan",
+  "Schengen",
+  "Within India - Domestic",
 ];
-const RELATIONS = ["Self", "Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Other"];
+export const TRAVEL_SUM_INSURED = [
+  ...[50000, 100000, 200000, 500000, 750000, 1000000].map((n) => ({ label: `$${n.toLocaleString("en-US")}`, value: String(n) })),
+  { label: "Modular", value: "Modular" },
+];
+export const TRAVEL_PLANS = ["Travel Ace Standard", "Travel Prime Individual Silver", "Travel Companion Care", "Travel Elite Silver", "Travel Assist Classic"];
+export const TRAVEL_MARITAL = ["Married", "Unmarried", "Live-in Relationship", "Widow", "Divorcee"];
+const COMPANION_RELATIONS = ["Spouse", "Son", "Daughter", "Father", "Mother", "Sibling", "Friend", "Other"];
+export const GST_STATES = [
+  "Andhra Pradesh", "Arunachal Pradesh", "Assam", "Bihar", "Chhattisgarh", "Goa", "Gujarat", "Haryana", "Himachal Pradesh",
+  "Jharkhand", "Karnataka", "Kerala", "Madhya Pradesh", "Maharashtra", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha",
+  "Punjab", "Rajasthan", "Sikkim", "Tamil Nadu", "Telangana", "Tripura", "Uttar Pradesh", "Uttarakhand", "West Bengal",
+  "Andaman and Nicobar Islands", "Chandigarh", "Dadra and Nagar Haveli and Daman and Diu", "Delhi", "Jammu and Kashmir",
+  "Ladakh", "Lakshadweep", "Puducherry",
+];
 
-const emptyTraveler = () => ({
-  relationship: "", fullName: "", dob: "", sumInsured: "", product: "", addon: "",
-  panNumber: "", panFile: null, aadhaarNumber: "", aadhaarFile: null,
-  passportNumber: "", passportFile: null,
-  pinCode: "", address: "", mobile: "", email: "", gender: "",
-  nomineeName: "", nomineeRelation: "", nomineeDOB: "",
-});
+const sumInsuredLabel = (v) => (TRAVEL_SUM_INSURED.find((o) => o.value === String(v)) || {}).label || v || "";
+
+// days between two yyyy-mm-dd dates, inclusive (start == end -> 1 day)
+const daysInclusive = (start, end) => {
+  if (!start || !end) return "";
+  const n = Math.round((new Date(end + "T00:00:00Z") - new Date(start + "T00:00:00Z")) / 86400000) + 1;
+  return n > 0 ? String(n) : "";
+};
+
+// ============================================================
+// STATE
+// ============================================================
+const emptyCompanion = () => ({ fullName: "", dob: "", relationship: "", passportNumber: "", passportFront: null, passportBack: null });
 
 export const emptyTravel = () => ({
-  region: "", journeyStartDate: "", travelDays: "", journeyEndDate: "",
-  travelers: [emptyTraveler()],
+  // Quote
+  region: "", journeyStartDate: "", journeyEndDate: "", travelDays: "", gstState: "",
+  proposerName: "", proposerDOB: "", sumInsured: "", plan: "", additionalCovers: "", addonRemarks: "",
+  addressAsPerPassport: "", passportNumber: "", passportFront: null, passportBack: null,
+  hasPED: "", pedDetails: "", indianCitizen: "", aadhaarNumber: "", aadhaarFile: null,
+  companions: [],
+  // Policy Issuance
+  maritalStatus: "", issuanceRemarks: "",
 });
 
-export const hydrateTravel = (s) => {
-  if (!s) return emptyTravel();
+/** Load a saved lead; older single-page Travel leads (travelers[]) are mapped onto the staged fields */
+export const hydrateTravel = (s, leadName = "") => {
+  if (!s) return { ...emptyTravel(), proposerName: leadName };
+  const base = { ...emptyTravel(), ...s };
+  const legacy = !s.proposerName && s.travelers?.length;
+  if (legacy) {
+    const [p, ...rest] = s.travelers;
+    Object.assign(base, {
+      proposerName: p.fullName || leadName, proposerDOB: p.dob, sumInsured: p.sumInsured ? String(p.sumInsured) : "",
+      plan: p.product || "", additionalCovers: p.addon ? "Required" : "", addonRemarks: p.addon || "",
+      addressAsPerPassport: p.address || "", passportNumber: p.passportNumber || "", passportFront: p.passportFile || null,
+      aadhaarNumber: p.aadhaarNumber || "", aadhaarFile: p.aadhaarFile || null,
+      companions: rest.map((t) => ({ ...emptyCompanion(), fullName: t.fullName || "", dob: t.dob, relationship: t.relationship || "", passportNumber: t.passportNumber || "", passportFront: t.passportFile || null })),
+    });
+  }
   return {
-    ...emptyTravel(), ...s,
-    journeyStartDate: fmtDate(s.journeyStartDate),
-    journeyEndDate: fmtDate(s.journeyEndDate),
-    travelers: (s.travelers?.length ? s.travelers : [{}]).map((t) => ({
-      ...emptyTraveler(), ...t, dob: fmtDate(t.dob), nomineeDOB: fmtDate(t.nomineeDOB),
-    })),
+    ...base,
+    proposerName: base.proposerName || leadName,
+    region: base.region === "World Wide Including USA and Canada" ? TRAVEL_REGIONS[0] : base.region === "World Wide Excluding USA and Canada" ? TRAVEL_REGIONS[1] : base.region || "",
+    travelDays: base.travelDays ? String(base.travelDays) : "",
+    sumInsured: base.sumInsured ? String(base.sumInsured) : "",
+    journeyStartDate: fmtDate(base.journeyStartDate),
+    journeyEndDate: fmtDate(base.journeyEndDate),
+    proposerDOB: fmtDate(base.proposerDOB),
+    companions: (base.companions || []).map((c) => ({ ...emptyCompanion(), ...c, dob: fmtDate(c.dob) })),
   };
 };
 
+/** Adds travelDetails JSON + files to the FormData */
 export const appendTravel = (fd, d) => {
   fd.append("travelDetails", stripFiles(d));
-  d.travelers.forEach((t, i) => {
-    if (t.panFile instanceof File) fd.append(`travelPan_${i}`, t.panFile);
-    if (t.aadhaarFile instanceof File) fd.append(`travelAadhaar_${i}`, t.aadhaarFile);
-    if (t.passportFile instanceof File) fd.append(`travelPassport_${i}`, t.passportFile);
+  if (d.passportFront instanceof File) fd.append("travelPassportFront", d.passportFront);
+  if (d.passportBack instanceof File) fd.append("travelPassportBack", d.passportBack);
+  if (d.aadhaarFile instanceof File) fd.append("travelAadhaarFile", d.aadhaarFile);
+  (d.companions || []).forEach((c, i) => {
+    if (c.passportFront instanceof File) fd.append(`travelCompanionPassportFront_${i}`, c.passportFront);
+    if (c.passportBack instanceof File) fd.append(`travelCompanionPassportBack_${i}`, c.passportBack);
   });
 };
 
+// ============================================================
+// VALIDATION
+// ============================================================
+/** Quote module */
 export const validateTravel = (d) => {
   const out = [];
   const add = (field, message) => out.push({ field, message });
-  if (!d.region) add("tr_region", "Travel: Select the travel region");
-  if (!d.journeyStartDate) add("tr_journeyStartDate", "Travel: Journey start date is required");
-  if (!d.travelDays || Number(d.travelDays) < 1) add("tr_travelDays", "Travel: No. of travel days is required");
-
-  d.travelers.forEach((t, i) => {
-    const p = `tr_t${i}_`;
-    const w = `Traveler ${i + 1}: `;
-    if (!t.relationship) add(p + "relationship", w + "Relationship is required");
-    if (!t.fullName?.trim()) add(p + "fullName", w + "Name as per passport is required");
-    if (!t.dob) add(p + "dob", w + "DOB is required");
-    else if (t.dob > todayStr()) add(p + "dob", w + "DOB cannot be in the future");
-    if (!t.sumInsured) add(p + "sumInsured", w + "Sum Insured is required");
-    if (!t.product) add(p + "product", w + "Product is required");
-    if (t.panNumber && !validatePAN(t.panNumber)) add(p + "panNumber", w + "PAN format: ABCDE1234F");
-    if (t.aadhaarNumber && !validateAadhaar(t.aadhaarNumber)) add(p + "aadhaarNumber", w + "Aadhaar must be exactly 12 digits");
-    if (!validatePassport(t.passportNumber)) add(p + "passportNumber", w + "Enter a valid passport number (e.g. A1234567)");
-    if (!hasFile(t.passportFile)) add(p + "passportFile", w + "Passport upload is required");
-    if (!validatePIN(t.pinCode)) add(p + "pinCode", w + "Enter a valid 6-digit PIN code");
-    if (!t.address?.trim()) add(p + "address", w + "Address as per passport is required");
-    if (!validateMobile(t.mobile)) add(p + "mobile", w + "Enter a valid 10-digit mobile number");
-    if (!validateEmail(t.email)) add(p + "email", w + "Enter a valid email");
-    if (!t.gender) add(p + "gender", w + "Gender is required");
-    if (!t.nomineeName?.trim()) add(p + "nomineeName", w + "Nominee name is required");
-    if (!t.nomineeRelation) add(p + "nomineeRelation", w + "Nominee relation is required");
-    if (!t.nomineeDOB) add(p + "nomineeDOB", w + "Nominee DOB is required");
-    else if (t.nomineeDOB > todayStr()) add(p + "nomineeDOB", w + "Nominee DOB cannot be in the future");
+  const today = todayStr();
+  if (!d.region) add("tr_region", "Travel: 'Travel to' is required");
+  if (!d.journeyStartDate) add("tr_journeyStartDate", "Travel: Journey Start Date is required");
+  else if (d.journeyStartDate < today) add("tr_journeyStartDate", "Travel: Journey Start Date must be today or a future date");
+  if (!(Number(d.travelDays) >= 1)) add("tr_travelDays", "Travel: No. of Days is required");
+  if (!d.journeyEndDate) add("tr_journeyEndDate", "Travel: Journey End Date is required");
+  else if (d.journeyStartDate && d.journeyEndDate < d.journeyStartDate) add("tr_journeyEndDate", "Travel: Journey End Date cannot be before the start date");
+  if (!d.gstState) add("tr_gstState", "Travel: Select the GST State");
+  if (!String(d.proposerName || "").trim()) add("tr_proposerName", "Travel: Proposer Name is required");
+  if (!d.proposerDOB) add("tr_proposerDOB", "Travel: Proposer DOB is required");
+  else if (d.proposerDOB > today) add("tr_proposerDOB", "Travel: DOB cannot be in the future");
+  if (!d.sumInsured) add("tr_sumInsured", "Travel: Sum Insured is required");
+  if (!d.plan) add("tr_plan", "Travel: Select the Plan / Product");
+  if (!d.additionalCovers) add("tr_additionalCovers", "Travel: Choose Additional Covers (Required / Not Required)");
+  if (d.additionalCovers === "Required" && !String(d.addonRemarks || "").trim()) add("tr_addonRemarks", "Travel: Describe the additional covers required");
+  if (!String(d.addressAsPerPassport || "").trim()) add("tr_addressAsPerPassport", "Travel: Address as per Passport is required");
+  if (!d.passportNumber) add("tr_passportNumber", "Travel: Passport No is required");
+  else if (!validatePassport(String(d.passportNumber).toUpperCase())) add("tr_passportNumber", "Travel: Enter a valid passport number (e.g. A1234567)");
+  if (!hasFile(d.passportFront)) add("tr_passportFront", "Travel: Upload Passport Front (mandatory)");
+  if (!hasFile(d.passportBack)) add("tr_passportBack", "Travel: Upload Passport Back (mandatory)");
+  if (!d.hasPED) add("tr_hasPED", "Travel: Any pre-existing disease? (Yes / No)");
+  if (d.hasPED === "Yes" && !String(d.pedDetails || "").trim()) add("tr_pedDetails", "Travel: Enter the pre-existing disease details");
+  if (!d.indianCitizen) add("tr_indianCitizen", "Travel: Indian Citizen? (Yes / No)");
+  if (d.aadhaarNumber && !validateAadhaar(d.aadhaarNumber)) add("tr_aadhaarNumber", "Travel: Aadhaar must be exactly 12 digits");
+  (d.companions || []).forEach((c, i) => {
+    const w = `Traveller ${i + 2}: `;
+    const k = (f) => `tr_c${i}_${f}`;
+    if (!String(c.fullName || "").trim()) add(k("fullName"), w + "Name is required");
+    if (!c.dob) add(k("dob"), w + "DOB is required");
+    if (!c.relationship) add(k("relationship"), w + "Relationship is required");
+    if (!c.passportNumber) add(k("passportNumber"), w + "Passport No is required");
+    else if (!validatePassport(String(c.passportNumber).toUpperCase())) add(k("passportNumber"), w + "Enter a valid passport number");
+    if (!hasFile(c.passportFront)) add(k("passportFront"), w + "Upload Passport Front (mandatory)");
+    if (!hasFile(c.passportBack)) add(k("passportBack"), w + "Upload Passport Back (mandatory)");
   });
   return out;
 };
 
-// `lead` = the main lead form data (name, mobileNo, email, gender, pinCode) for the "Self" auto-fill
-export default function TravelInsuranceForm({ details, setDetails, errors = {}, lead = {} }) {
+/** Policy Issuance module */
+export const validateTravelIssuance = (d) => {
+  const out = [];
+  const add = (field, message) => out.push({ field, message });
+  if (!d.maritalStatus) add("tr_maritalStatus", "Travel: Marital Status is required");
+  if (!hasFile(d.passportFront) || !hasFile(d.passportBack)) add("tr_passportFront", "Travel: Upload the Passport (front and back)");
+  if (d.aadhaarNumber && !validateAadhaar(d.aadhaarNumber)) add("tr_aadhaarNumber", "Travel: Aadhaar must be exactly 12 digits");
+  return out;
+};
+
+// ============================================================
+// QUOTE MODULE
+// ============================================================
+export function TravelQuoteSection({ details: d, setDetails, errors: err = {} }) {
   const set = (patch) => setDetails((p) => ({ ...p, ...patch }));
-  const setJourney = (patch) =>
-    setDetails((p) => {
-      const n = { ...p, ...patch };
-      const days = parseInt(n.travelDays, 10);
-      n.journeyEndDate = n.journeyStartDate && days > 0 ? addDaysStr(n.journeyStartDate, days - 1) : "";
-      return n;
-    });
-  const setTraveler = (i, patch) =>
-    setDetails((p) => ({ ...p, travelers: p.travelers.map((t, idx) => (idx === i ? { ...t, ...patch } : t)) }));
-
-  const onRelation = (i, v) => {
-    if (v === "Self") {
-      setTraveler(i, {
-        relationship: v,
-        fullName: lead.name || "",
-        mobile: lead.mobileNo || "",
-        email: lead.email || "",
-        gender: lead.gender || "",
-        pinCode: lead.pinCode || "",
-      });
-    } else setTraveler(i, { relationship: v });
-  };
-
-  const f = (name) => ({ "data-field": name, className: inputCls(errors[name]) });
-
+  const setCompanion = (i, patch) => setDetails((p) => ({ ...p, companions: p.companions.map((c, k) => (k === i ? { ...c, ...patch } : c)) }));
+  // start / days / end stay in step: changing days or start recalculates the end, changing the end recalculates days
+  const setStart = (v) => setDetails((p) => {
+    const days = parseInt(p.travelDays, 10);
+    if (v && days > 0) return { ...p, journeyStartDate: v, journeyEndDate: addDaysStr(v, days - 1) };
+    return { ...p, journeyStartDate: v, travelDays: daysInclusive(v, p.journeyEndDate) || p.travelDays };
+  });
+  const setDays = (v) => setDetails((p) => {
+    const days = parseInt(v, 10);
+    return { ...p, travelDays: v, journeyEndDate: p.journeyStartDate && days > 0 ? addDaysStr(p.journeyStartDate, days - 1) : "" };
+  });
+  const setEnd = (v) => setDetails((p) => ({ ...p, journeyEndDate: v, travelDays: daysInclusive(p.journeyStartDate, v) }));
+  const today = todayStr();
   return (
-    <div className="border-t-2 border-indigo-200 pt-4 mt-4">
-      <h3 className="text-lg font-semibold text-indigo-700 mb-4 flex items-center gap-2">
-        <FaPlane /> Travel Insurance Details
-      </h3>
-
+    <div className="mb-6">
+      <h4 className="text-md font-semibold text-indigo-600 mb-3 flex items-center gap-2"><FaPlane /> Travel Insurance — Quote Details</h4>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <Field label="Travel Region" required error={errors.tr_region} className="lg:col-span-3">
-          <Select {...f("tr_region")} value={details.region} options={REGIONS} onChange={(e) => set({ region: e.target.value })} />
+        <Field label="Travel to" required error={err.tr_region}>
+          <Select data-field="tr_region" options={TRAVEL_REGIONS} value={d.region} onChange={(e) => set({ region: e.target.value })} className={inputCls(err.tr_region)} />
         </Field>
-        <Field label="Journey Start Date (as per ticket)" required error={errors.tr_journeyStartDate}>
-          <input {...f("tr_journeyStartDate")} type="date" value={details.journeyStartDate}
-            onChange={(e) => setJourney({ journeyStartDate: e.target.value })} />
+        <Field label="Journey Start Date" required error={err.tr_journeyStartDate} hint="Today or a future date">
+          <input data-field="tr_journeyStartDate" type="date" min={today} value={d.journeyStartDate} onChange={(e) => setStart(e.target.value)} className={inputCls(err.tr_journeyStartDate)} />
         </Field>
-        <Field label="No. of Travel Days" required error={errors.tr_travelDays}>
-          <input {...f("tr_travelDays")} type="number" min="1" value={details.travelDays}
-            onChange={(e) => setJourney({ travelDays: e.target.value })} />
+        <Field label="No. of Days" required error={err.tr_travelDays} hint="Type the days, or pick the end date">
+          <input data-field="tr_travelDays" type="text" inputMode="numeric" value={d.travelDays} onChange={(e) => setDays(e.target.value.replace(/\D/g, "").slice(0, 3))} className={inputCls(err.tr_travelDays)} />
         </Field>
-        <Field label="Journey End Date (auto)">
-          <input type="date" readOnly value={details.journeyEndDate} className="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-100" />
+        <Field label="Journey End Date" required error={err.tr_journeyEndDate}>
+          <input data-field="tr_journeyEndDate" type="date" min={d.journeyStartDate || today} value={d.journeyEndDate} onChange={(e) => setEnd(e.target.value)} className={inputCls(err.tr_journeyEndDate)} />
         </Field>
+        <Field label="GST State" required error={err.tr_gstState}>
+          <Select data-field="tr_gstState" options={GST_STATES} value={d.gstState} onChange={(e) => set({ gstState: e.target.value })} className={inputCls(err.tr_gstState)} />
+        </Field>
+        <div />
+        <Field label="Proposer Name" required error={err.tr_proposerName} hint="Taken from the lead — you can change it">
+          <input data-field="tr_proposerName" type="text" value={d.proposerName} onChange={(e) => set({ proposerName: e.target.value.toUpperCase() })} className={`${inputCls(err.tr_proposerName)} uppercase`} />
+        </Field>
+        <Field label="Proposer DOB" required error={err.tr_proposerDOB}>
+          <input data-field="tr_proposerDOB" type="date" max={today} value={d.proposerDOB} onChange={(e) => set({ proposerDOB: e.target.value })} className={inputCls(err.tr_proposerDOB)} />
+        </Field>
+        <Field label="Relationship"><input type="text" readOnly value="Self" className={`${inputCls()} bg-gray-100`} /></Field>
+        <Field label="Sum Insured" required error={err.tr_sumInsured}>
+          <Select data-field="tr_sumInsured" options={TRAVEL_SUM_INSURED} value={d.sumInsured} onChange={(e) => set({ sumInsured: e.target.value })} className={inputCls(err.tr_sumInsured)} />
+        </Field>
+        <Field label="Plan / Product" required error={err.tr_plan}>
+          <Select data-field="tr_plan" options={TRAVEL_PLANS} value={d.plan} onChange={(e) => set({ plan: e.target.value })} className={inputCls(err.tr_plan)} />
+        </Field>
+        <Field label="Additional Covers" required error={err.tr_additionalCovers}>
+          <Select data-field="tr_additionalCovers" options={["Not Required", "Required"]} value={d.additionalCovers} onChange={(e) => set({ additionalCovers: e.target.value, addonRemarks: e.target.value === "Required" ? d.addonRemarks : "" })} className={inputCls(err.tr_additionalCovers)} />
+        </Field>
+        {d.additionalCovers === "Required" && (
+          <Field label="Additional Covers Required (Remarks)" required error={err.tr_addonRemarks} className="sm:col-span-2 lg:col-span-3">
+            <textarea data-field="tr_addonRemarks" rows="2" value={d.addonRemarks} onChange={(e) => set({ addonRemarks: e.target.value })} className={inputCls(err.tr_addonRemarks)} />
+          </Field>
+        )}
+        <Field label="Address as per Passport (or Other)" required error={err.tr_addressAsPerPassport} className="sm:col-span-2 lg:col-span-3">
+          <textarea data-field="tr_addressAsPerPassport" rows="2" value={d.addressAsPerPassport} onChange={(e) => set({ addressAsPerPassport: e.target.value })} className={inputCls(err.tr_addressAsPerPassport)} />
+        </Field>
+        <Field label="Passport No" required error={err.tr_passportNumber}>
+          <input data-field="tr_passportNumber" type="text" maxLength="8" value={d.passportNumber} onChange={(e) => set({ passportNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} className={`${inputCls(err.tr_passportNumber)} uppercase`} placeholder="A1234567" />
+        </Field>
+        <FileInput label="Upload Passport Front (Mandatory)" required name="tr_passportFront" value={d.passportFront} error={err.tr_passportFront} onChange={(file) => set({ passportFront: file })} />
+        <FileInput label="Upload Passport Back (Mandatory)" required name="tr_passportBack" value={d.passportBack} error={err.tr_passportBack} onChange={(file) => set({ passportBack: file })} />
+        <Field label="Any pre-existing disease(s)?" required error={err.tr_hasPED}>
+          <Select data-field="tr_hasPED" options={YES_NO} value={d.hasPED} onChange={(e) => set({ hasPED: e.target.value, pedDetails: e.target.value === "Yes" ? d.pedDetails : "" })} className={inputCls(err.tr_hasPED)} />
+        </Field>
+        {d.hasPED === "Yes" && (
+          <Field label="Pre-existing disease details" required error={err.tr_pedDetails} className="sm:col-span-2">
+            <input data-field="tr_pedDetails" type="text" value={d.pedDetails} onChange={(e) => set({ pedDetails: e.target.value })} className={inputCls(err.tr_pedDetails)} />
+          </Field>
+        )}
+        <Field label="Indian Citizen?" required error={err.tr_indianCitizen}>
+          <Select data-field="tr_indianCitizen" options={YES_NO} value={d.indianCitizen} onChange={(e) => set({ indianCitizen: e.target.value })} className={inputCls(err.tr_indianCitizen)} />
+        </Field>
+        {d.indianCitizen === "Yes" && (
+          <>
+            <Field label="Aadhaar Number" error={err.tr_aadhaarNumber}>
+              <input data-field="tr_aadhaarNumber" type="text" inputMode="numeric" maxLength="12" value={d.aadhaarNumber} onChange={(e) => set({ aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} className={inputCls(err.tr_aadhaarNumber)} />
+            </Field>
+            <FileInput label="Upload Aadhaar (Not Mandatory)" name="tr_aadhaarFile" value={d.aadhaarFile} onChange={(file) => set({ aadhaarFile: file })} />
+          </>
+        )}
       </div>
 
-      <h4 className="text-md font-semibold text-indigo-600 mt-6 mb-3">Traveler's Details</h4>
-      {details.travelers.map((t, i) => {
-        const p = `tr_t${i}_`;
-        return (
-          <div key={i} className="border rounded-lg p-4 mb-4 bg-gray-50">
-            <div className="flex justify-between items-center mb-3">
-              <h5 className="font-medium text-gray-700">Traveler {i + 1}</h5>
-              {details.travelers.length > 1 && (
-                <button type="button" onClick={() => set({ travelers: details.travelers.filter((_, idx) => idx !== i) })}
-                  className="text-red-600 text-xs flex items-center gap-1"><FaTrash /> Remove</button>
-              )}
+      <div className="mt-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-medium text-gray-700">Other Travellers ({(d.companions || []).length})</p>
+          <button type="button" onClick={() => set({ companions: [...(d.companions || []), emptyCompanion()] })} className="text-xs px-3 py-1 rounded-md border border-indigo-300 text-indigo-700 hover:bg-indigo-50 flex items-center gap-1">
+            <FaPlus /> Add Traveller
+          </button>
+        </div>
+        {(d.companions || []).map((c, i) => {
+          const k = (f) => `tr_c${i}_${f}`;
+          return (
+            <div key={i} className="border rounded-lg p-3 mb-3 bg-gray-50">
+              <div className="flex items-center justify-between mb-2">
+                <h5 className="font-medium text-gray-700 text-sm">Traveller {i + 2}</h5>
+                <button type="button" aria-label={`Remove traveller ${i + 2}`} onClick={() => set({ companions: d.companions.filter((_, x) => x !== i) })} className="text-red-500 hover:text-red-700"><FaTrash /></button>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Field label="Name (as per Passport)" required error={err[k("fullName")]}>
+                  <input data-field={k("fullName")} type="text" value={c.fullName} onChange={(e) => setCompanion(i, { fullName: e.target.value.toUpperCase() })} className={`${inputCls(err[k("fullName")])} uppercase`} />
+                </Field>
+                <Field label="DOB" required error={err[k("dob")]}>
+                  <input data-field={k("dob")} type="date" max={today} value={c.dob} onChange={(e) => setCompanion(i, { dob: e.target.value })} className={inputCls(err[k("dob")])} />
+                </Field>
+                <Field label="Relationship" required error={err[k("relationship")]}>
+                  <Select data-field={k("relationship")} options={COMPANION_RELATIONS} value={c.relationship} onChange={(e) => setCompanion(i, { relationship: e.target.value })} className={inputCls(err[k("relationship")])} />
+                </Field>
+                <Field label="Passport No" required error={err[k("passportNumber")]}>
+                  <input data-field={k("passportNumber")} type="text" maxLength="8" value={c.passportNumber} onChange={(e) => setCompanion(i, { passportNumber: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "") })} className={`${inputCls(err[k("passportNumber")])} uppercase`} />
+                </Field>
+                <FileInput label="Passport Front (Mandatory)" required name={k("passportFront")} value={c.passportFront} error={err[k("passportFront")]} onChange={(file) => setCompanion(i, { passportFront: file })} />
+                <FileInput label="Passport Back (Mandatory)" required name={k("passportBack")} value={c.passportBack} error={err[k("passportBack")]} onChange={(file) => setCompanion(i, { passportBack: file })} />
+              </div>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              <Field label="Relationship with Proposer" required error={errors[p + "relationship"]}
-                hint={t.relationship === "Self" ? "Details filled from the lead" : undefined}>
-                <Select {...f(p + "relationship")} value={t.relationship} options={RELATIONS} onChange={(e) => onRelation(i, e.target.value)} />
-              </Field>
-              <Field label="Name (as per Passport)" required error={errors[p + "fullName"]}>
-                <input {...f(p + "fullName")} className={inputCls(errors[p + "fullName"]) + " uppercase"} value={t.fullName}
-                  onChange={(e) => setTraveler(i, { fullName: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="DOB" required error={errors[p + "dob"]}>
-                <input {...f(p + "dob")} type="date" max={todayStr()} value={t.dob} onChange={(e) => setTraveler(i, { dob: e.target.value })} />
-              </Field>
-              <Field label="Sum Insured" required error={errors[p + "sumInsured"]}>
-                <Select {...f(p + "sumInsured")} value={t.sumInsured} options={SUM_INSURED} onChange={(e) => setTraveler(i, { sumInsured: e.target.value })} />
-              </Field>
-              <Field label="Select Product" required error={errors[p + "product"]}>
-                <Select {...f(p + "product")} value={t.product} options={PRODUCTS} onChange={(e) => setTraveler(i, { product: e.target.value })} />
-              </Field>
-              <Field label="Add-on (manual)">
-                <input className={inputCls(false)} value={t.addon} onChange={(e) => setTraveler(i, { addon: e.target.value })} />
-              </Field>
-              <Field label="PAN No. (Not Mandatory)" error={errors[p + "panNumber"]}>
-                <input {...f(p + "panNumber")} className={inputCls(errors[p + "panNumber"]) + " uppercase"} value={t.panNumber} maxLength={10} placeholder="ABCDE1234F"
-                  onChange={(e) => setTraveler(i, { panNumber: e.target.value.toUpperCase().slice(0, 10) })} />
-              </Field>
-              <FileInput label="Upload PAN (Not Mandatory)" name={p + "panFile"} value={t.panFile} onChange={(file) => setTraveler(i, { panFile: file })} />
-              <Field label="Aadhaar No. (Not Mandatory)" error={errors[p + "aadhaarNumber"]}>
-                <input {...f(p + "aadhaarNumber")} value={t.aadhaarNumber} maxLength={12} placeholder="12 digits"
-                  onChange={(e) => setTraveler(i, { aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} />
-              </Field>
-              <FileInput label="Upload Aadhaar (Not Mandatory)" name={p + "aadhaarFile"} value={t.aadhaarFile} onChange={(file) => setTraveler(i, { aadhaarFile: file })} />
-              <Field label="Passport No." required error={errors[p + "passportNumber"]}>
-                <input {...f(p + "passportNumber")} className={inputCls(errors[p + "passportNumber"]) + " uppercase"} value={t.passportNumber} maxLength={8} placeholder="A1234567"
-                  onChange={(e) => setTraveler(i, { passportNumber: e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 8) })} />
-              </Field>
-              <FileInput label="Upload Passport" required name={p + "passportFile"} error={errors[p + "passportFile"]}
-                value={t.passportFile} onChange={(file) => setTraveler(i, { passportFile: file })} />
-              <Field label="Area PIN Code" required error={errors[p + "pinCode"]}>
-                <input {...f(p + "pinCode")} value={t.pinCode} maxLength={6}
-                  onChange={(e) => setTraveler(i, { pinCode: e.target.value.replace(/\D/g, "").slice(0, 6) })} />
-              </Field>
-              <Field label="Address (as per Passport)" required error={errors[p + "address"]} className="lg:col-span-2">
-                <textarea {...f(p + "address")} rows={2} value={t.address} onChange={(e) => setTraveler(i, { address: e.target.value })} />
-              </Field>
-              <Field label="Mobile No." required error={errors[p + "mobile"]}>
-                <input {...f(p + "mobile")} value={t.mobile} maxLength={10}
-                  onChange={(e) => setTraveler(i, { mobile: e.target.value.replace(/\D/g, "").slice(0, 10) })} />
-              </Field>
-              <Field label="e-Mail ID" required error={errors[p + "email"]}>
-                <input {...f(p + "email")} type="email" value={t.email} onChange={(e) => setTraveler(i, { email: e.target.value })} />
-              </Field>
-              <Field label="Gender" required error={errors[p + "gender"]}>
-                <Select {...f(p + "gender")} value={t.gender} options={GENDERS} onChange={(e) => setTraveler(i, { gender: e.target.value })} />
-              </Field>
-              <Field label="Nominee Name" required error={errors[p + "nomineeName"]}>
-                <input {...f(p + "nomineeName")} className={inputCls(errors[p + "nomineeName"]) + " uppercase"} value={t.nomineeName}
-                  onChange={(e) => setTraveler(i, { nomineeName: e.target.value.toUpperCase() })} />
-              </Field>
-              <Field label="Nominee Relation with IP" required error={errors[p + "nomineeRelation"]}>
-                <Select {...f(p + "nomineeRelation")} value={t.nomineeRelation} options={NOMINEE_RELATIONS} onChange={(e) => setTraveler(i, { nomineeRelation: e.target.value })} />
-              </Field>
-              <Field label="Nominee DOB" required error={errors[p + "nomineeDOB"]}>
-                <input {...f(p + "nomineeDOB")} type="date" max={todayStr()} value={t.nomineeDOB} onChange={(e) => setTraveler(i, { nomineeDOB: e.target.value })} />
-              </Field>
-            </div>
-          </div>
-        );
-      })}
-
-      <button type="button" onClick={() => set({ travelers: [...details.travelers, emptyTraveler()] })}
-        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg text-sm flex items-center gap-2 hover:bg-indigo-100">
-        <FaPlus /> Add Traveler
-      </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
+
+// ============================================================
+// POLICY ISSUANCE MODULE
+// ============================================================
+export function TravelIssuanceSection({ details: d, setDetails, errors: err = {} }) {
+  const set = (patch) => setDetails((p) => ({ ...p, ...patch }));
+  // remarks start from the PED noted at the Quote
+  useEffect(() => {
+    if (!d.issuanceRemarks && d.hasPED === "Yes" && d.pedDetails) set({ issuanceRemarks: d.pedDetails });
+  }, [d.pedDetails]); // eslint-disable-line react-hooks/exhaustive-deps
+  const ro = `${inputCls()} bg-gray-100`;
+  return (
+    <div>
+      <h4 className="text-md font-semibold text-indigo-600 mb-3">Proposer Details</h4>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <Field label="Name" hint="From the Quote"><input type="text" readOnly value={d.proposerName} className={ro} /></Field>
+        <Field label="DOB" hint="From the Quote"><input type="date" readOnly value={d.proposerDOB} className={ro} /></Field>
+        <Field label="Relationship"><input type="text" readOnly value="Self" className={ro} /></Field>
+        <Field label="Marital Status" required error={err.tr_maritalStatus}>
+          <Select data-field="tr_maritalStatus" options={TRAVEL_MARITAL} value={d.maritalStatus} onChange={(e) => set({ maritalStatus: e.target.value })} className={inputCls(err.tr_maritalStatus)} />
+        </Field>
+        <Field label="Passport Number" hint="From the Quote"><input type="text" readOnly value={d.passportNumber} className={`${ro} uppercase`} /></Field>
+        <FileInput label="Passport Front (Mandatory)" required name="tr_passportFront" value={d.passportFront} error={err.tr_passportFront} onChange={(file) => set({ passportFront: file })} />
+        <FileInput label="Passport Back (Mandatory)" required name="tr_passportBack" value={d.passportBack} onChange={(file) => set({ passportBack: file })} />
+        <Field label="Aadhaar Number" error={err.tr_aadhaarNumber}>
+          <input data-field="tr_aadhaarNumber" type="text" inputMode="numeric" maxLength="12" value={d.aadhaarNumber} onChange={(e) => set({ aadhaarNumber: e.target.value.replace(/\D/g, "").slice(0, 12) })} className={inputCls(err.tr_aadhaarNumber)} />
+        </Field>
+        <FileInput label="Upload Aadhaar (Not Mandatory)" name="tr_aadhaarFile" value={d.aadhaarFile} onChange={(file) => set({ aadhaarFile: file })} />
+        <Field label="Any Additional Cover?" className="sm:col-span-2 lg:col-span-3">
+          <div className="p-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-700 min-h-[38px]">
+            {d.additionalCovers === "Required" ? `Required — ${d.addonRemarks}` : d.additionalCovers || "—"}
+            {d.plan ? ` · Plan: ${d.plan}` : ""}{d.sumInsured ? ` · Sum Insured: ${sumInsuredLabel(d.sumInsured)}` : ""}
+          </div>
+        </Field>
+        <Field label="Remarks (PED / Treatment)" className="sm:col-span-2 lg:col-span-3">
+          <textarea rows="2" value={d.issuanceRemarks} onChange={(e) => set({ issuanceRemarks: e.target.value })} className={inputCls()} />
+        </Field>
+      </div>
+      {(d.companions || []).length > 0 && (
+        <p className="text-xs text-gray-500 mt-3">
+          Also travelling: {d.companions.map((c) => `${c.fullName} (${c.relationship})`).join(", ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
+export default TravelQuoteSection;

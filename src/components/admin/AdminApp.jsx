@@ -1,10 +1,13 @@
 // src/components/AdminApp.jsx
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, useLayoutEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import axios from 'axios';
 import Sidebar from './Sidebar';
-import Dashboard from './Dashboard';
+import BrdDashboard from '../dashboard/BrdDashboard'; // TERM LOB & Dashboard BRD
+import CpOnboardingAdmin from '../cp/CpOnboardingAdmin'; // Channel Partner Onboarding BRD
+import AssignedAccess from '../access/AssignedAccess';
+import { useMyAccess, moduleRoot, isRealAdmin, setActingModule } from '../access/myAccess';
 import LeadTable from './LeadTable';
 import TaskList from './TaskList';
 import Analytics from './Analytics';
@@ -20,8 +23,10 @@ import assets from '../../assets/assets';
 import SalarySlipGenerator from './SalarySlipGenerator';
 import WelcomeLetterGenerator from './WelcomeLetterGenerator';
 import EmployeeLeads from './EmployeeLeads'; // ← ADDED
+import PolicyReports from '../reports/PolicyReports';
+import MyHR from '../hr/MyHR';
 
-function AdminApp({ handleLogout }) {
+function AdminApp({ handleLogout, embedded = false, embeddedTab = '' }) {
   const navigate = useNavigate();
   const location = useLocation();
   const token = localStorage.getItem('token');
@@ -33,6 +38,30 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
+      'hr-offers': '/admin/my-hr/offers',
+      'hr-validation': '/admin/my-hr/validation',
+      'hr-employees': '/admin/my-hr/employees',
+      'hr-attendance': '/admin/my-hr/attendance',
+      'hr-salary': '/admin/my-hr/salary',
+      'hr-slips': '/admin/my-hr/slips',
+      'hr-promotions': '/admin/my-hr/promotions',
+      'hr-settings': '/admin/my-hr/settings',
+      'cp-onboarding': '/admin/cp-onboarding',
+      'access': '/admin/assigned-access',
+      'hr-holidays': '/admin/my-hr/holidays',
+      'hr-assets': '/admin/my-hr/assets',
+      'hr-confirmation': '/admin/my-hr/confirmation',
+      'hr-exits': '/admin/my-hr/exits',
+      'hr-relieving': '/admin/my-hr/relieving',
+      'hr-documents': '/admin/my-hr/documents',
+      'reports-quoteProgress': '/admin/reports/quote-progress',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -51,7 +80,33 @@ function AdminApp({ handleLogout }) {
   }, [location.pathname]);
 
   const [leads, setLeads] = useState([]);
-  const [activeTab, setActiveTab] = useState(initialTab);
+  const [activeTab, setActiveTab] = useState(embedded && embeddedTab ? embeddedTab : initialTab);
+  useEffect(() => { if (embedded && embeddedTab) setActiveTab(embeddedTab); }, [embedded, embeddedTab]);
+  const { ready: accessReady, can, adminModules } = useMyAccess(); // Assigned Access
+  // ---- "Admin Rights" mode: an Employee / CP using the Admin modules assigned to them ----
+  const elevated = !isRealAdmin();
+  const actingRef = useRef(moduleRoot(activeTab));
+  actingRef.current = moduleRoot(activeTab);
+  // useLayoutEffect: installed before any module screen's first fetch (child effects run before the parent's useEffect)
+  useLayoutEffect(() => {
+    if (!elevated) return undefined;
+    // every request says which module it is for; the server grants Admin rights for that module only
+    const id = axios.interceptors.request.use((cfg) => { cfg.headers = cfg.headers || {}; if (!cfg.headers['X-Acting-Module']) cfg.headers['X-Acting-Module'] = actingRef.current; return cfg; });
+    const original = globalThis.fetch;
+    globalThis.fetch = (input, init = {}) => {
+      const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+      if (!headers.has('X-Acting-Module')) headers.set('X-Acting-Module', actingRef.current);
+      return original(input, { ...init, headers });
+    };
+    return () => { axios.interceptors.request.eject(id); globalThis.fetch = original; };
+  }, [elevated]);
+  // the lead form (and other module screens) treat the user as Admin for the module being worked in
+  useLayoutEffect(() => { if (elevated) setActingModule(moduleRoot(activeTab)); }, [elevated, activeTab]);
+  useLayoutEffect(() => () => setActingModule(null), []);
+  useEffect(() => { // an unassigned module -> the first assigned one, through the address (setting the tab alone fought the URL sync and blinked)
+    if (embedded || !elevated || !accessReady || can(activeTab) || !adminModules.length) return;
+    navigate(tabPathMap[adminModules[0]] || '/admin', { replace: true });
+  }, [embedded, elevated, accessReady, activeTab, adminModules]); // eslint-disable-line react-hooks/exhaustive-deps
   const [filter, setFilter] = useState('All');
   const [isAdmin] = useState(true);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
@@ -68,6 +123,30 @@ function AdminApp({ handleLogout }) {
       dashboard: '/admin',
       leads: '/admin/leads',
       'employee-leads': '/admin/employee-leads', // ← ADDED
+      reports: '/admin/reports',
+      'reports-leads': '/admin/reports/leads',
+      'reports-active': '/admin/reports/active',
+      'reports-expired': '/admin/reports/expired',
+      'reports-renewal': '/admin/reports/renewal',
+      'reports-emi': '/admin/reports/emi',
+      'reports-all': '/admin/reports/all',
+      'hr-offers': '/admin/my-hr/offers',
+      'hr-validation': '/admin/my-hr/validation',
+      'hr-employees': '/admin/my-hr/employees',
+      'hr-attendance': '/admin/my-hr/attendance',
+      'hr-salary': '/admin/my-hr/salary',
+      'hr-slips': '/admin/my-hr/slips',
+      'hr-promotions': '/admin/my-hr/promotions',
+      'hr-settings': '/admin/my-hr/settings',
+      'cp-onboarding': '/admin/cp-onboarding',
+      'access': '/admin/assigned-access',
+      'hr-holidays': '/admin/my-hr/holidays',
+      'hr-assets': '/admin/my-hr/assets',
+      'hr-confirmation': '/admin/my-hr/confirmation',
+      'hr-exits': '/admin/my-hr/exits',
+      'hr-relieving': '/admin/my-hr/relieving',
+      'hr-documents': '/admin/my-hr/documents',
+      'reports-quoteProgress': '/admin/reports/quote-progress',
       tasks: '/admin/tasks',
       analytics: '/admin/analytics',
       users: '/admin/users',
@@ -94,8 +173,10 @@ function AdminApp({ handleLogout }) {
   useEffect(() => {
     const fetchUsers = async () => {
       try {
+        const acting = elevated ? (can('users') ? 'users' : can('attendance') ? 'attendance' : '') : '';
+        if (elevated && !acting) { setLoadingUsers(false); return; } // no Users / Attendance rights: no user list needed
         const res = await axios.get(`${import.meta.env.VITE_BACKEND_URL}/api/auth/users`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${token}`, ...(acting ? { 'X-Acting-Module': acting } : {}) },
         });
         setUserList(res.data);
         setLoadingUsers(false);
@@ -105,16 +186,17 @@ function AdminApp({ handleLogout }) {
         setLoadingUsers(false);
       }
     };
-    if (token) {
+    if (token && accessReady) {
       fetchUsers();
-    } else {
+    } else if (!token) {
       setErrorUsers('No authentication token found. Please log in.');
       setLoadingUsers(false);
     }
-  }, [token]);
+  }, [token, accessReady]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Sync activeTab with URL and navigate
+  // Sync activeTab with URL and navigate (not when embedded in the employee's CRM)
   useEffect(() => {
+    if (embedded) return;
     const pathname = location.pathname;
     const mappedTab = pathToTab(pathname);
 
@@ -128,7 +210,7 @@ function AdminApp({ handleLogout }) {
         navigate(desiredPath, { replace: true });
       }
     }
-  }, [location.pathname, activeTab, navigate, pathToTab, tabPathMap]);
+  }, [location.pathname, activeTab, navigate, pathToTab, tabPathMap, embedded]);
 
   // Sidebar open/close on resize
   useEffect(() => {
@@ -224,6 +306,84 @@ function AdminApp({ handleLogout }) {
     return descriptions[activeTab] || 'Manage your CRM efficiently';
   }, [activeTab]);
 
+  // the selected module (inside the Admin layout, or alone when embedded in an employee's CRM)
+  const moduleArea = (
+    <>
+          {loadingUsers && <p>Loading users...</p>}
+          {errorUsers && <p className="text-red-600">{errorUsers}</p>}
+          {!loadingUsers && !errorUsers && (
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                transition={{ duration: 0.3 }}
+                className="min-h-[calc(100vh-200px)]"
+              >
+                {elevated && accessReady && !embedded && (
+                  <div className="mx-4 mt-3 mb-1 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-sm text-indigo-800" data-admin-rights-banner>
+                    <span>Admin Rights — you see only the modules assigned to you.</span>
+                    <button type="button" onClick={() => navigate('/')} className="underline">Back to my CRM</button>
+                  </div>
+                )}
+                {accessReady && !can(activeTab) ? <div className="p-8 text-center" data-no-access><h2 className="text-lg font-semibold text-gray-700">You don't have access to this module</h2><p className="text-sm text-gray-500 mt-1">Ask your Admin to assign it in Assigned Access.</p></div> : <>
+                {activeTab === 'access' && <AssignedAccess />}
+                {activeTab === 'dashboard' && <BrdDashboard />}
+                {activeTab === 'cp-onboarding' && <CpOnboardingAdmin />}
+                {activeTab === 'leads' && (
+                  <LeadTable
+                    leads={leads}
+                    filter={filter}
+                    setFilter={setFilter}
+                    setSelectedLead={setSelectedLead}
+                    users={userList}
+                    onAssignLead={handleAssignLead}
+                    onAddLead={handleAddLead}
+                  />
+                )}
+                {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
+                {activeTab.startsWith('hr-') && <MyHR key={activeTab} section={activeTab.replace('hr-', '')} />}
+                {(activeTab === 'reports' || activeTab.startsWith('reports-')) && (
+                  <PolicyReports key={activeTab} report={activeTab === 'reports' ? 'leads' : activeTab.replace('reports-', '')} />
+                )}
+                {activeTab === 'tasks' && (
+                  <TaskList
+                    tasks={taskList}
+                    newTask={newTask}
+                    setNewTask={setNewTask}
+                    handleAddTask={handleAddTask}
+                  />
+                )}
+                {activeTab === 'analytics' && <Analytics leads={leads} />}
+                {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
+                {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
+                {activeTab === 'invoice' && <InvoiceGenerator />}
+                {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
+                {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
+                {/* {activeTab === 'policy-upload' && <PolicyUpload />} */}
+                {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />}
+                              </>}
+              </motion.div>
+            </AnimatePresence>
+          )}
+    </>
+  );
+  const leadModal = (
+      <AnimatePresence>
+        {selectedLead && (
+          <LeadModal
+            lead={selectedLead}
+            setSelectedLead={setSelectedLead}
+            activities={activities}
+            users={userList}
+            onAssignLead={handleAssignLead}
+          />
+        )}
+      </AnimatePresence>
+  );
+  if (embedded) return <div className="pt-2" data-embedded-admin>{moduleArea}{leadModal}</div>;
+
   // Render
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100 flex relative">
@@ -294,64 +454,11 @@ function AdminApp({ handleLogout }) {
             </div>
           </motion.div>
 
-          {loadingUsers && <p>Loading users...</p>}
-          {errorUsers && <p className="text-red-600">{errorUsers}</p>}
-          {!loadingUsers && !errorUsers && (
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={activeTab}
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.3 }}
-                className="min-h-[calc(100vh-200px)]"
-              >
-                {activeTab === 'dashboard' && <Dashboard leads={leads} activities={activities} />}
-                {activeTab === 'leads' && (
-                  <LeadTable
-                    leads={leads}
-                    filter={filter}
-                    setFilter={setFilter}
-                    setSelectedLead={setSelectedLead}
-                    users={userList}
-                    onAssignLead={handleAssignLead}
-                    onAddLead={handleAddLead}
-                  />
-                )}
-                {activeTab === 'employee-leads' && <EmployeeLeads />} {/* ← ADDED */}
-                {activeTab === 'tasks' && (
-                  <TaskList
-                    tasks={taskList}
-                    newTask={newTask}
-                    setNewTask={setNewTask}
-                    handleAddTask={handleAddTask}
-                  />
-                )}
-                {activeTab === 'analytics' && <Analytics leads={leads} />}
-                {activeTab === 'users' && isAdmin && <UserManagement users={userList} setUsers={setUserList} />}
-                {activeTab === 'attendance' && isAdmin && <AdminAttendance users={userList} />}
-                {activeTab === 'invoice' && <InvoiceGenerator />}
-                {activeTab === 'vehicle-admin' && <VehicleAdmin isAdmin={isAdmin} />}
-                {activeTab === 'salary-slip' && <SalarySlipGenerator isAdmin={isAdmin} />}
-                {/* {activeTab === 'policy-upload' && <PolicyUpload />} */}
-                {activeTab === 'welcome-letter' && <WelcomeLetterGenerator />}
-              </motion.div>
-            </AnimatePresence>
-          )}
+          {moduleArea}
         </div>
       </div>
 
-      <AnimatePresence>
-        {selectedLead && (
-          <LeadModal
-            lead={selectedLead}
-            setSelectedLead={setSelectedLead}
-            activities={activities}
-            users={userList}
-            onAssignLead={handleAssignLead}
-          />
-        )}
-      </AnimatePresence>
+      {leadModal}
     </div>
   );
 }

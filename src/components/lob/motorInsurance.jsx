@@ -1,4 +1,5 @@
 // src/lob/motorInsurance.js
+import { getActingModule } from "../access/myAccess";
 // Shared Motor Insurance helpers used by LeadTable.jsx and EmployeeLeads.jsx
 // (placed next to PersonalAccidentForm.jsx / TravelInsuranceForm.jsx so the
 //  existing "../lob/..." import path works from both components)
@@ -215,6 +216,8 @@ export const MOTOR_POLICY_TYPE_LABELS = {
 export const MOTOR_FUEL_OPTIONS = ["Petrol", "CNG", "Diesel", "Electric", "Hybrid-Electric"];
 export const OWNER_TYPE_OPTIONS = ["Individual", "Corporate"];
 export const TP_ADDON_OPTIONS = ["Owner-Driver PA", "Not Required"];
+// Exclusive choice in the add-on pickers: picking it clears the add-ons, picking an add-on clears it
+export const NO_ADDON = "No Add-on Required";
 // Payment "Status" for motor (BRD) — replaces At UW / e-Mandate used for health
 export const MOTOR_ISSUANCE_STATUS_OPTIONS = ["Policy Issued", "Awaited for Inspection", "Inspection Done - Waiting for Policy"];
 // Shown to users as "Not Active"; stored as "Expired" so older records stay valid
@@ -470,6 +473,8 @@ const isAdminValue = (v) => typeof v === "string" && v.trim().toLowerCase() === 
 
 export const isAdminUser = () => {
   try {
+    // Admin Rights: an Employee / CP working inside an Admin module assigned to them (the server checks it too)
+    if (getActingModule()) return true;
     if (typeof localStorage === "undefined") return false;
 
     // 1. Plain keys

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
-import { Routes, Route, useNavigate } from "react-router-dom";
+import { Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { useMyAccess, PATH_MODULE } from "../access/myAccess";
+import RightsArea from "../access/RightsArea";
+import BrdDashboard from "../dashboard/BrdDashboard";
 import Navbar from "./Navbar";
-import UserDashboard from "./UserDashboard";
 import UserLeadTable from "./UserLeadTable";
 import UserTaskList from "./UserTaskList";
 import UserProfile from "./UserProfile";
@@ -17,8 +19,12 @@ import {
   campaigns,
 } from "../../data/mockData";
 import EmployeeSalarySlipViewer from "./EmployeeSalarySlipViewer";
+import PolicyReports from "../reports/PolicyReports";
+import MyHrSelf from "../hr/MyHrSelf";
 
 function UserApp({ handleLogout }) {
+  const location = useLocation();
+  const { ready: accessReady, can } = useMyAccess(); // Assigned Access
   const [activeTab, setActiveTab] = useState("home");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [filter, setFilter] = useState("All");
@@ -125,15 +131,12 @@ function UserApp({ handleLogout }) {
 
       <div className="flex-1 flex flex-col">
         <div className="pt-16">
-          <Routes>
+          {accessReady && PATH_MODULE[location.pathname] && !can(PATH_MODULE[location.pathname]) ? <div className="p-8 text-center" data-no-access><h2 className="text-lg font-semibold text-gray-700">You don't have access to this module</h2><p className="text-sm text-gray-500 mt-1">Ask your Admin to assign it in Assigned Access.</p></div> : <Routes>
+            <Route path="/rights/*" element={<RightsArea handleLogout={handleUserLogout} />} />
             <Route
               path="/"
               element={
-                <UserDashboard
-                  leads={leads}
-                  activities={activities}
-                  user={currentUser}
-                />
+                <BrdDashboard self />
               }
             />
             <Route
@@ -181,7 +184,9 @@ function UserApp({ handleLogout }) {
             <Route path="/vehicle-quote" element={<VehicleQuote user={currentUser} />} />
             <Route path="/salary-slip" element={<EmployeeSalarySlipViewer user={currentUser} />} />
             <Route path="/quote" element={<Quote user={currentUser} />} />
-          </Routes>
+            <Route path="/reports" element={<PolicyReports />} />
+            <Route path="/my-hr" element={<MyHrSelf />} />
+          </Routes>}
         </div>
       </div>
     </div>

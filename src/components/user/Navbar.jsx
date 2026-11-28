@@ -1,4 +1,6 @@
 import { useState, useEffect } from "react";
+import { useMyAccess, PATH_MODULE } from "../access/myAccess"; // Assigned Access
+import { FaUserShield } from "react-icons/fa";
 import {
   FaBars,
   FaTimes,
@@ -11,25 +13,30 @@ import {
   FaMoneyCheckAlt,
   FaSignOutAlt,
   FaChartBar,
+  FaChartLine,
+  FaIdBadge,
 } from "react-icons/fa";
 import { useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import assets from "../../assets/assets";
 
 function Navbar({ activeTab, setActiveTab, handleLogout, username, user }) {
+  const { can, adminModules } = useMyAccess();
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const tabs = [
     { name: "Dashboard", icon: FaChartBar, path: "/" },
     { name: "Leads", icon: FaUsers, path: "/leads" },
+    { name: "Reports", icon: FaChartLine, path: "/reports" },
+    { name: "My HR", icon: FaIdBadge, path: "/my-hr" },
     { name: "Tasks", icon: FaClipboardList, path: "/tasks" },
     { name: "Salary Slip", icon: FaMoneyCheckAlt, path: "/salary-slip" },
     { name: "Quote", icon: FaBullhorn, path: "/quote" },
     { name: "Profile", icon: FaUser, path: "/profile" },
     { name: "Activity", icon: FaChartPie, path: "/activity" },
     { name: "Attendance", icon: FaClock, path: "/attendance" },
-  ];
+  ].filter((t) => can(PATH_MODULE[t.path])).concat(adminModules.length ? [{ name: "Admin Rights", icon: FaUserShield, path: "/rights" }] : []); // Assigned Access
 
   const navigate = useNavigate();
   const location = useLocation();

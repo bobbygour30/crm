@@ -1,0 +1,55 @@
+// src/components/access/myAccess.js — the signed-in user's assigned modules (Assigned Access)
+// Until Admin customises a user, the server returns every module of their app, so nothing changes.
+import { useEffect, useState } from "react";
+
+const API = import.meta.env.VITE_BACKEND_URL;
+// employee / CP app: page path -> module key
+export const PATH_MODULE = { "/": "u-dashboard", "/leads": "u-leads", "/reports": "u-reports", "/my-hr": "u-my-hr", "/tasks": "u-tasks", "/salary-slip": "u-salary-slip", "/quote": "u-quote", "/profile": "u-profile", "/activity": "u-activity", "/attendance": "u-attendance" };
+
+let cache = null;      // { customized, modules }
+let pending = null;
+
+export const loadMyAccess = (force = false) => {
+  if (cache && !force) return Promise.resolve(cache);
+  if (pending && !force) return pending;
+  pending = fetch(`${API}/api/access/me`, { headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } })
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => { cache = d && Array.isArray(d.modules) ? { adminModules: [], ...d } : { customized: false, modules: [], adminModules: [] }; return cache; })
+    .catch(() => { cache = { customized: false, modules: [], adminModules: [] }; return cache; }) // can't reach the server: keep the menus
+    .finally(() => { pending = null; });
+  return pending;
+};
+export const resetMyAccess = () => { cache = null; };
+
+/** a parent ("hr", "reports") is allowed when any of its children is */
+export const canAccess = (access, key) => {
+  if (!access || !access.customized) return true;
+  const list = access.modules || [];
+  return list.includes(key) || list.some((k) => k.startsWith(`${key}-`));
+};
+
+export function useMyAccess() {
+  const [access, setAccess] = useState(cache);
+  useEffect(() => { let on = true; loadMyAccess().then((a) => { if (on) setAccess(a); }); return () => { on = false; }; }, []);
+  return { ready: !!access, access, can: (key) => canAccess(access, key), adminModules: (access && access.adminModules) || [] };
+}
+
+/** Admin-panel tab -> module the server checks ("hr-salary" -> "hr", "reports-emi" -> "reports") */
+export const moduleRoot = (tab) => String(tab || "").replace(/^(hr|reports)-.*$/, "$1");
+// ---- Admin Rights: the Admin module an Employee / CP is working in right now ----
+let actingModule = null;
+export const setActingModule = (key) => { actingModule = key || null; };
+export const getActingModule = () => actingModule;
+
+/** labels for the Admin Rights tabs (the server's catalog holds the same modules) */
+export const ADMIN_LABELS = {
+  dashboard: "Admin Dashboard", leads: "Policy Punch", "employee-leads": "Employee Leads", "cp-onboarding": "CP Onboarding", hr: "My HR (Admin)", reports: "Reports (Admin)",
+  tasks: "Tasks", invoice: "Invoice", "salary-slip": "Salary Slip", "welcome-letter": "Portable Equipments", "vehicle-admin": "Vehicle Admin", users: "Users", attendance: "Attendance", access: "Assigned Access",
+  "hr-offers": "Offer Letters", "hr-validation": "Document Validation", "hr-employees": "Employees", "hr-attendance": "HR Attendance", "hr-holidays": "Holiday Calendar", "hr-salary": "Salary Register",
+  "hr-slips": "HR Salary Slip", "hr-promotions": "Promotion & Hike", "hr-assets": "Assets", "hr-confirmation": "Confirmation Letter", "hr-exits": "Employee Exit", "hr-relieving": "Relieving Letter",
+  "hr-documents": "Documents", "hr-settings": "Settings", "reports-leads": "Leads", "reports-quoteProgress": "Quote Under Progress", "reports-active": "Active Policy", "reports-expired": "Expired Policy",
+  "reports-renewal": "Renewal Alert", "reports-emi": "EMI Due", "reports-all": "All Data",
+};
+
+/** true for real Admins (the login flag) */
+export const isRealAdmin = () => localStorage.getItem("isAdmin") === "true";
